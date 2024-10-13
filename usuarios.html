@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firestore User Management</title>
+
+    <!-- Import Firebase SDK (v8 with namespaced API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        input, button, label {
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: left;
+        }
+        th, td {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Firestore User Management</h1>
+
+        <!-- Form to create or update a user -->
+        <input type="text" id="username" placeholder="Username" />
+        <input type="password" id="password" placeholder="Password" />
+        <input type="text" id="fullName" placeholder="Full Name" />
+        <label>
+            <input type="checkbox" id="isAdmin" /> Is Admin
+        </label>
+        <button onclick="addOrUpdateUser()">Add/Update User</button>
+
+        <!-- Table to display users -->
+        <h2>Existing Users</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th>Admin</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTable">
+                <!-- User rows will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Firebase configuration from your project
+        const firebaseConfig = {
+            apiKey: "AIzaSyBUMnzUEqWQ8I7xyx99r0_4lKdKhgmFlfY",
+            authDomain: "facturacion-667e6.firebaseapp.com",
+            projectId: "facturacion-667e6",
+            storageBucket: "facturacion-667e6.appspot.com",
+            messagingSenderId: "113022628074",
+            appId: "1:113022628074:web:2fc742d06e1979b013e793",
+            measurementId: "G-4JR1R0PLCM"
+        };
+
+        // Initialize Firebase (Namespaced API v8)
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Function to add or update user
+        function addOrUpdateUser() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('fullName').value;
+            const isAdmin = document.getElementById('isAdmin').checked ? 1 : 0;
+
+            if (username) {
+                db.collection("users").doc(username).set({
+                    username: username,
+                    password: password,
+                    fullName: fullName,
+                    admin: isAdmin
+                }).then(() => {
+                    alert("User added/updated successfully");
+                    loadUsers();
+                }).catch((error) => {
+                    console.error("Error adding/updating user: ", error);
+                });
+            } else {
+                alert("Username is required");
+            }
+        }
+
+        // Function to load users
+        function loadUsers() {
+            db.collection("users").get().then((querySnapshot) => {
+                const userTable = document.getElementById('userTable');
+                userTable.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const user = doc.data();
+                    const row = `<tr>
+                                    <td>${user.username}</td>
+                                    <td>${user.fullName}</td>
+                                    <td>${user.admin === 1 ? 'Yes' : 'No'}</td>
+                                    <td>
+                                        <button onclick="editUser('${user.username}')">Edit</button>
+                                        <button onclick="deleteUser('${user.username}')">Delete</button>
+                                    </td>
+                                 </tr>`;
+                    userTable.innerHTML += row;
+                });
+            }).catch((error) => {
+                console.error("Error loading users: ", error);
+            });
+        }
+
+        // Function to edit user
+        function editUser(username) {
+            db.collection("users").doc(username).get().then((doc) => {
+                if (doc.exists) {
+                    const user = doc.data();
+                    document.getElementById('username').value = user.username;
+                    document.getElementById('password').value = user.password;
+                    document.getElementById('fullName').value = user.fullName;
+                    document.getElementById('isAdmin').checked = user.admin === 1;
+                } else {
+                    alert("No such user");
+                }
+            }).catch((error) => {
+                console.error("Error editing user: ", error);
+            });
+        }
+
+        // Function to delete user
+        function deleteUser(username) {
+            db.collection("users").doc(username).delete().then(() => {
+                alert("User deleted successfully");
+                loadUsers();
+            }).catch((error) => {
+                console.error("Error deleting user: ", error);
+            });
+        }
+
+        // Load users when the page loads
+        window.onload = loadUsers;
+    </script>
+</body>
+</html>

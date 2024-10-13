@@ -6,11 +6,47 @@
     <title>Firestore Data Example</title>
     
     <!-- Firebase SDK -->
-    <!-- Step 1: Import Firebase core app -->
-    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js"></script>
-    
-    <!-- Step 2: Import Firebase Firestore -->
-    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-firestore.js"></script>
+    <!-- Import Firebase core app and Firestore modular libraries -->
+    <script type="module">
+      // Import the functions you need from the SDKs you need
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
+      import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-firestore.js";
+      
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyBUMnzUEqWQ8I7xyx99r0_4lKdKhgmFlfY",
+        authDomain: "facturacion-667e6.firebaseapp.com",
+        projectId: "facturacion-667e6",
+        storageBucket: "facturacion-667e6.appspot.com",
+        messagingSenderId: "113022628074",
+        appId: "1:113022628074:web:2fc742d06e1979b013e793",
+        measurementId: "G-4JR1R0PLCM"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Function to add user data to Firestore
+      window.addUser = async function() {
+          const firstName = document.getElementById('firstName').value;
+          const lastName = document.getElementById('lastName').value;
+          const birthYear = parseInt(document.getElementById('birthYear').value);
+
+          try {
+              // Add a new document with a generated ID to Firestore
+              const docRef = await addDoc(collection(db, "users"), {
+                  first: firstName,
+                  last: lastName,
+                  born: birthYear
+              });
+              console.log("Document written with ID: ", docRef.id);
+              document.getElementById('displayData').innerText = `User added with ID: ${docRef.id}`;
+          } catch (e) {
+              console.error("Error adding document: ", e);
+          }
+      }
+    </script>
 
     <style>
         body {
@@ -39,49 +75,9 @@
         <h2>Stored Data:</h2>
         <p id="displayData">No data yet...</p>
     </div>
-
-    <script>
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-          apiKey: "AIzaSyBUMnzUEqWQ8I7xyx99r0_4lKdKhgmFlfY",
-          authDomain: "facturacion-667e6.firebaseapp.com",
-          projectId: "facturacion-667e6",
-          storageBucket: "facturacion-667e6.appspot.com",
-          messagingSenderId: "113022628074",
-          appId: "1:113022628074:web:2fc742d06e1979b013e793",
-          measurementId: "G-4JR1R0PLCM"
-        };
-
-        // Initialize Firebase
-        const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        // Function to add user data to Firestore
-        function addUser() {
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const birthYear = parseInt(document.getElementById('birthYear').value);
-
-            // Creating the user object
-            const user = {
-                first: firstName,
-                last: lastName,
-                born: birthYear
-            };
-
-            // Add a new document with a generated ID to Firestore
-            db.collection("users")
-                .add(user)
-                .then((docRef) => {
-                    console.log("Document written with ID: ", docRef.id);
-                    document.getElementById('displayData').innerText = `User added with ID: ${docRef.id}`;
-                })
-                .catch((error) => {
-                    console.error("Error adding document: ", error);
-                });
-        }
-    </script>
 </body>
 </html>
+
+
 
 

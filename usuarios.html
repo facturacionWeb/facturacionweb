@@ -50,6 +50,7 @@
             <input type="checkbox" id="isAdmin" /> Administrador
         </label>
         <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
+<button onclick="clearFields()">Limpiar Campos</button>
 
         <!-- Table to display users -->
         <h2>Usuarios Existentes</h2>
@@ -68,8 +69,15 @@
         </table>
     </div>
 
-    <script>
-        // Firebase configuration from your project
+    $1// Function to clear input fields
+        function clearFields() {
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('fullName').value = '';
+            document.getElementById('isAdmin').checked = false;
+        }
+
+// Firebase configuration from your project
         const firebaseConfig = {
             apiKey: "AIzaSyBUMnzUEqWQ8I7xyx99r0_4lKdKhgmFlfY",
             authDomain: "facturacion-667e6.firebaseapp.com",
@@ -98,13 +106,13 @@
                     fullName: fullName,
                     admin: isAdmin
                 }).then(() => {
-                    alert("Usuario agregado/actualizado exitosamente");
+                    alert("Usuario agregado o actualizado con éxito");
                     loadUsers();
                 }).catch((error) => {
-                    console.error("Error agregando/actualizando usuario: ", error);
+                    console.error("Error al agregar o actualizar el usuario: ", error);
                 });
             } else {
-                alert("Username es requerido");
+                alert("El nombre de usuario es requerido");
             }
         }
 
@@ -118,7 +126,7 @@
                     const row = `<tr>
                                     <td>${user.username}</td>
                                     <td>${user.fullName}</td>
-                                    <td>${user.admin === 1 ? 'Yes' : 'No'}</td>
+                                    <td>${user.admin === 1 ? 'Sí' : 'No'}</td>
                                     <td>
                                         <button onclick="editUser('${user.username}')">Editar</button>
                                         <button onclick="deleteUser('${user.username}')">Eliminar</button>
@@ -127,7 +135,7 @@
                     userTable.innerHTML += row;
                 });
             }).catch((error) => {
-                console.error("Error cargando usuarios: ", error);
+                console.error("Error al cargar los usuarios: ", error);
             });
         }
 
@@ -141,7 +149,7 @@
                     document.getElementById('fullName').value = user.fullName;
                     document.getElementById('isAdmin').checked = user.admin === 1;
                 } else {
-                    alert("No such user");
+                    alert("El usuario no existe");
                 }
             }).catch((error) => {
                 console.error("Error editando usuario: ", error);
@@ -151,10 +159,10 @@
         // Function to delete user
         function deleteUser(username) {
             db.collection("users").doc(username).delete().then(() => {
-                alert("User deleted successfully");
+                alert("Usuario eliminado con éxito");
                 loadUsers();
             }).catch((error) => {
-                console.error("Error elimiando usuario: ", error);
+                console.error("Error al eliminar el usuario: ", error);
             });
         }
 

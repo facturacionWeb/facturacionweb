@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firestore User Management</title>
+    <title>Gestión de Usuarios</title>
 
     <!-- Import Firebase SDK (v8 with namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -40,26 +40,26 @@
 </head>
 <body>
     <div class="container">
-        <h1>Firestore User Management</h1>
+        <h1>Gestión de Usuarios</h1>
 
         <!-- Form to create or update a user -->
         <input type="text" id="username" placeholder="Username" />
         <input type="password" id="password" placeholder="Password" />
-        <input type="text" id="fullName" placeholder="Full Name" />
+        <input type="text" id="fullName" placeholder="Nombre Completo" />
         <label>
-            <input type="checkbox" id="isAdmin" /> Is Admin
+            <input type="checkbox" id="isAdmin" /> Administrador
         </label>
-        <button onclick="addOrUpdateUser()">Add/Update User</button>
+        <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
 
         <!-- Table to display users -->
-        <h2>Existing Users</h2>
+        <h2>Usuarios Existentes</h2>
         <table>
             <thead>
                 <tr>
                     <th>Username</th>
-                    <th>Full Name</th>
-                    <th>Admin</th>
-                    <th>Actions</th>
+                    <th>Nombre Completo</th>
+                    <th>Administrador</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody id="userTable">
@@ -98,13 +98,13 @@
                     fullName: fullName,
                     admin: isAdmin
                 }).then(() => {
-                    alert("User added/updated successfully");
+                    alert("Usuario agregado/actualizado exitosamente");
                     loadUsers();
                 }).catch((error) => {
-                    console.error("Error adding/updating user: ", error);
+                    console.error("Error agregando/actualizando usuario: ", error);
                 });
             } else {
-                alert("Username is required");
+                alert("Username es requerido");
             }
         }
 
@@ -120,14 +120,14 @@
                                     <td>${user.fullName}</td>
                                     <td>${user.admin === 1 ? 'Yes' : 'No'}</td>
                                     <td>
-                                        <button onclick="editUser('${user.username}')">Edit</button>
-                                        <button onclick="deleteUser('${user.username}')">Delete</button>
+                                        <button onclick="editUser('${user.username}')">Editar</button>
+                                        <button onclick="deleteUser('${user.username}')">Eliminar</button>
                                     </td>
                                  </tr>`;
                     userTable.innerHTML += row;
                 });
             }).catch((error) => {
-                console.error("Error loading users: ", error);
+                console.error("Error cargando usuarios: ", error);
             });
         }
 
@@ -144,7 +144,7 @@
                     alert("No such user");
                 }
             }).catch((error) => {
-                console.error("Error editing user: ", error);
+                console.error("Error editando usuario: ", error);
             });
         }
 
@@ -154,7 +154,7 @@
                 alert("User deleted successfully");
                 loadUsers();
             }).catch((error) => {
-                console.error("Error deleting user: ", error);
+                console.error("Error elimiando usuario: ", error);
             });
         }
 

@@ -152,6 +152,7 @@
                 userTable.innerHTML = '';
                 querySnapshot.forEach((doc) => {
                     const user = doc.data();
+                    if (user.username === 'Administrador') return;
                     const row = `<tr>
                                     <td>${user.username || 'N/A'}</td>
                                     <td>${user.fullName || 'N/A'}</td>

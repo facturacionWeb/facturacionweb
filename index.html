@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firestore Data Example</title>
+    <title>Inicio de Sesión - Portal de Administración</title>
 
     <!-- Import Firebase SDK (v8 with namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -17,6 +17,7 @@
         .container {
             max-width: 600px;
             margin: 0 auto;
+            text-align: center;
         }
         input, button {
             padding: 10px;
@@ -26,16 +27,15 @@
     </style>
 </head>
 <body>
-    <a href="https://facturacionweb.github.io/facturacionweb/usuarios.html">Administrar Usuarios</a>
-    <!--<div class="container">
-        <h1>Firebase Firestore Example</h1>
-        <input type="text" id="firstName" placeholder="First Name" />
-        <input type="text" id="lastName" placeholder="Last Name" />
-        <input type="number" id="birthYear" placeholder="Birth Year" />
-        <button onclick="addUser()">Submit Data</button>
-        
-        <h2>Stored Data:</h2>
-        <p id="displayData">No data yet...</p>
+    <div class="container">
+        <h1>Inicio de Sesión</h1>
+        <input type="password" id="adminPassword" placeholder="Contraseña de Administrador" />
+        <button onclick="verifyPassword()">Ingresar</button>
+    </div>
+
+    <div id="adminPanel" class="container" style="display:none;">
+        <h1>Panel General de Administración</h1>
+        <button onclick="goToUserManagement()">Administrar Usuarios</button>
     </div>
 
     <script>
@@ -54,31 +54,31 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // Function to add user data to Firestore
-        function addUser() {
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const birthYear = parseInt(document.getElementById('birthYear').value);
-
-            // Creating the user object
-            const user = {
-                first: firstName,
-                last: lastName,
-                born: birthYear
-            };
-
-            // Add a new document with a generated ID to Firestore
-            db.collection("users")
-                .add(user)
-                .then((docRef) => {
-                    console.log("Document written with ID: ", docRef.id);
-                    document.getElementById('displayData').innerText = `User added with ID: ${docRef.id}`;
-                })
-                .catch((error) => {
-                    console.error("Error adding document: ", error);
-                });
+        // Function to verify admin password
+        function verifyPassword() {
+            const password = document.getElementById('adminPassword').value.trim();
+            db.collection("users").doc("Administrador").get().then((doc) => {
+                if (doc.exists) {
+                    const adminData = doc.data();
+                    if (adminData.password === password) {
+                        document.querySelector('.container').style.display = 'none';
+                        document.getElementById('adminPanel').style.display = 'block';
+                    } else {
+                        alert("Contraseña incorrecta");
+                    }
+                } else {
+                    alert("No se encontró el usuario Administrador");
+                }
+            }).catch((error) => {
+                console.error("Error al verificar la contraseña: ", error);
+            });
         }
-    </script>-->
+
+        // Function to navigate to user management page
+        function goToUserManagement() {
+            window.location.href = "https://facturacionweb.github.io/facturacionweb/usuarios.html";
+        }
+    </script>
 </body>
 </html>
 

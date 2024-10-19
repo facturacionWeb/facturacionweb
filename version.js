@@ -1,5 +1,6 @@
 // version.js
 document.addEventListener("DOMContentLoaded", function() {
+    alert("punto 1");
     const versionContainer = document.createElement("div");
     versionContainer.classList.add("container");
     versionContainer.innerHTML = '<p>Versión del sitio: 2024101911</p>';

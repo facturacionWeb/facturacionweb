@@ -54,8 +54,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        let isAuthenticated = false;
-
         // Function to verify admin password
         function verifyPassword() {
             const password = document.getElementById('adminPassword').value.trim();
@@ -63,7 +61,6 @@
                 if (doc.exists) {
                     const adminData = doc.data();
                     if (adminData.password === password) {
-                        isAuthenticated = true;
                         document.querySelector('.container').style.display = 'none';
                         document.getElementById('adminPanel').style.display = 'block';
                     } else {
@@ -79,17 +76,14 @@
 
         // Function to navigate to user management page
         function goToUserManagement() {
-            if (isAuthenticated) {
-                window.location.href = "https://facturacionweb.github.io/facturacionweb/usuarios.html";
-            } else {
-                alert("Debe autenticarse primero");
-            }
+            window.location.href = "https://facturacionweb.github.io/facturacionweb/usuarios.html";
         }
     </script>
-<div class="container">
-        <p>Versión del sitio: 2024101900</p>
+
+    <div class="container">
+        <p>Versión del sitio: 2024101901</p>
     </div>
-$1
+</body>
 </html>
 
 

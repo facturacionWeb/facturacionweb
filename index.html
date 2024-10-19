@@ -27,7 +27,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <div id="loginContainer" class="container" style="display:none;">
         <h1>Inicio de Sesión</h1>
         <input type="password" id="adminPassword" placeholder="Contraseña de Administrador" />
         <button onclick="verifyPassword()">Ingresar</button>
@@ -36,6 +36,7 @@
     <div id="adminPanel" class="container" style="display:none;">
         <h1>Panel General de Administración</h1>
         <button onclick="goToUserManagement()">Administrar Usuarios</button>
+        <button onclick="logout()">Cerrar Sesión</button>
     </div>
 
     <script>
@@ -54,6 +55,17 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // Check if the user is already authenticated
+        window.onload = function() {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (isAuthenticated) {
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+            } else {
+                document.getElementById('loginContainer').style.display = 'block';
+            }
+        };
+
         // Function to verify admin password
         function verifyPassword() {
             const password = document.getElementById('adminPassword').value.trim();
@@ -61,7 +73,8 @@
                 if (doc.exists) {
                     const adminData = doc.data();
                     if (adminData.password === password) {
-                        document.querySelector('.container').style.display = 'none';
+                        sessionStorage.setItem('isAuthenticated', true);
+                        document.getElementById('loginContainer').style.display = 'none';
                         document.getElementById('adminPanel').style.display = 'block';
                     } else {
                         alert("Contraseña incorrecta");
@@ -78,13 +91,21 @@
         function goToUserManagement() {
             window.location.href = "https://facturacionweb.github.io/facturacionweb/usuarios.html";
         }
+
+        // Function to log out
+        function logout() {
+            sessionStorage.removeItem('isAuthenticated');
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'block';
+        }
     </script>
 
     <div class="container">
-        <p>Versión del sitio: 2024101901</p>
+        <p>Versión del sitio: 2024101902</p>
     </div>
 </body>
 </html>
+
 
 
 

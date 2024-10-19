@@ -9,6 +9,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+    
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -49,19 +52,7 @@
     </div>
 
     <script>
-        // Firebase configuration from your project
-        const firebaseConfig = {
-            apiKey: "AIzaSyBUMnzUEqWQ8I7xyx99r0_4lKdKhgmFlfY",
-            authDomain: "facturacion-667e6.firebaseapp.com",
-            projectId: "facturacion-667e6",
-            storageBucket: "facturacion-667e6.appspot.com",
-            messagingSenderId: "113022628074",
-            appId: "1:113022628074:web:2fc742d06e1979b013e793",
-            measurementId: "G-4JR1R0PLCM"
-        };
 
-        // Initialize Firebase (Namespaced API v8)
-        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         // Check if the user is already authenticated

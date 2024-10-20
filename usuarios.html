@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Usuarios</title>
+    <title>Gestión de Clientes</title>
 
     <!-- Import Firebase SDK (v8 with namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -40,186 +40,154 @@
             text-align: center;
         }
     </style>
-    <script>
-        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
-        (function loadVersionScript() {
-            const versionScript = document.createElement('script');
-            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-            document.head.appendChild(versionScript);
-        })();
-    </script>
 </head>
 <body>
-    <script>
-        // Check if the user is already authenticated
-        window.onload = function() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
-            } else {
-                // Load users if authenticated
-                loadUsers();
-            }
-
-           document.getElementById('showPassword').addEventListener('change', togglePasswordVisibility);
-    
-            function togglePasswordVisibility() {
-                const passwordInput = document.getElementById('password');
-                const showPasswordCheckbox = document.getElementById('showPassword');
-                passwordInput.type = showPasswordCheckbox.checked ? 'text' : 'password';
-            }
-            
-        };
-    </script>
-
     <a href="javascript:window.history.back();">Volver a la Página Anterior</a>
     
     <div class="container">
-        <h1>Gestión de Usuarios</h1>
+        <h1>Gestión de Clientes</h1>
 
-        <!-- Form to create or update a user -->
-        <input type="text" id="username" placeholder="Username" />
-        <label>
-            <input type="checkbox" id="showPassword"> Mostrar Contraseña
-        </label>
-        <input type="password" id="password" placeholder="Password" />
-        <input type="text" id="fullName" placeholder="Nombre Completo" />
-        <label>
-            <input type="checkbox" id="isAdmin" /> Administrador
-        </label>
-        <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
+        <!-- Form to create or update a client -->
+        <input type="hidden" id="idCliente" />
+        <input type="text" id="nombreCliente" placeholder="Nombre del Cliente" />
+        <input type="text" id="nombreTienda" placeholder="Nombre de la Tienda" />
+        <input type="text" id="direccion" placeholder="Dirección" />
+        <input type="text" id="telefono" placeholder="Teléfono" />
+        <button onclick="addOrUpdateClient()">Agregar/Actualizar Cliente</button>
         <button onclick="clearFields()">Limpiar Campos</button>
 
-        <!-- Table to display users -->
-        <h2>Usuarios Existentes</h2>
+        <!-- Table to display clients -->
+        <h2>Clientes Existentes</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Username</th>
-                    <th>Nombre Completo</th>
-                    <th>Administrador</th>
+                    <th>ID Cliente</th>
+                    <th>Nombre del Cliente</th>
+                    <th>Nombre de la Tienda</th>
+                    <th>Dirección</th>
+                    <th>Teléfono</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
-            <tbody id="userTable">
-                <!-- User rows will be populated here -->
+            <tbody id="clientTable">
+                <!-- Client rows will be populated here -->
             </tbody>
         </table>
     </div>
 
     <script>
-        // Function to clear input fields
-        function clearFields() {
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('fullName').value = '';
-            document.getElementById('isAdmin').checked = false;
-        }
-
+        // Initialize Firestore
         const db = firebase.firestore();
 
-        // Function to add or update user
-        function addOrUpdateUser() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            const fullName = document.getElementById('fullName').value.trim();
-            const isAdmin = document.getElementById('isAdmin').checked ? 1 : 0;
+        // Function to clear input fields
+        function clearFields() {
+            document.getElementById('idCliente').value = '';
+            document.getElementById('nombreCliente').value = '';
+            document.getElementById('nombreTienda').value = '';
+            document.getElementById('direccion').value = '';
+            document.getElementById('telefono').value = '';
+        }
 
-            if (username) {
-                db.collection("users").doc(username).set({
-                    username: username,
-                    password: password,
-                    fullName: fullName,
-                    admin: isAdmin
+        // Function to add or update client
+        function addOrUpdateClient() {
+            const idCliente = document.getElementById('idCliente').value.trim();
+            const nombreCliente = document.getElementById('nombreCliente').value.trim();
+            const nombreTienda = document.getElementById('nombreTienda').value.trim();
+            const direccion = document.getElementById('direccion').value.trim();
+            const telefono = document.getElementById('telefono').value.trim();
+
+            if (idCliente) {
+                // Update existing client
+                db.collection("clientes").doc(idCliente).set({
+                    nombreCliente: nombreCliente,
+                    nombreTienda: nombreTienda,
+                    direccion: direccion,
+                    telefono: telefono
                 }).then(() => {
-                    alert("Usuario agregado o actualizado con éxito");
-                    loadUsers();
+                    alert("Cliente actualizado con éxito");
+                    loadClients();
+                    clearFields();
                 }).catch((error) => {
-                    console.error("Error al agregar o actualizar el usuario: ", error);
+                    console.error("Error al actualizar el cliente: ", error);
                 });
             } else {
-                alert("El nombre de usuario es requerido");
+                // Add a new client with an auto-generated ID
+                db.collection("clientes").add({
+                    nombreCliente: nombreCliente,
+                    nombreTienda: nombreTienda,
+                    direccion: direccion,
+                    telefono: telefono
+                }).then(() => {
+                    alert("Cliente agregado con éxito");
+                    loadClients();
+                    clearFields();
+                }).catch((error) => {
+                    console.error("Error al agregar el cliente: ", error);
+                });
             }
         }
 
-        // Function to load users
-        function loadUsers() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
-            db.collection("users").get().then((querySnapshot) => {
-                const userTable = document.getElementById('userTable');
-                userTable.innerHTML = '';
+        // Function to load clients
+        function loadClients() {
+            db.collection("clientes").get().then((querySnapshot) => {
+                const clientTable = document.getElementById('clientTable');
+                clientTable.innerHTML = '';
                 querySnapshot.forEach((doc) => {
-                    const user = doc.data();
-                    if (user.username === 'Administrador') return;
+                    const client = doc.data();
                     const row = `<tr>
-                                    <td>${user.username || 'N/A'}</td>
-                                    <td>${user.fullName || 'N/A'}</td>
-                                    <td>${user.admin === 1 ? 'Sí' : 'No'}</td>
+                                    <td>${doc.id || 'N/A'}</td>
+                                    <td>${client.nombreCliente || 'N/A'}</td>
+                                    <td>${client.nombreTienda || 'N/A'}</td>
+                                    <td>${client.direccion || 'N/A'}</td>
+                                    <td>${client.telefono || 'N/A'}</td>
                                     <td>
-                                        <button onclick="editUser('${user.username}')">Editar</button>
-                                        <button onclick="deleteUser('${user.username}')">Eliminar</button>
+                                        <button onclick="editClient('${doc.id}')">Editar</button>
+                                        <button onclick="deleteClient('${doc.id}')">Eliminar</button>
                                     </td>
                                  </tr>`;
-                    userTable.innerHTML += row;
+                    clientTable.innerHTML += row;
                 });
             }).catch((error) => {
-                console.error("Error al cargar los usuarios: ", error);
+                console.error("Error al cargar los clientes: ", error);
             });
         }
 
-        // Function to edit user
-        function editUser(username) {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
-            db.collection("users").doc(username).get().then((doc) => {
+        // Function to edit client
+        function editClient(idCliente) {
+            db.collection("clientes").doc(idCliente).get().then((doc) => {
                 if (doc.exists) {
-                    const user = doc.data();
-                    document.getElementById('username').value = user.username;
-                    document.getElementById('password').value = user.password;
-                    document.getElementById('fullName').value = user.fullName;
-                    document.getElementById('isAdmin').checked = user.admin === 1;
+                    const client = doc.data();
+                    document.getElementById('idCliente').value = idCliente;
+                    document.getElementById('nombreCliente').value = client.nombreCliente;
+                    document.getElementById('nombreTienda').value = client.nombreTienda;
+                    document.getElementById('direccion').value = client.direccion;
+                    document.getElementById('telefono').value = client.telefono;
                 } else {
-                    alert("El usuario no existe");
+                    alert("El cliente no existe");
                 }
             }).catch((error) => {
-                console.error("Error editando usuario: ", error);
+                console.error("Error editando cliente: ", error);
             });
         }
 
-        // Function to delete user
-        function deleteUser(username) {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
-            db.collection("users").doc(username).delete().then(() => {
-                alert("Usuario eliminado con éxito");
-                loadUsers();
+        // Function to delete client
+        function deleteClient(idCliente) {
+            db.collection("clientes").doc(idCliente).delete().then(() => {
+                alert("Cliente eliminado con éxito");
+                loadClients();
             }).catch((error) => {
-                console.error("Error al eliminar el usuario: ", error);
+                console.error("Error al eliminar el cliente: ", error);
             });
         }
+
+        // Load clients when the page loads
+        window.onload = function() {
+            loadClients();
+        };
     </script>
 </body>
 </html>
+
 
 
 

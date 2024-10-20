@@ -48,6 +48,7 @@
     <div id="adminPanel" class="container" style="display:none;">
         <h1>Panel General de Administración</h1>
         <button onclick="goToUserManagement()">Administrar Usuarios</button>
+        <button onclick="goToClientesManagement()">Administrar Clientes</button>
         <button onclick="logout()">Cerrar Sesión</button>
     </div>
 
@@ -92,6 +93,10 @@
             window.location.href = "usuarios.html";
         }
 
+        function goToClientesManagement() {
+            window.location.href = "clientes.html";
+        }
+        
         // Function to log out
         function logout() {
             sessionStorage.removeItem('isAuthenticated');

@@ -7,7 +7,36 @@
 
     <!-- Import Firebase SDK (v8 with namespaced API) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-@@ -40,186 +40,154 @@
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        input, button, label {
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: left;
+        }
+        th, td {
             text-align: center;
         }
     </style>
@@ -32,6 +61,7 @@
                 // Load users if authenticated
                 loadUsers();
             }
+
            document.getElementById('showPassword').addEventListener('change', togglePasswordVisibility);
     
             function togglePasswordVisibility() {
@@ -42,8 +72,9 @@
             
         };
     </script>
-    <a href="javascript:window.history.back();">Volver a la Página Anterior</a>
 
+    <a href="javascript:window.history.back();">Volver a la Página Anterior</a>
+    
     <div class="container">
         <h1>Gestión de Usuarios</h1>
 
@@ -87,6 +118,7 @@
         }
 
         const db = firebase.firestore();
+
         // Function to add or update user
         function addOrUpdateUser() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
@@ -188,6 +220,9 @@
     </script>
 </body>
 </html>
+
+
+
 
 
 

@@ -40,6 +40,14 @@
             text-align: center;
         }
     </style>
+    <script>
+        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
+        (function loadVersionScript() {
+            const versionScript = document.createElement('script');
+            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+            document.head.appendChild(versionScript);
+        })();
+    </script>
 </head>
 <body>
     <a href="javascript:window.history.back();">Volver a la Página Anterior</a>

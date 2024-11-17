@@ -21,23 +21,55 @@
             max-width: 1000px;
             margin: 0 auto;
         }
-        input, button, label, select {
+        input[type="text"],
+        input[type="number"],
+        input[type="datetime-local"],
+        select,
+        textarea,
+        button {
             margin: 10px 0;
             display: block;
             width: 100%;
             padding: 10px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        label {
+            margin: 10px 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+        }
+        .checkbox-group label {
+            margin-left: 5px;
+            margin-bottom: 0;
+        }
+        .table-container {
+            overflow-x: auto;
         }
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
         table, th, td {
             border: 1px solid black;
-            padding: 10px;
-            text-align: left;
         }
         th, td {
+            padding: 5px;
             text-align: center;
+            font-size: 12px;
+            word-wrap: break-word;
+        }
+        th {
+            background-color: #f2f2f2;
         }
     </style>
     <script>
@@ -68,70 +100,103 @@
         <h1>Gestión de Artículos</h1>
 
         <!-- Formulario para agregar o editar un artículo -->
-        <input type="text" id="codigoArticulo" placeholder="Código del Artículo" />
-        <select id="rubro">
-            <option value="">Seleccione un Rubro</option>
-            <option value="teléfonos">Teléfonos</option>
-            <option value="tablet">Tablet</option>
-            <option value="otros">Otros</option>
-        </select>
-        <input type="text" id="marca" placeholder="Marca" />
-        <input type="text" id="modelo" placeholder="Modelo" />
-        <textarea id="descripcion" placeholder="Descripción"></textarea>
-        <input type="text" id="imei1" placeholder="IMEI 1" />
-        <input type="text" id="imei2" placeholder="IMEI 2" />
-        <select id="proveedor">
-            <option value="">Seleccione un Proveedor</option>
-            <!-- Opciones cargadas dinámicamente -->
-        </select>
-        <input type="text" id="facturaProveedor" placeholder="Factura del Proveedor" />
-        <input type="datetime-local" id="fechaEntrada" />
-        <input type="text" id="semana" placeholder="Semana" />
-        <select id="ubicacion">
-            <option value="">Seleccione Ubicación</option>
-            <option value="Ruta 1">Ruta 1</option>
-            <option value="Ruta 2">Ruta 2</option>
-            <option value="Bodega General">Bodega General</option>
-            <option value="En Taller">En Taller</option>
-        </select>
-        <input type="number" id="precioCompra" placeholder="Precio de Compra" />
-        <input type="number" id="precioVenta" placeholder="Precio de Venta" />
-        <label>
-            <input type="checkbox" id="activo" /> Activo
-        </label>
-        <input type="number" id="existencias" placeholder="Existencias" />
+        <div class="form-group">
+            <input type="text" id="codigoArticulo" placeholder="Código del Artículo" />
+        </div>
+        <div class="form-group">
+            <select id="rubro">
+                <option value="">Seleccione un Rubro</option>
+                <option value="teléfonos">Teléfonos</option>
+                <option value="tablet">Tablet</option>
+                <option value="otros">Otros</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <input type="text" id="marca" placeholder="Marca" />
+        </div>
+        <div class="form-group">
+            <input type="text" id="modelo" placeholder="Modelo" />
+        </div>
+        <div class="form-group">
+            <textarea id="descripcion" placeholder="Descripción"></textarea>
+        </div>
+        <div class="form-group">
+            <input type="text" id="imei1" placeholder="IMEI 1" />
+        </div>
+        <div class="form-group">
+            <input type="text" id="imei2" placeholder="IMEI 2" />
+        </div>
+        <div class="form-group">
+            <select id="proveedor">
+                <option value="">Seleccione un Proveedor</option>
+                <!-- Opciones cargadas dinámicamente -->
+            </select>
+        </div>
+        <div class="form-group">
+            <input type="text" id="facturaProveedor" placeholder="Factura del Proveedor" />
+        </div>
+        <div class="form-group">
+            <input type="datetime-local" id="fechaEntrada" />
+        </div>
+        <div class="form-group">
+            <input type="text" id="semana" placeholder="Semana" />
+        </div>
+        <div class="form-group">
+            <select id="ubicacion">
+                <option value="">Seleccione Ubicación</option>
+                <option value="Ruta 1">Ruta 1</option>
+                <option value="Ruta 2">Ruta 2</option>
+                <option value="Bodega General">Bodega General</option>
+                <option value="En Taller">En Taller</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <input type="number" id="precioCompra" placeholder="Precio de Compra" />
+        </div>
+        <div class="form-group">
+            <input type="number" id="precioVenta" placeholder="Precio de Venta" />
+        </div>
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="activo" />
+            <label for="activo">Activo</label>
+        </div>
+        <div class="form-group">
+            <input type="number" id="existencias" placeholder="Existencias" />
+        </div>
 
         <button onclick="addOrUpdateArticulo()">Agregar/Actualizar Artículo</button>
         <button onclick="clearFields()">Limpiar Campos</button>
 
         <!-- Tabla para mostrar los artículos existentes -->
         <h2>Artículos Existentes</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Marca</th>
-                    <th>Modelo</th>
-                    <th>Rubro</th>
-                    <th>IMEI 1</th>
-                    <th>IMEI 2</th>
-                    <th>Proveedor</th>
-                    <th>Factura Proveedor</th>
-                    <th>Fecha Entrada</th>
-                    <th>Semana</th>
-                    <th>Ubicación</th>
-                    <th>Precio Compra</th>
-                    <th>Precio Venta</th>
-                    <th>Activo</th>
-                    <th>Existencias</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="articuloTable">
-                <!-- Filas de artículos se cargarán dinámicamente -->
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Descripción</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Rubro</th>
+                        <th>IMEI 1</th>
+                        <th>IMEI 2</th>
+                        <th>Proveedor</th>
+                        <th>Factura Proveedor</th>
+                        <th>Fecha Entrada</th>
+                        <th>Semana</th>
+                        <th>Ubicación</th>
+                        <th>Precio Compra</th>
+                        <th>Precio Venta</th>
+                        <th>Activo</th>
+                        <th>Existencias</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="articuloTable">
+                    <!-- Filas de artículos se cargarán dinámicamente -->
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
@@ -195,6 +260,7 @@
                 }).then(() => {
                     alert("Artículo agregado o actualizado con éxito");
                     loadArticulos();
+                    clearFields();
                 }).catch((error) => {
                     console.error("Error al agregar o actualizar el artículo: ", error);
                 });
@@ -241,6 +307,7 @@
         function loadProveedoresToDropdown() {
             const proveedorDropdown = document.getElementById('proveedor');
             db.collection("proveedores").get().then((querySnapshot) => {
+                proveedorDropdown.innerHTML = '<option value="">Seleccione un Proveedor</option>';
                 querySnapshot.forEach((doc) => {
                     const proveedor = doc.data();
                     const option = `<option value="${doc.id}">${proveedor.nombreProveedor}</option>`;
@@ -290,6 +357,7 @@
     </script>
 </body>
 </html>
+
 
 
 

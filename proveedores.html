@@ -50,6 +50,19 @@
     </script>
 </head>
 <body>
+
+    <script>
+        // Check if the user is already authenticated
+        window.onload = function() {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
+            } 
+        };
+    </script>
+
+    
     <a href="index.html">Volver a la Página Principal</a>
     
     <div class="container">

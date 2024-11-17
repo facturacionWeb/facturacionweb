@@ -49,6 +49,7 @@
         <h1>Panel General de Administración</h1>
         <button onclick="goToUserManagement()">Administrar Usuarios</button>
         <button onclick="goToClientesManagement()">Administrar Clientes</button>
+        <button onclick="goToProveedoresManagement()">Administrar Proveedores</button>
         <button onclick="logout()">Cerrar Sesión</button>
     </div>
 
@@ -95,6 +96,10 @@
 
         function goToClientesManagement() {
             window.location.href = "clientes.html";
+        }
+
+        function goToProveedoresManagement() {
+            window.location.href = "proveedores.html";
         }
         
         // Function to log out

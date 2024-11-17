@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -275,29 +275,32 @@
                 articuloTable.innerHTML = '';
                 querySnapshot.forEach((doc) => {
                     const articulo = doc.data();
-                    const row = `<tr>
-                                    <td>${articulo.codigoArticulo || ''}</td>
-                                    <td>${articulo.descripcion || ''}</td>
-                                    <td>${articulo.marca || ''}</td>
-                                    <td>${articulo.modelo || ''}</td>
-                                    <td>${articulo.rubro || ''}</td>
-                                    <td>${articulo.imei1 || ''}</td>
-                                    <td>${articulo.imei2 || ''}</td>
-                                    <td>${articulo.proveedor || ''}</td>
-                                    <td>${articulo.facturaProveedor || ''}</td>
-                                    <td>${articulo.fechaEntrada || ''}</td>
-                                    <td>${articulo.semana || ''}</td>
-                                    <td>${articulo.ubicacion || ''}</td>
-                                    <td>${articulo.precioCompra || ''}</td>
-                                    <td>${articulo.precioVenta || ''}</td>
-                                    <td>${articulo.activo ? 'Sí' : 'No'}</td>
-                                    <td>${articulo.existencias || ''}</td>
-                                    <td>
-                                        <button onclick="editArticulo('${doc.id}')">Editar</button>
-                                        <button onclick="deleteArticulo('${doc.id}')">Eliminar</button>
-                                    </td>
-                                </tr>`;
-                    articuloTable.innerHTML += row;
+                    db.collection("proveedores").doc(articulo.proveedor).get().then((proveedorDoc) => {
+                        const nombreProveedor = proveedorDoc.exists ? proveedorDoc.data().nombreProveedor : 'No disponible';
+                        const row = `<tr>
+                                        <td>${articulo.codigoArticulo || ''}</td>
+                                        <td>${articulo.descripcion || ''}</td>
+                                        <td>${articulo.marca || ''}</td>
+                                        <td>${articulo.modelo || ''}</td>
+                                        <td>${articulo.rubro || ''}</td>
+                                        <td>${articulo.imei1 || ''}</td>
+                                        <td>${articulo.imei2 || ''}</td>
+                                        <td>${nombreProveedor}</td>
+                                        <td>${articulo.facturaProveedor || ''}</td>
+                                        <td>${articulo.fechaEntrada || ''}</td>
+                                        <td>${articulo.semana || ''}</td>
+                                        <td>${articulo.ubicacion || ''}</td>
+                                        <td>${articulo.precioCompra || ''}</td>
+                                        <td>${articulo.precioVenta || ''}</td>
+                                        <td>${articulo.activo ? 'Sí' : 'No'}</td>
+                                        <td>${articulo.existencias || ''}</td>
+                                        <td>
+                                            <button onclick="editArticulo('${doc.id}')">Editar</button>
+                                            <button onclick="deleteArticulo('${doc.id}')">Eliminar</button>
+                                        </td>
+                                    </tr>`;
+                        articuloTable.innerHTML += row;
+                    });
                 });
             }).catch((error) => {
                 console.error("Error al cargar los artículos: ", error);
@@ -357,6 +360,7 @@
     </script>
 </body>
 </html>
+
 
 
 

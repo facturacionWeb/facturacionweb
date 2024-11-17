@@ -1,1 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Proveedores</title>
+
+    <!-- Import Firebase SDK (v8 with namespaced API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        input, button, label {
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: left;
+        }
+        th, td {
+            text-align: center;
+        }
+    </style>
+    <script>
+        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
+        (function loadVersionScript() {
+            const versionScript = document.createElement('script');
+            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+            document.head.appendChild(versionScript);
+        })();
+    </script>
+</head>
+<body>
+    <a href="javascript:window.history.back();">Volver a la Página Anterior</a>
+    
+    <div class="container">
+        <h1>Gestión de Proveedores</h1>
+
+        <!-- Form to create or update a supplier -->
+        <input type="text" id="nombreProveedor" placeholder="Nombre del Proveedor" />
+        <input type="text" id="telefono" placeholder="Teléfono" />
+        <input type="text" id="direccion" placeholder="Dirección" />
+        <button onclick="addOrUpdateProveedor()">Agregar/Actualizar Proveedor</button>
+        <button onclick="clearFields()">Limpiar Campos</button>
+
+        <!-- Table to display suppliers -->
+        <h2>Proveedores Existentes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Proveedor</th>
+                    <th>Nombre del Proveedor</th>
+                    <th>Teléfono</th>
+                    <th>Dirección</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="proveedorTable">
+                <!-- Supplier rows will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Initialize Firestore
+        const db = firebase.firestore();
+
+        // Variable global para almacenar el ID del proveedor que se está editando
+        let idProveedorActual = null;
+
+        // Function to clear input fields
+        function clearFields() {
+            document.getElementById('nombreProveedor').value = '';
+            document.getElementById('telefono').value = '';
+            document.getElementById('direccion').value = '';
+            idProveedorActual = null;  // Limpiar el ID actual cuando se limpian los campos
+        }
+
+        // Function to add or update supplier
+        function addOrUpdateProveedor() {
+            const nombreProveedor = document.getElementById('nombreProveedor').value.trim();
+            const telefono = document.getElementById('telefono').value.trim();
+            const direccion = document.getElementById('direccion').value.trim();
+
+            if (idProveedorActual) {
+                // Si hay un ID de proveedor actual, actualizamos el proveedor existente
+                db.collection("proveedores").doc(idProveedorActual).set({
+                    nombreProveedor: nombreProveedor,
+                    telefono: telefono,
+                    direccion: direccion
+                }).then(() => {
+                    alert("Proveedor actualizado con éxito");
+                    loadProveedores();
+                    clearFields(); // Limpiar los campos después de actualizar
+                }).catch((error) => {
+                    console.error("Error al actualizar el proveedor: ", error);
+                });
+            } else {
+                // Si no hay ID de proveedor actual, agregamos un nuevo proveedor
+                db.collection("proveedores").add({
+                    nombreProveedor: nombreProveedor,
+                    telefono: telefono,
+                    direccion: direccion
+                }).then(() => {
+                    alert("Proveedor agregado con éxito");
+                    loadProveedores();
+                    clearFields(); // Limpiar los campos después de agregar
+                }).catch((error) => {
+                    console.error("Error al agregar el proveedor: ", error);
+                });
+            }
+        }
+
+        // Function to load suppliers
+        function loadProveedores() {
+            db.collection("proveedores").get().then((querySnapshot) => {
+                const proveedorTable = document.getElementById('proveedorTable');
+                proveedorTable.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const proveedor = doc.data();
+                    const row = `<tr>
+                                    <td>${doc.id || 'N/A'}</td>
+                                    <td>${proveedor.nombreProveedor || 'N/A'}</td>
+                                    <td>${proveedor.telefono || 'N/A'}</td>
+                                    <td>${proveedor.direccion || 'N/A'}</td>
+                                    <td>
+                                        <button onclick="editProveedor('${doc.id}')">Editar</button>
+                                        <button onclick="deleteProveedor('${doc.id}')">Eliminar</button>
+                                    </td>
+                                 </tr>`;
+                    proveedorTable.innerHTML += row;
+                });
+            }).catch((error) => {
+                console.error("Error al cargar los proveedores: ", error);
+            });
+        }
+
+        // Function to edit supplier
+        function editProveedor(idProveedor) {
+            db.collection("proveedores").doc(idProveedor).get().then((doc) => {
+                if (doc.exists) {
+                    const proveedor = doc.data();
+                    document.getElementById('nombreProveedor').value = proveedor.nombreProveedor;
+                    document.getElementById('telefono').value = proveedor.telefono;
+                    document.getElementById('direccion').value = proveedor.direccion;
+                    idProveedorActual = idProveedor;  // Guardar el ID del proveedor que se está editando
+                } else {
+                    alert("El proveedor no existe");
+                }
+            }).catch((error) => {
+                console.error("Error editando proveedor: ", error);
+            });
+        }
+
+        // Function to delete supplier
+        function deleteProveedor(idProveedor) {
+            db.collection("proveedores").doc(idProveedor).delete().then(() => {
+                alert("Proveedor eliminado con éxito");
+                loadProveedores();
+            }).catch((error) => {
+                console.error("Error al eliminar el proveedor: ", error);
+            });
+        }
+
+        // Load suppliers when the page loads
+        window.onload = function() {
+            loadProveedores();
+        };
+    </script>
+</body>
+</html>
 

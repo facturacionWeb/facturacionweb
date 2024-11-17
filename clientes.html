@@ -191,7 +191,14 @@
 
         // Load clients when the page loads
         window.onload = function() {
-            loadClients();
+            // Check if the user is already authenticated
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
+            }else{
+                loadClients();
+            }     
         };
     </script>
 </body>

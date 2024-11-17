@@ -54,6 +54,7 @@
     <script>
         // Check if the user is already authenticated
         window.onload = function() {
+            debugger;
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
             if (!isAuthenticated) {
                 alert("Debe autenticarse primero");

@@ -250,8 +250,46 @@
                 console.error("Error al cargar los proveedores: ", error);
             });
         }
+
+        function editArticulo(id) {
+            db.collection("articulos").doc(id).get().then((doc) => {
+                if (doc.exists) {
+                    const articulo = doc.data();
+                    document.getElementById('codigoArticulo').value = articulo.codigoArticulo;
+                    document.getElementById('rubro').value = articulo.rubro;
+                    document.getElementById('marca').value = articulo.marca;
+                    document.getElementById('modelo').value = articulo.modelo;
+                    document.getElementById('descripcion').value = articulo.descripcion;
+                    document.getElementById('imei1').value = articulo.imei1;
+                    document.getElementById('imei2').value = articulo.imei2;
+                    document.getElementById('proveedor').value = articulo.proveedor;
+                    document.getElementById('facturaProveedor').value = articulo.facturaProveedor;
+                    document.getElementById('fechaEntrada').value = articulo.fechaEntrada;
+                    document.getElementById('semana').value = articulo.semana;
+                    document.getElementById('ubicacion').value = articulo.ubicacion;
+                    document.getElementById('precioCompra').value = articulo.precioCompra;
+                    document.getElementById('precioVenta').value = articulo.precioVenta;
+                    document.getElementById('activo').checked = articulo.activo;
+                    document.getElementById('existencias').value = articulo.existencias;
+                }
+            }).catch((error) => {
+                console.error("Error al obtener el artículo: ", error);
+            });
+        }
+
+        function deleteArticulo(id) {
+            if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
+                db.collection("articulos").doc(id).delete().then(() => {
+                    alert("Artículo eliminado con éxito");
+                    loadArticulos();
+                }).catch((error) => {
+                    console.error("Error al eliminar el artículo: ", error);
+                });
+            }
+        }
     </script>
 </body>
 </html>
+
 
 

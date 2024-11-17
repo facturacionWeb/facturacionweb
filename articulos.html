@@ -94,11 +94,8 @@
             <option value="Bodega General">Bodega General</option>
             <option value="En Taller">En Taller</option>
         </select>
-        <input type="text" id="facturaCliente" placeholder="Factura del Cliente" />
         <input type="number" id="precioCompra" placeholder="Precio de Compra" />
         <input type="number" id="precioVenta" placeholder="Precio de Venta" />
-        <input type="number" id="precioVentaReal" placeholder="Precio de Venta Real" />
-        <input type="number" id="descuento" placeholder="Descuento" readonly />
         <label>
             <input type="checkbox" id="activo" /> Activo
         </label>
@@ -116,8 +113,17 @@
                     <th>Descripción</th>
                     <th>Marca</th>
                     <th>Modelo</th>
+                    <th>Rubro</th>
+                    <th>IMEI 1</th>
+                    <th>IMEI 2</th>
+                    <th>Proveedor</th>
+                    <th>Factura Proveedor</th>
+                    <th>Fecha Entrada</th>
+                    <th>Semana</th>
                     <th>Ubicación</th>
+                    <th>Precio Compra</th>
                     <th>Precio Venta</th>
+                    <th>Activo</th>
                     <th>Existencias</th>
                     <th>Acciones</th>
                 </tr>
@@ -144,11 +150,8 @@
             document.getElementById('fechaEntrada').value = '';
             document.getElementById('semana').value = '';
             document.getElementById('ubicacion').value = '';
-            document.getElementById('facturaCliente').value = '';
             document.getElementById('precioCompra').value = '';
             document.getElementById('precioVenta').value = '';
-            document.getElementById('precioVentaReal').value = '';
-            document.getElementById('descuento').value = '';
             document.getElementById('activo').checked = false;
             document.getElementById('existencias').value = '';
         }
@@ -166,11 +169,8 @@
             const fechaEntrada = document.getElementById('fechaEntrada').value;
             const semana = document.getElementById('semana').value.trim();
             const ubicacion = document.getElementById('ubicacion').value;
-            const facturaCliente = document.getElementById('facturaCliente').value.trim();
             const precioCompra = parseFloat(document.getElementById('precioCompra').value);
             const precioVenta = parseFloat(document.getElementById('precioVenta').value);
-            const precioVentaReal = parseFloat(document.getElementById('precioVentaReal').value);
-            const descuento = parseFloat(document.getElementById('descuento').value);
             const activo = document.getElementById('activo').checked;
             const existencias = parseInt(document.getElementById('existencias').value);
 
@@ -188,11 +188,8 @@
                     fechaEntrada: fechaEntrada,
                     semana: semana,
                     ubicacion: ubicacion,
-                    facturaCliente: facturaCliente,
                     precioCompra: precioCompra,
                     precioVenta: precioVenta,
-                    precioVentaReal: precioVentaReal,
-                    descuento: descuento,
                     activo: activo,
                     existencias: existencias
                 }).then(() => {
@@ -217,8 +214,17 @@
                                     <td>${articulo.descripcion || ''}</td>
                                     <td>${articulo.marca || ''}</td>
                                     <td>${articulo.modelo || ''}</td>
+                                    <td>${articulo.rubro || ''}</td>
+                                    <td>${articulo.imei1 || ''}</td>
+                                    <td>${articulo.imei2 || ''}</td>
+                                    <td>${articulo.proveedor || ''}</td>
+                                    <td>${articulo.facturaProveedor || ''}</td>
+                                    <td>${articulo.fechaEntrada || ''}</td>
+                                    <td>${articulo.semana || ''}</td>
                                     <td>${articulo.ubicacion || ''}</td>
+                                    <td>${articulo.precioCompra || ''}</td>
                                     <td>${articulo.precioVenta || ''}</td>
+                                    <td>${articulo.activo ? 'Sí' : 'No'}</td>
                                     <td>${articulo.existencias || ''}</td>
                                     <td>
                                         <button onclick="editArticulo('${doc.id}')">Editar</button>
@@ -247,4 +253,5 @@
     </script>
 </body>
 </html>
+
 

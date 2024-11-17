@@ -134,21 +134,67 @@
         function clearFields() {
             document.getElementById('codigoArticulo').value = '';
             document.getElementById('rubro').value = '';
-            // Limpiar todos los demás campos...
+            document.getElementById('marca').value = '';
+            document.getElementById('modelo').value = '';
+            document.getElementById('descripcion').value = '';
+            document.getElementById('imei1').value = '';
+            document.getElementById('imei2').value = '';
+            document.getElementById('proveedor').value = '';
+            document.getElementById('facturaProveedor').value = '';
+            document.getElementById('fechaEntrada').value = '';
+            document.getElementById('semana').value = '';
+            document.getElementById('ubicacion').value = '';
+            document.getElementById('facturaCliente').value = '';
+            document.getElementById('precioCompra').value = '';
+            document.getElementById('precioVenta').value = '';
+            document.getElementById('precioVentaReal').value = '';
+            document.getElementById('descuento').value = '';
+            document.getElementById('activo').checked = false;
+            document.getElementById('existencias').value = '';
         }
 
         function addOrUpdateArticulo() {
             const codigoArticulo = document.getElementById('codigoArticulo').value.trim();
             const rubro = document.getElementById('rubro').value;
             const marca = document.getElementById('marca').value.trim();
-            // Obtener y validar todos los demás campos...
+            const modelo = document.getElementById('modelo').value.trim();
+            const descripcion = document.getElementById('descripcion').value.trim();
+            const imei1 = document.getElementById('imei1').value.trim();
+            const imei2 = document.getElementById('imei2').value.trim();
+            const proveedor = document.getElementById('proveedor').value;
+            const facturaProveedor = document.getElementById('facturaProveedor').value.trim();
+            const fechaEntrada = document.getElementById('fechaEntrada').value;
+            const semana = document.getElementById('semana').value.trim();
+            const ubicacion = document.getElementById('ubicacion').value;
+            const facturaCliente = document.getElementById('facturaCliente').value.trim();
+            const precioCompra = parseFloat(document.getElementById('precioCompra').value);
+            const precioVenta = parseFloat(document.getElementById('precioVenta').value);
+            const precioVentaReal = parseFloat(document.getElementById('precioVentaReal').value);
+            const descuento = parseFloat(document.getElementById('descuento').value);
+            const activo = document.getElementById('activo').checked;
+            const existencias = parseInt(document.getElementById('existencias').value);
 
             if (codigoArticulo) {
                 db.collection("articulos").doc(codigoArticulo).set({
                     codigoArticulo: codigoArticulo,
                     rubro: rubro,
                     marca: marca,
-                    // Guardar los demás campos...
+                    modelo: modelo,
+                    descripcion: descripcion,
+                    imei1: imei1,
+                    imei2: imei2,
+                    proveedor: proveedor,
+                    facturaProveedor: facturaProveedor,
+                    fechaEntrada: fechaEntrada,
+                    semana: semana,
+                    ubicacion: ubicacion,
+                    facturaCliente: facturaCliente,
+                    precioCompra: precioCompra,
+                    precioVenta: precioVenta,
+                    precioVentaReal: precioVentaReal,
+                    descuento: descuento,
+                    activo: activo,
+                    existencias: existencias
                 }).then(() => {
                     alert("Artículo agregado o actualizado con éxito");
                     loadArticulos();
@@ -167,13 +213,13 @@
                 querySnapshot.forEach((doc) => {
                     const articulo = doc.data();
                     const row = `<tr>
-                                    <td>${articulo.codigoArticulo}</td>
-                                    <td>${articulo.descripcion}</td>
-                                    <td>${articulo.marca}</td>
-                                    <td>${articulo.modelo}</td>
-                                    <td>${articulo.ubicacion}</td>
-                                    <td>${articulo.precioVenta}</td>
-                                    <td>${articulo.existencias}</td>
+                                    <td>${articulo.codigoArticulo || ''}</td>
+                                    <td>${articulo.descripcion || ''}</td>
+                                    <td>${articulo.marca || ''}</td>
+                                    <td>${articulo.modelo || ''}</td>
+                                    <td>${articulo.ubicacion || ''}</td>
+                                    <td>${articulo.precioVenta || ''}</td>
+                                    <td>${articulo.existencias || ''}</td>
                                     <td>
                                         <button onclick="editArticulo('${doc.id}')">Editar</button>
                                         <button onclick="deleteArticulo('${doc.id}')">Eliminar</button>

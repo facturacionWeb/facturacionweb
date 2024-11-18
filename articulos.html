@@ -254,7 +254,7 @@
                         const ubicacionOriginal = articulo.ubicacion;
                         const existenciasOriginal = articulo.existencias;
 
-                        if (ubicacion !== ubicacionOriginal && existencias <= existenciasOriginal) {
+                        if (ubicacion !== ubicacionOriginal) {
                             // Crear o actualizar la nueva ubicación
                             const newArticuloRef = db.collection("articulos").doc(codigoArticulo + "-" + ubicacion);
                             newArticuloRef.get().then((newDoc) => {
@@ -286,18 +286,21 @@
                                     });
                                 }
                                 // Restar existencias de la ubicación original
-                                if (existencias < existenciasOriginal) {
-                                    db.collection("articulos").doc(codigoArticulo).update({
-                                        existencias: existenciasOriginal - existencias
+                                const nuevasExistenciasOriginal = existenciasOriginal - existencias;
+                                if (nuevasExistenciasOriginal > 0) {
+                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacionOriginal).update({
+                                        existencias: nuevasExistenciasOriginal
                                     }).then(() => {
                                         alert("Artículo actualizado con éxito");
                                         loadArticulos();
                                         clearFields();
                                     });
                                 } else {
-                                    alert("Artículo actualizado con éxito");
-                                    loadArticulos();
-                                    clearFields();
+                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacionOriginal).delete().then(() => {
+                                        alert("Artículo actualizado con éxito");
+                                        loadArticulos();
+                                        clearFields();
+                                    });
                                 }
                             });
                         } else if (ubicacion === ubicacionOriginal) {
@@ -468,4 +471,5 @@
     </script>
 </body>
 </html>
+
 

@@ -72,6 +72,9 @@
             background-color: #f2f2f2;
             cursor: pointer;
         }
+        .disabled {
+            background-color: #e9ecef;
+        }
     </style>
     <script>
         (function loadVersionScript() {
@@ -91,7 +94,7 @@
             } else {
                 loadArticulos();
                 loadProveedoresToDropdown();
-                loadUbicaciones(); // Cargar ubicaciones dinámicamente
+                loadUbicaciones();
             }
         };
     </script>
@@ -165,6 +168,7 @@
 
         <!-- Campo oculto para almacenar el ID del documento -->
         <input type="hidden" id="documentId" />
+        <input type="hidden" id="isRouteOriginal" />
 
         <button onclick="addOrUpdateArticulo()">Agregar/Actualizar Artículo</button>
         <button onclick="clearFields()">Limpiar Campos</button>
@@ -203,6 +207,7 @@
 
     <script>
         const db = firebase.firestore();
+        let ubicacionesData = {};
 
         function clearFields() {
             document.getElementById('codigoArticulo').value = '';
@@ -221,7 +226,10 @@
             document.getElementById('precioVenta').value = '';
             document.getElementById('activo').checked = false;
             document.getElementById('existencias').value = '';
+            document.getElementById('existencias').disabled = false;
+            document.getElementById('existencias').classList.remove('disabled');
             document.getElementById('documentId').value = '';
+            document.getElementById('isRouteOriginal').value = '';
         }
 
         function addOrUpdateArticulo() {
@@ -242,6 +250,7 @@
             const activo = document.getElementById('activo').checked;
             const existencias = parseInt(document.getElementById('existencias').value);
             const documentId = document.getElementById('documentId').value.trim();
+            const isRouteOriginal = document.getElementById('isRouteOriginal').value;
 
             if (codigoArticulo) {
                 if (ubicacion === "") {
@@ -249,92 +258,65 @@
                     return;
                 }
 
-                // Obtener el flag isRoute de la ubicación seleccionada
-                db.collection("locations").doc(ubicacion).get().then((ubicacionDoc) => {
-                    if (ubicacionDoc.exists) {
-                        const ubicacionData = ubicacionDoc.data();
-                        const isRoute = ubicacionData.isRoute;
+                const ubicacionData = ubicacionesData[ubicacion];
+                if (!ubicacionData) {
+                    alert("La ubicación seleccionada no existe");
+                    return;
+                }
+                const isRoute = ubicacionData.isRoute;
 
-                        if (documentId) {
-                            // Actualizar artículo existente
-                            db.collection("articulos").doc(documentId).get().then((doc) => {
-                                if (doc.exists) {
-                                    const articulo = doc.data();
-                                    const ubicacionOriginal = articulo.ubicacion;
-                                    const existenciasOriginal = articulo.existencias;
+                if (documentId) {
+                    // Actualizar artículo existente
+                    db.collection("articulos").doc(documentId).get().then((doc) => {
+                        if (doc.exists) {
+                            const articulo = doc.data();
+                            const ubicacionOriginal = articulo.ubicacion;
+                            const existenciasOriginal = articulo.existencias;
 
-                                    if (ubicacion !== ubicacionOriginal) {
-                                        // Mover existencias a nueva ubicación
-                                        const newDocumentId = codigoArticulo + "-" + ubicacion;
-                                        const newArticuloRef = db.collection("articulos").doc(newDocumentId);
-                                        newArticuloRef.get().then((newDoc) => {
-                                            if (newDoc.exists) {
-                                                // Sumar existencias en la nueva ubicación
-                                                const nuevasExistencias = newDoc.data().existencias + existencias;
-                                                newArticuloRef.update({
-                                                    existencias: nuevasExistencias
+                            if (ubicacionOriginal !== ubicacion) {
+                                // Verificar que la nueva ubicación tenga isRoute == 0
+                                const nuevaUbicacionData = ubicacionesData[ubicacion];
+                                if (nuevaUbicacionData.isRoute !== 0) {
+                                    alert("La nueva ubicación debe tener 'isRoute' igual a 0");
+                                    return;
+                                }
+
+                                if (existencias > existenciasOriginal) {
+                                    alert("No puede aumentar las existencias más allá del valor actual");
+                                    return;
+                                }
+
+                                // Mover existencias a nueva ubicación
+                                const newDocumentId = codigoArticulo + "-" + ubicacion;
+                                const newArticuloRef = db.collection("articulos").doc(newDocumentId);
+                                newArticuloRef.get().then((newDoc) => {
+                                    if (newDoc.exists) {
+                                        // Sumar existencias en la nueva ubicación
+                                        const nuevasExistencias = newDoc.data().existencias + existencias;
+                                        newArticuloRef.update({
+                                            existencias: nuevasExistencias
+                                        }).then(() => {
+                                            // Restar existencias de la ubicación original
+                                            const nuevasExistenciasOriginal = existenciasOriginal - existencias;
+                                            if (nuevasExistenciasOriginal > 0) {
+                                                db.collection("articulos").doc(documentId).update({
+                                                    existencias: nuevasExistenciasOriginal
                                                 }).then(() => {
-                                                    // Restar existencias de la ubicación original
-                                                    const nuevasExistenciasOriginal = existenciasOriginal - existencias;
-                                                    if (nuevasExistenciasOriginal > 0) {
-                                                        db.collection("articulos").doc(documentId).update({
-                                                            existencias: nuevasExistenciasOriginal
-                                                        }).then(() => {
-                                                            alert("Artículo actualizado con éxito");
-                                                            loadArticulos();
-                                                            clearFields();
-                                                        });
-                                                    } else {
-                                                        db.collection("articulos").doc(documentId).delete().then(() => {
-                                                            alert("Artículo actualizado con éxito");
-                                                            loadArticulos();
-                                                            clearFields();
-                                                        });
-                                                    }
+                                                    alert("Artículo actualizado con éxito");
+                                                    loadArticulos();
+                                                    clearFields();
                                                 });
                                             } else {
-                                                // Crear nuevo documento en la nueva ubicación
-                                                newArticuloRef.set({
-                                                    codigoArticulo: codigoArticulo,
-                                                    rubro: rubro,
-                                                    marca: marca,
-                                                    modelo: modelo,
-                                                    descripcion: descripcion,
-                                                    imei1: imei1,
-                                                    imei2: imei2,
-                                                    proveedor: proveedor,
-                                                    facturaProveedor: facturaProveedor,
-                                                    fechaEntrada: fechaEntrada,
-                                                    semana: semana,
-                                                    ubicacion: ubicacion,
-                                                    precioCompra: precioCompra,
-                                                    precioVenta: precioVenta,
-                                                    activo: activo,
-                                                    existencias: existencias
-                                                }).then(() => {
-                                                    // Restar existencias de la ubicación original
-                                                    const nuevasExistenciasOriginal = existenciasOriginal - existencias;
-                                                    if (nuevasExistenciasOriginal > 0) {
-                                                        db.collection("articulos").doc(documentId).update({
-                                                            existencias: nuevasExistenciasOriginal
-                                                        }).then(() => {
-                                                            alert("Artículo actualizado con éxito");
-                                                            loadArticulos();
-                                                            clearFields();
-                                                        });
-                                                    } else {
-                                                        db.collection("articulos").doc(documentId).delete().then(() => {
-                                                            alert("Artículo actualizado con éxito");
-                                                            loadArticulos();
-                                                            clearFields();
-                                                        });
-                                                    }
+                                                db.collection("articulos").doc(documentId).delete().then(() => {
+                                                    alert("Artículo actualizado con éxito");
+                                                    loadArticulos();
+                                                    clearFields();
                                                 });
                                             }
                                         });
                                     } else {
-                                        // Actualizar artículo en la misma ubicación
-                                        db.collection("articulos").doc(documentId).update({
+                                        // Crear nuevo documento en la nueva ubicación
+                                        newArticuloRef.set({
                                             codigoArticulo: codigoArticulo,
                                             rubro: rubro,
                                             marca: marca,
@@ -352,56 +334,97 @@
                                             activo: activo,
                                             existencias: existencias
                                         }).then(() => {
-                                            alert("Artículo actualizado con éxito");
-                                            loadArticulos();
-                                            clearFields();
+                                            // Restar existencias de la ubicación original
+                                            const nuevasExistenciasOriginal = existenciasOriginal - existencias;
+                                            if (nuevasExistenciasOriginal > 0) {
+                                                db.collection("articulos").doc(documentId).update({
+                                                    existencias: nuevasExistenciasOriginal
+                                                }).then(() => {
+                                                    alert("Artículo actualizado con éxito");
+                                                    loadArticulos();
+                                                    clearFields();
+                                                });
+                                            } else {
+                                                db.collection("articulos").doc(documentId).delete().then(() => {
+                                                    alert("Artículo actualizado con éxito");
+                                                    loadArticulos();
+                                                    clearFields();
+                                                });
+                                            }
                                         });
                                     }
+                                });
+                            } else {
+                                // Ubicación no ha cambiado
+                                if (isRouteOriginal == 1) {
+                                    // No se puede editar existencias en ubicaciones con isRoute == 1
+                                    alert("No puede editar las existencias en esta ubicación. Debe cambiar a una ubicación con 'isRoute' igual a 0");
+                                    return;
+                                } else {
+                                    // Actualizar artículo en la misma ubicación
+                                    db.collection("articulos").doc(documentId).update({
+                                        codigoArticulo: codigoArticulo,
+                                        rubro: rubro,
+                                        marca: marca,
+                                        modelo: modelo,
+                                        descripcion: descripcion,
+                                        imei1: imei1,
+                                        imei2: imei2,
+                                        proveedor: proveedor,
+                                        facturaProveedor: facturaProveedor,
+                                        fechaEntrada: fechaEntrada,
+                                        semana: semana,
+                                        ubicacion: ubicacion,
+                                        precioCompra: precioCompra,
+                                        precioVenta: precioVenta,
+                                        activo: activo,
+                                        existencias: existencias
+                                    }).then(() => {
+                                        alert("Artículo actualizado con éxito");
+                                        loadArticulos();
+                                        clearFields();
+                                    });
                                 }
-                            }).catch((error) => {
-                                console.error("Error al actualizar el artículo: ", error);
-                            });
-                        } else {
-                            // Crear nuevo artículo
-                            const newDocumentId = codigoArticulo + "-" + ubicacion;
-
-                            // Validar si se puede agregar nuevo artículo en esta ubicación
-                            if (isRoute !== 0) {
-                                alert("Los nuevos artículos deben ingresarse inicialmente en una ubicación con 'isRoute' igual a 0");
-                                return;
                             }
-
-                            db.collection("articulos").doc(newDocumentId).set({
-                                codigoArticulo: codigoArticulo,
-                                rubro: rubro,
-                                marca: marca,
-                                modelo: modelo,
-                                descripcion: descripcion,
-                                imei1: imei1,
-                                imei2: imei2,
-                                proveedor: proveedor,
-                                facturaProveedor: facturaProveedor,
-                                fechaEntrada: fechaEntrada,
-                                semana: semana,
-                                ubicacion: ubicacion,
-                                precioCompra: precioCompra,
-                                precioVenta: precioVenta,
-                                activo: activo,
-                                existencias: existencias
-                            }).then(() => {
-                                alert("Artículo agregado con éxito");
-                                loadArticulos();
-                                clearFields();
-                            }).catch((error) => {
-                                console.error("Error al agregar el artículo: ", error);
-                            });
                         }
-                    } else {
-                        alert("La ubicación seleccionada no existe");
+                    }).catch((error) => {
+                        console.error("Error al actualizar el artículo: ", error);
+                    });
+                } else {
+                    // Crear nuevo artículo
+                    const newDocumentId = codigoArticulo + "-" + ubicacion;
+
+                    // Validar si se puede agregar nuevo artículo en esta ubicación
+                    if (isRoute !== 0) {
+                        alert("Los nuevos artículos deben ingresarse inicialmente en una ubicación con 'isRoute' igual a 0");
+                        return;
                     }
-                }).catch((error) => {
-                    console.error("Error al obtener la ubicación: ", error);
-                });
+
+                    db.collection("articulos").doc(newDocumentId).set({
+                        codigoArticulo: codigoArticulo,
+                        rubro: rubro,
+                        marca: marca,
+                        modelo: modelo,
+                        descripcion: descripcion,
+                        imei1: imei1,
+                        imei2: imei2,
+                        proveedor: proveedor,
+                        facturaProveedor: facturaProveedor,
+                        fechaEntrada: fechaEntrada,
+                        semana: semana,
+                        ubicacion: ubicacion,
+                        precioCompra: precioCompra,
+                        precioVenta: precioVenta,
+                        activo: activo,
+                        existencias: existencias
+                    }).then(() => {
+                        alert("Artículo agregado con éxito");
+                        loadArticulos();
+                        clearFields();
+                    }).catch((error) => {
+                        console.error("Error al agregar el artículo: ", error);
+                    });
+                }
             } else {
                 alert("El código del artículo es requerido");
             }
@@ -427,7 +450,7 @@
                                         <td>${articulo.facturaProveedor || ''}</td>
                                         <td>${articulo.fechaEntrada || ''}</td>
                                         <td>${articulo.semana || ''}</td>
-                                        <td>${articulo.ubicacion || ''}</td>
+                                        <td>${ubicacionesData[articulo.ubicacion]?.name || articulo.ubicacion}</td>
                                         <td>${articulo.precioCompra || ''}</td>
                                         <td>${articulo.precioVenta || ''}</td>
                                         <td>${articulo.activo ? 'Sí' : 'No'}</td>
@@ -482,8 +505,10 @@
             const ubicacionDropdown = document.getElementById('ubicacion');
             db.collection("locations").get().then((querySnapshot) => {
                 ubicacionDropdown.innerHTML = '<option value="">Seleccione Ubicación</option>';
+                ubicacionesData = {};
                 querySnapshot.forEach((doc) => {
                     const ubicacion = doc.data();
+                    ubicacionesData[doc.id] = ubicacion;
                     const option = `<option value="${doc.id}">${ubicacion.name}</option>`;
                     ubicacionDropdown.innerHTML += option;
                 });
@@ -513,6 +538,17 @@
                     document.getElementById('precioVenta').value = articulo.precioVenta;
                     document.getElementById('activo').checked = articulo.activo;
                     document.getElementById('existencias').value = articulo.existencias;
+
+                    const ubicacionData = ubicacionesData[articulo.ubicacion];
+                    if (ubicacionData && ubicacionData.isRoute == 1) {
+                        document.getElementById('existencias').disabled = true;
+                        document.getElementById('existencias').classList.add('disabled');
+                        document.getElementById('isRouteOriginal').value = 1;
+                    } else {
+                        document.getElementById('existencias').disabled = false;
+                        document.getElementById('existencias').classList.remove('disabled');
+                        document.getElementById('isRouteOriginal').value = 0;
+                    }
                 }
             }).catch((error) => {
                 console.error("Error al obtener el artículo: ", error);
@@ -529,6 +565,29 @@
                 });
             }
         }
+
+        // Evento para detectar cambio de ubicación
+        document.getElementById('ubicacion').addEventListener('change', function() {
+            const nuevaUbicacion = this.value;
+            const ubicacionData = ubicacionesData[nuevaUbicacion];
+            if (!ubicacionData) {
+                alert("La ubicación seleccionada no existe");
+                return;
+            }
+            const isRouteNueva = ubicacionData.isRoute;
+            const isRouteOriginal = document.getElementById('isRouteOriginal').value;
+
+            if (isRouteOriginal == 1) {
+                if (nuevaUbicacion !== document.getElementById('ubicacion').value) {
+                    if (isRouteNueva != 0) {
+                        alert("La nueva ubicación debe tener 'isRoute' igual a 0");
+                    } else {
+                        document.getElementById('existencias').disabled = false;
+                        document.getElementById('existencias').classList.remove('disabled');
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>

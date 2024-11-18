@@ -254,18 +254,19 @@
                         const ubicacionOriginal = articulo.ubicacion;
                         const existenciasOriginal = articulo.existencias;
 
-                        if (ubicacion !== ubicacionOriginal && existencias < existenciasOriginal) {
+                        if (ubicacion !== ubicacionOriginal && existencias <= existenciasOriginal) {
                             // Crear o actualizar la nueva ubicación
-                            db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).get().then((newDoc) => {
+                            const newArticuloRef = db.collection("articulos").doc(codigoArticulo + "-" + ubicacion);
+                            newArticuloRef.get().then((newDoc) => {
                                 if (newDoc.exists) {
                                     // Si ya existe un registro para la nueva ubicación, sumar existencias
                                     const nuevasExistencias = newDoc.data().existencias + existencias;
-                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).update({
+                                    newArticuloRef.update({
                                         existencias: nuevasExistencias
                                     });
                                 } else {
                                     // Crear un nuevo registro para la nueva ubicación
-                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).set({
+                                    newArticuloRef.set({
                                         codigoArticulo: codigoArticulo,
                                         rubro: rubro,
                                         marca: marca,
@@ -284,13 +285,17 @@
                                         existencias: existencias
                                     });
                                 }
+                                // Restar existencias de la ubicación original
+                                db.collection("articulos").doc(codigoArticulo).update({
+                                    existencias: existenciasOriginal - existencias
+                                }).then(() => {
+                                    alert("Artículo actualizado con éxito");
+                                    loadArticulos();
+                                    clearFields();
+                                });
                             });
-                            // Restar existencias de la ubicación original
-                            db.collection("articulos").doc(codigoArticulo).update({
-                                existencias: existenciasOriginal - existencias
-                            });
-                        } else {
-                            // Actualizar el artículo normalmente
+                        } else if (ubicacion === ubicacionOriginal) {
+                            // Actualizar el artículo normalmente si la ubicación no cambia
                             db.collection("articulos").doc(codigoArticulo).update({
                                 codigoArticulo: codigoArticulo,
                                 rubro: rubro,
@@ -309,7 +314,7 @@
                                 activo: activo,
                                 existencias: existencias
                             }).then(() => {
-                                alert("Artículo agregado o actualizado con éxito");
+                                alert("Artículo actualizado con éxito");
                                 loadArticulos();
                                 clearFields();
                             });
@@ -334,7 +339,7 @@
                             activo: activo,
                             existencias: existencias
                         }).then(() => {
-                            alert("Artículo agregado o actualizado con éxito");
+                            alert("Artículo agregado con éxito");
                             loadArticulos();
                             clearFields();
                         });
@@ -457,8 +462,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-

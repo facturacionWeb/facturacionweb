@@ -2,7 +2,7 @@
 (function() {
     const versionContainer = document.createElement("div");
     versionContainer.classList.add("container");
-    versionContainer.innerHTML = '<p>Versión del sitio: 2024111806</p>';
+    versionContainer.innerHTML = '<p>Versión del sitio: 2024111807</p>';
     document.body.appendChild(versionContainer);
 })();
 

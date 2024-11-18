@@ -1,1 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración de Ubicaciones</title>
 
+    <!-- Import Firebase SDK (v8 with namespaced API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        input, button, label {
+            margin: 10px 0;
+            display: block;
+            width: 100%;
+            padding: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: left;
+        }
+        th, td {
+            text-align: center;
+        }
+    </style>
+    <script>
+        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
+        (function loadVersionScript() {
+            const versionScript = document.createElement('script');
+            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+            document.head.appendChild(versionScript);
+        })();
+    </script>
+</head>
+<body>
+    <script>
+        // Check if the user is already authenticated
+        window.onload = function() {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
+            } else {
+                // Load locations if authenticated
+                loadLocations();
+            }
+        };
+    </script>
+
+    <a href="index.html">Volver a la Página Principal</a>
+    
+    <div class="container">
+        <h1>Administración de Ubicaciones</h1>
+
+        <!-- Form to create or update a location -->
+        <input type="text" id="locationName" placeholder="Nombre de la Ubicación" />
+        <label>
+            <input type="checkbox" id="isRoute" /> Es Ruta
+        </label>
+        <textarea id="description" placeholder="Descripción de la Ubicación"></textarea>
+        <button onclick="addOrUpdateLocation()">Agregar/Actualizar Ubicación</button>
+        <button onclick="clearFields()">Limpiar Campos</button>
+
+        <!-- Table to display locations -->
+        <h2>Ubicaciones Existentes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Es Ruta</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="locationTable">
+                <!-- Location rows will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Function to clear input fields
+        function clearFields() {
+            document.getElementById('locationName').value = '';
+            document.getElementById('isRoute').checked = false;
+            document.getElementById('description').value = '';
+        }
+
+        const db = firebase.firestore();
+
+        // Function to add or update location
+        function addOrUpdateLocation() {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html";
+                return;
+            }
+            const locationName = document.getElementById('locationName').value.trim();
+            const isRoute = document.getElementById('isRoute').checked ? 1 : 0;
+            const description = document.getElementById('description').value.trim();
+
+            if (locationName) {
+                db.collection("locations").doc(locationName).get().then((doc) => {
+                    if (doc.exists) {
+                        alert("Ya existe una ubicación con ese nombre");
+                    } else {
+                        db.collection("locations").doc(locationName).set({
+                            name: locationName,
+                            isRoute: isRoute,
+                            description: description
+                        }).then(() => {
+                            alert("Ubicación agregada o actualizada con éxito");
+                            loadLocations();
+                        }).catch((error) => {
+                            console.error("Error al agregar o actualizar la ubicación: ", error);
+                        });
+                    }
+                });
+            } else {
+                alert("El nombre de la ubicación es requerido");
+            }
+        }
+
+        // Function to load locations
+        function loadLocations() {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html";
+                return;
+            }
+            db.collection("locations").get().then((querySnapshot) => {
+                const locationTable = document.getElementById('locationTable');
+                locationTable.innerHTML = '';
+                querySnapshot.forEach((doc) => {
+                    const location = doc.data();
+                    const row = `<tr>
+                                    <td>${location.name || 'N/A'}</td>
+                                    <td>${location.isRoute === 1 ? 'Sí' : 'No'}</td>
+                                    <td>${location.description || 'N/A'}</td>
+                                    <td>
+                                        <button onclick="editLocation('${location.name}')">Editar</button>
+                                        <button onclick="deleteLocation('${location.name}')">Eliminar</button>
+                                    </td>
+                                 </tr>`;
+                    locationTable.innerHTML += row;
+                });
+            }).catch((error) => {
+                console.error("Error al cargar las ubicaciones: ", error);
+            });
+        }
+
+        // Function to edit location
+        function editLocation(locationName) {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html";
+                return;
+            }
+            db.collection("locations").doc(locationName).get().then((doc) => {
+                if (doc.exists) {
+                    const location = doc.data();
+                    document.getElementById('locationName').value = location.name;
+                    document.getElementById('isRoute').checked = location.isRoute === 1;
+                    document.getElementById('description').value = location.description;
+                } else {
+                    alert("La ubicación no existe");
+                }
+            }).catch((error) => {
+                console.error("Error editando ubicación: ", error);
+            });
+        }
+
+        // Function to delete location
+        function deleteLocation(locationName) {
+            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            if (!isAuthenticated) {
+                alert("Debe autenticarse primero");
+                window.location.href = "index.html";
+                return;
+            }
+            db.collection("locations").doc(locationName).delete().then(() => {
+                alert("Ubicación eliminada con éxito");
+                loadLocations();
+            }).catch((error) => {
+                console.error("Error al eliminar la ubicación: ", error);
+            });
+        }
+    </script>
+</body>
+</html>

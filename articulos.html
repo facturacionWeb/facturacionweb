@@ -163,7 +163,14 @@
             <label for="activo">Activo</label>
         </div>
         <div class="form-group">
+            <label for="existencias">Existencias</label>
             <input type="number" id="existencias" placeholder="Existencias" />
+        </div>
+
+        <!-- Nuevo campo para ingresar la cantidad a transferir -->
+        <div class="form-group" id="transferDiv" style="display: none;">
+            <label for="transferCantidad">Cantidad a Transferir</label>
+            <input type="number" id="transferCantidad" placeholder="Cantidad a Transferir" />
         </div>
 
         <!-- Campos ocultos para almacenar información adicional -->
@@ -232,6 +239,8 @@
             document.getElementById('documentId').value = '';
             document.getElementById('isRouteOriginal').value = '';
             document.getElementById('ubicacionOriginal').value = '';
+            document.getElementById('transferDiv').style.display = 'none';
+            document.getElementById('transferCantidad').value = '';
         }
 
         function addOrUpdateArticulo() {
@@ -276,15 +285,21 @@
                             const existenciasOriginal = articulo.existencias;
 
                             if (ubicacionOriginal !== ubicacion) {
-                                // Verificar que la nueva ubicación tenga isRoute == 0
-                                const nuevaUbicacionData = ubicacionesData[ubicacion];
-                                if (nuevaUbicacionData.isRoute !== 0) {
-                                    alert("La nueva ubicación debe tener 'isRoute' igual a 0");
+                                const transferCantidad = parseInt(document.getElementById('transferCantidad').value);
+                                if (isNaN(transferCantidad) || transferCantidad <= 0) {
+                                    alert("Debe ingresar una cantidad válida a transferir");
                                     return;
                                 }
 
-                                if (existencias > existenciasOriginal) {
-                                    alert("No puede aumentar las existencias más allá del valor actual");
+                                if (transferCantidad > existenciasOriginal) {
+                                    alert("La cantidad a transferir no puede ser mayor que las existencias actuales");
+                                    return;
+                                }
+
+                                // Verificar que la nueva ubicación tenga isRoute == 0 si isRouteOriginal == 1
+                                const nuevaUbicacionData = ubicacionesData[ubicacion];
+                                if (isRouteOriginal == 1 && nuevaUbicacionData.isRoute !== 0) {
+                                    alert("La nueva ubicación debe tener 'isRoute' igual a 0");
                                     return;
                                 }
 
@@ -294,27 +309,19 @@
                                 newArticuloRef.get().then((newDoc) => {
                                     if (newDoc.exists) {
                                         // Sumar existencias en la nueva ubicación
-                                        const nuevasExistencias = newDoc.data().existencias + existencias;
+                                        const nuevasExistencias = newDoc.data().existencias + transferCantidad;
                                         newArticuloRef.update({
                                             existencias: nuevasExistencias
                                         }).then(() => {
                                             // Restar existencias de la ubicación original
-                                            const nuevasExistenciasOriginal = existenciasOriginal - existencias;
-                                            if (nuevasExistenciasOriginal > 0) {
-                                                db.collection("articulos").doc(documentId).update({
-                                                    existencias: nuevasExistenciasOriginal
-                                                }).then(() => {
-                                                    alert("Artículo actualizado con éxito");
-                                                    loadArticulos();
-                                                    clearFields();
-                                                });
-                                            } else {
-                                                db.collection("articulos").doc(documentId).delete().then(() => {
-                                                    alert("Artículo actualizado con éxito");
-                                                    loadArticulos();
-                                                    clearFields();
-                                                });
-                                            }
+                                            const nuevasExistenciasOriginal = existenciasOriginal - transferCantidad;
+                                            db.collection("articulos").doc(documentId).update({
+                                                existencias: nuevasExistenciasOriginal
+                                            }).then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
                                         });
                                     } else {
                                         // Crear nuevo documento en la nueva ubicación
@@ -334,25 +341,17 @@
                                             precioCompra: precioCompra,
                                             precioVenta: precioVenta,
                                             activo: activo,
-                                            existencias: existencias
+                                            existencias: transferCantidad
                                         }).then(() => {
                                             // Restar existencias de la ubicación original
-                                            const nuevasExistenciasOriginal = existenciasOriginal - existencias;
-                                            if (nuevasExistenciasOriginal > 0) {
-                                                db.collection("articulos").doc(documentId).update({
-                                                    existencias: nuevasExistenciasOriginal
-                                                }).then(() => {
-                                                    alert("Artículo actualizado con éxito");
-                                                    loadArticulos();
-                                                    clearFields();
-                                                });
-                                            } else {
-                                                db.collection("articulos").doc(documentId).delete().then(() => {
-                                                    alert("Artículo actualizado con éxito");
-                                                    loadArticulos();
-                                                    clearFields();
-                                                });
-                                            }
+                                            const nuevasExistenciasOriginal = existenciasOriginal - transferCantidad;
+                                            db.collection("articulos").doc(documentId).update({
+                                                existencias: nuevasExistenciasOriginal
+                                            }).then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
                                         });
                                     }
                                 });
@@ -581,20 +580,39 @@
             const isRouteOriginal = document.getElementById('isRouteOriginal').value;
             const ubicacionOriginal = document.getElementById('ubicacionOriginal').value;
 
-            if (isRouteOriginal == 1) {
+            if (document.getElementById('documentId').value) {
+                // Si estamos editando un artículo
                 if (nuevaUbicacion !== ubicacionOriginal) {
-                    if (isRouteNueva != 0) {
-                        alert("La nueva ubicación debe tener 'isRoute' igual a 0");
-                        // Revertir al valor anterior
-                        document.getElementById('ubicacion').value = ubicacionOriginal;
+                    // Mostrar campo para ingresar cantidad a transferir
+                    document.getElementById('transferDiv').style.display = 'block';
+
+                    if (isRouteOriginal == 1) {
+                        // Si la ubicación original es isRoute == 1
+                        if (isRouteNueva != 0) {
+                            alert("La nueva ubicación debe tener 'isRoute' igual a 0");
+                            document.getElementById('ubicacion').value = ubicacionOriginal;
+                            document.getElementById('transferDiv').style.display = 'none';
+                        } else {
+                            document.getElementById('existencias').disabled = false;
+                            document.getElementById('existencias').classList.remove('disabled');
+                        }
+                    } else {
+                        // Si la ubicación original es isRoute == 0
+                        // Validar que la cantidad a transferir no sea mayor a las existencias
+                        document.getElementById('existencias').disabled = true;
+                        document.getElementById('existencias').classList.add('disabled');
+                    }
+                } else {
+                    // Ocultar campo de transferencia si la ubicación no cambia
+                    document.getElementById('transferDiv').style.display = 'none';
+                    document.getElementById('transferCantidad').value = '';
+                    if (isRouteOriginal == 1) {
+                        document.getElementById('existencias').disabled = true;
+                        document.getElementById('existencias').classList.add('disabled');
                     } else {
                         document.getElementById('existencias').disabled = false;
                         document.getElementById('existencias').classList.remove('disabled');
                     }
-                } else {
-                    // Si vuelve a seleccionar la ubicación original, deshabilitamos existencias
-                    document.getElementById('existencias').disabled = true;
-                    document.getElementById('existencias').classList.add('disabled');
                 }
             }
         });

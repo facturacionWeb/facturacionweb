@@ -51,6 +51,7 @@
         <button onclick="goToClientesManagement()">Administrar Clientes</button>
         <button onclick="goToProveedoresManagement()">Administrar Proveedores</button>
         <button onclick="goToItemsManagement()">Administrar Artículos</button>
+        <button onclick="goToStoreManagement()">Administrar Ubicaciones</button>
         <button onclick="logout()">Cerrar Sesión</button>
     </div>
 
@@ -105,6 +106,10 @@
 
         function goToItemsManagement(){
             window.location.href = "articulos.html";
+        }
+
+        function goToStoreManagement(){
+            window.location.href = "ubicaciones.html";
         }
         
         // Function to log out

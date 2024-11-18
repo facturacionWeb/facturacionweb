@@ -70,6 +70,7 @@
         }
         th {
             background-color: #f2f2f2;
+            cursor: pointer;
         }
     </style>
     <script>
@@ -144,9 +145,9 @@
         <div class="form-group">
             <select id="ubicacion">
                 <option value="">Seleccione Ubicación</option>
+                <option value="Bodega General">Bodega General</option>
                 <option value="Ruta 1">Ruta 1</option>
                 <option value="Ruta 2">Ruta 2</option>
-                <option value="Bodega General">Bodega General</option>
                 <option value="En Taller">En Taller</option>
             </select>
         </div>
@@ -173,22 +174,22 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        <th>Marca</th>
-                        <th>Modelo</th>
-                        <th>Rubro</th>
-                        <th>IMEI 1</th>
-                        <th>IMEI 2</th>
-                        <th>Proveedor</th>
-                        <th>Factura Proveedor</th>
-                        <th>Fecha Entrada</th>
-                        <th>Semana</th>
-                        <th>Ubicación</th>
-                        <th>Precio Compra</th>
-                        <th>Precio Venta</th>
-                        <th>Activo</th>
-                        <th>Existencias</th>
+                        <th onclick="sortTable(0)">Código</th>
+                        <th onclick="sortTable(1)">Descripción</th>
+                        <th onclick="sortTable(2)">Marca</th>
+                        <th onclick="sortTable(3)">Modelo</th>
+                        <th onclick="sortTable(4)">Rubro</th>
+                        <th onclick="sortTable(5)">IMEI 1</th>
+                        <th onclick="sortTable(6)">IMEI 2</th>
+                        <th onclick="sortTable(7)">Proveedor</th>
+                        <th onclick="sortTable(8)">Factura Proveedor</th>
+                        <th onclick="sortTable(9)">Fecha Entrada</th>
+                        <th onclick="sortTable(10)">Semana</th>
+                        <th onclick="sortTable(11)">Ubicación</th>
+                        <th onclick="sortTable(12)">Precio Compra</th>
+                        <th onclick="sortTable(13)">Precio Venta</th>
+                        <th onclick="sortTable(14)">Activo</th>
+                        <th onclick="sortTable(15)">Existencias</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -240,23 +241,96 @@
             const existencias = parseInt(document.getElementById('existencias').value);
 
             if (codigoArticulo) {
-                db.collection("articulos").doc(codigoArticulo).set({
-                    codigoArticulo: codigoArticulo,
-                    rubro: rubro,
-                    marca: marca,
-                    modelo: modelo,
-                    descripcion: descripcion,
-                    imei1: imei1,
-                    imei2: imei2,
-                    proveedor: proveedor,
-                    facturaProveedor: facturaProveedor,
-                    fechaEntrada: fechaEntrada,
-                    semana: semana,
-                    ubicacion: ubicacion,
-                    precioCompra: precioCompra,
-                    precioVenta: precioVenta,
-                    activo: activo,
-                    existencias: existencias
+                // Validar que la ubicación inicial sea Bodega General si el artículo no existe
+                db.collection("articulos").doc(codigoArticulo).get().then((doc) => {
+                    if (!doc.exists && ubicacion !== "Bodega General") {
+                        alert("Los nuevos artículos deben ingresarse inicialmente en Bodega General");
+                        return;
+                    }
+
+                    // Si el artículo existe, actualizar datos
+                    if (doc.exists) {
+                        const articulo = doc.data();
+                        const ubicacionOriginal = articulo.ubicacion;
+                        const existenciasOriginal = articulo.existencias;
+
+                        if (ubicacion !== ubicacionOriginal && existencias < existenciasOriginal) {
+                            // Crear o actualizar la nueva ubicación
+                            db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).get().then((newDoc) => {
+                                if (newDoc.exists) {
+                                    // Si ya existe un registro para la nueva ubicación, sumar existencias
+                                    const nuevasExistencias = newDoc.data().existencias + existencias;
+                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).update({
+                                        existencias: nuevasExistencias
+                                    });
+                                } else {
+                                    // Crear un nuevo registro para la nueva ubicación
+                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacion).set({
+                                        codigoArticulo: codigoArticulo,
+                                        rubro: rubro,
+                                        marca: marca,
+                                        modelo: modelo,
+                                        descripcion: descripcion,
+                                        imei1: imei1,
+                                        imei2: imei2,
+                                        proveedor: proveedor,
+                                        facturaProveedor: facturaProveedor,
+                                        fechaEntrada: fechaEntrada,
+                                        semana: semana,
+                                        ubicacion: ubicacion,
+                                        precioCompra: precioCompra,
+                                        precioVenta: precioVenta,
+                                        activo: activo,
+                                        existencias: existencias
+                                    });
+                                }
+                            });
+                            // Restar existencias de la ubicación original
+                            db.collection("articulos").doc(codigoArticulo).update({
+                                existencias: existenciasOriginal - existencias
+                            });
+                        } else {
+                            // Actualizar el artículo normalmente
+                            db.collection("articulos").doc(codigoArticulo).update({
+                                codigoArticulo: codigoArticulo,
+                                rubro: rubro,
+                                marca: marca,
+                                modelo: modelo,
+                                descripcion: descripcion,
+                                imei1: imei1,
+                                imei2: imei2,
+                                proveedor: proveedor,
+                                facturaProveedor: facturaProveedor,
+                                fechaEntrada: fechaEntrada,
+                                semana: semana,
+                                ubicacion: ubicacion,
+                                precioCompra: precioCompra,
+                                precioVenta: precioVenta,
+                                activo: activo,
+                                existencias: existencias
+                            });
+                        }
+                    } else {
+                        // Crear nuevo artículo
+                        db.collection("articulos").doc(codigoArticulo).set({
+                            codigoArticulo: codigoArticulo,
+                            rubro: rubro,
+                            marca: marca,
+                            modelo: modelo,
+                            descripcion: descripcion,
+                            imei1: imei1,
+                            imei2: imei2,
+                            proveedor: proveedor,
+                            facturaProveedor: facturaProveedor,
+                            fechaEntrada: fechaEntrada,
+                            semana: semana,
+                            ubicacion: ubicacion,
+                            precioCompra: precioCompra,
+                            precioVenta: precioVenta,
+                            activo: activo,
+                            existencias: existencias
+                        });
+                    }
                 }).then(() => {
                     alert("Artículo agregado o actualizado con éxito");
                     loadArticulos();
@@ -305,6 +379,25 @@
             }).catch((error) => {
                 console.error("Error al cargar los artículos: ", error);
             });
+        }
+
+        function sortTable(columnIndex) {
+            const table = document.querySelector("table tbody");
+            const rows = Array.from(table.rows);
+            const sortedRows = rows.sort((a, b) => {
+                const cellA = a.cells[columnIndex].innerText.toLowerCase();
+                const cellB = b.cells[columnIndex].innerText.toLowerCase();
+
+                if (cellA < cellB) {
+                    return -1;
+                } else if (cellA > cellB) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            });
+            table.innerHTML = '';
+            sortedRows.forEach(row => table.appendChild(row));
         }
 
         function loadProveedoresToDropdown() {

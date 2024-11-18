@@ -263,6 +263,24 @@
                                     const nuevasExistencias = newDoc.data().existencias + existencias;
                                     newArticuloRef.update({
                                         existencias: nuevasExistencias
+                                    }).then(() => {
+                                        // Restar existencias de la ubicación original
+                                        const nuevasExistenciasOriginal = existenciasOriginal - existencias;
+                                        if (nuevasExistenciasOriginal > 0) {
+                                            db.collection("articulos").doc(codigoArticulo).update({
+                                                existencias: nuevasExistenciasOriginal
+                                            }).then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
+                                        } else {
+                                            db.collection("articulos").doc(codigoArticulo).delete().then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
+                                        }
                                     });
                                 } else {
                                     // Crear un nuevo registro para la nueva ubicación
@@ -283,23 +301,24 @@
                                         precioVenta: precioVenta,
                                         activo: activo,
                                         existencias: existencias
-                                    });
-                                }
-                                // Restar existencias de la ubicación original
-                                const nuevasExistenciasOriginal = existenciasOriginal - existencias;
-                                if (nuevasExistenciasOriginal > 0) {
-                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacionOriginal).update({
-                                        existencias: nuevasExistenciasOriginal
                                     }).then(() => {
-                                        alert("Artículo actualizado con éxito");
-                                        loadArticulos();
-                                        clearFields();
-                                    });
-                                } else {
-                                    db.collection("articulos").doc(codigoArticulo + "-" + ubicacionOriginal).delete().then(() => {
-                                        alert("Artículo actualizado con éxito");
-                                        loadArticulos();
-                                        clearFields();
+                                        // Restar existencias de la ubicación original
+                                        const nuevasExistenciasOriginal = existenciasOriginal - existencias;
+                                        if (nuevasExistenciasOriginal > 0) {
+                                            db.collection("articulos").doc(codigoArticulo).update({
+                                                existencias: nuevasExistenciasOriginal
+                                            }).then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
+                                        } else {
+                                            db.collection("articulos").doc(codigoArticulo).delete().then(() => {
+                                                alert("Artículo actualizado con éxito");
+                                                loadArticulos();
+                                                clearFields();
+                                            });
+                                        }
                                     });
                                 }
                             });
@@ -471,5 +490,3 @@
     </script>
 </body>
 </html>
-
-

@@ -166,9 +166,10 @@
             <input type="number" id="existencias" placeholder="Existencias" />
         </div>
 
-        <!-- Campo oculto para almacenar el ID del documento -->
+        <!-- Campos ocultos para almacenar información adicional -->
         <input type="hidden" id="documentId" />
         <input type="hidden" id="isRouteOriginal" />
+        <input type="hidden" id="ubicacionOriginal" />
 
         <button onclick="addOrUpdateArticulo()">Agregar/Actualizar Artículo</button>
         <button onclick="clearFields()">Limpiar Campos</button>
@@ -230,6 +231,7 @@
             document.getElementById('existencias').classList.remove('disabled');
             document.getElementById('documentId').value = '';
             document.getElementById('isRouteOriginal').value = '';
+            document.getElementById('ubicacionOriginal').value = '';
         }
 
         function addOrUpdateArticulo() {
@@ -251,6 +253,7 @@
             const existencias = parseInt(document.getElementById('existencias').value);
             const documentId = document.getElementById('documentId').value.trim();
             const isRouteOriginal = document.getElementById('isRouteOriginal').value;
+            const ubicacionOriginal = document.getElementById('ubicacionOriginal').value;
 
             if (codigoArticulo) {
                 if (ubicacion === "") {
@@ -270,7 +273,6 @@
                     db.collection("articulos").doc(documentId).get().then((doc) => {
                         if (doc.exists) {
                             const articulo = doc.data();
-                            const ubicacionOriginal = articulo.ubicacion;
                             const existenciasOriginal = articulo.existencias;
 
                             if (ubicacionOriginal !== ubicacion) {
@@ -534,6 +536,7 @@
                     document.getElementById('fechaEntrada').value = articulo.fechaEntrada;
                     document.getElementById('semana').value = articulo.semana;
                     document.getElementById('ubicacion').value = articulo.ubicacion;
+                    document.getElementById('ubicacionOriginal').value = articulo.ubicacion;
                     document.getElementById('precioCompra').value = articulo.precioCompra;
                     document.getElementById('precioVenta').value = articulo.precioVenta;
                     document.getElementById('activo').checked = articulo.activo;
@@ -576,15 +579,22 @@
             }
             const isRouteNueva = ubicacionData.isRoute;
             const isRouteOriginal = document.getElementById('isRouteOriginal').value;
+            const ubicacionOriginal = document.getElementById('ubicacionOriginal').value;
 
             if (isRouteOriginal == 1) {
-                if (nuevaUbicacion !== document.getElementById('ubicacion').value) {
+                if (nuevaUbicacion !== ubicacionOriginal) {
                     if (isRouteNueva != 0) {
                         alert("La nueva ubicación debe tener 'isRoute' igual a 0");
+                        // Revertir al valor anterior
+                        document.getElementById('ubicacion').value = ubicacionOriginal;
                     } else {
                         document.getElementById('existencias').disabled = false;
                         document.getElementById('existencias').classList.remove('disabled');
                     }
+                } else {
+                    // Si vuelve a seleccionar la ubicación original, deshabilitamos existencias
+                    document.getElementById('existencias').disabled = true;
+                    document.getElementById('existencias').classList.add('disabled');
                 }
             }
         });

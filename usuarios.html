@@ -24,8 +24,9 @@
         input, button, label, select {
             margin: 10px 0;
             display: block;
-            width: 100%;
+            width: calc(100% - 20px);
             padding: 10px;
+            box-sizing: border-box;
         }
         table {
             width: 100%;
@@ -190,7 +191,7 @@
 
         // Function to load locations into the select element
         function loadLocations() {
-            db.collection("locations").get().then((querySnapshot) => {
+            db.collection("locations").where("isRoute", "==", 1).get().then((querySnapshot) => {
                 const locationSelect = document.getElementById('location');
                 locationSelect.innerHTML = '<option value="">Seleccione una Ubicación</option>';
                 querySnapshot.forEach((doc) => {
@@ -247,10 +248,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-

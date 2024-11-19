@@ -21,7 +21,7 @@
             max-width: 800px;
             margin: 0 auto;
         }
-        input, button, label {
+        input, button, label, select {
             margin: 10px 0;
             display: block;
             width: 100%;
@@ -60,6 +60,7 @@
             } else {
                 // Load users if authenticated
                 loadUsers();
+                loadLocations();
             }
 
            document.getElementById('showPassword').addEventListener('change', togglePasswordVisibility);
@@ -88,6 +89,9 @@
         <label>
             <input type="checkbox" id="isAdmin" /> Administrador
         </label>
+        <select id="location">
+            <option value="">Seleccione una Ubicación</option>
+        </select>
         <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
         <button onclick="clearFields()">Limpiar Campos</button>
 
@@ -99,6 +103,7 @@
                     <th>Username</th>
                     <th>Nombre Completo</th>
                     <th>Administrador</th>
+                    <th>Ubicación</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -115,6 +120,7 @@
             document.getElementById('password').value = '';
             document.getElementById('fullName').value = '';
             document.getElementById('isAdmin').checked = false;
+            document.getElementById('location').value = '';
         }
 
         const db = firebase.firestore();
@@ -131,13 +137,15 @@
             const password = document.getElementById('password').value.trim();
             const fullName = document.getElementById('fullName').value.trim();
             const isAdmin = document.getElementById('isAdmin').checked ? 1 : 0;
+            const location = document.getElementById('location').value;
 
             if (username) {
                 db.collection("users").doc(username).set({
                     username: username,
                     password: password,
                     fullName: fullName,
-                    admin: isAdmin
+                    admin: isAdmin,
+                    location: location
                 }).then(() => {
                     alert("Usuario agregado o actualizado con éxito");
                     loadUsers();
@@ -167,6 +175,7 @@
                                     <td>${user.username || 'N/A'}</td>
                                     <td>${user.fullName || 'N/A'}</td>
                                     <td>${user.admin === 1 ? 'Sí' : 'No'}</td>
+                                    <td>${user.location || 'N/A'}</td>
                                     <td>
                                         <button onclick="editUser('${user.username}')">Editar</button>
                                         <button onclick="deleteUser('${user.username}')">Eliminar</button>
@@ -176,6 +185,23 @@
                 });
             }).catch((error) => {
                 console.error("Error al cargar los usuarios: ", error);
+            });
+        }
+
+        // Function to load locations into the select element
+        function loadLocations() {
+            db.collection("locations").get().then((querySnapshot) => {
+                const locationSelect = document.getElementById('location');
+                locationSelect.innerHTML = '<option value="">Seleccione una Ubicación</option>';
+                querySnapshot.forEach((doc) => {
+                    const location = doc.data();
+                    const option = document.createElement('option');
+                    option.value = location.name;
+                    option.textContent = location.name;
+                    locationSelect.appendChild(option);
+                });
+            }).catch((error) => {
+                console.error("Error al cargar las ubicaciones: ", error);
             });
         }
 
@@ -194,6 +220,7 @@
                     document.getElementById('password').value = user.password;
                     document.getElementById('fullName').value = user.fullName;
                     document.getElementById('isAdmin').checked = user.admin === 1;
+                    document.getElementById('location').value = user.location || '';
                 } else {
                     alert("El usuario no existe");
                 }

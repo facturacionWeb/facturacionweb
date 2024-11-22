@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Agregar Datos de Ejemplo</title>
+
+    <!-- Importar Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <!-- Configuración de Firebase -->
+    <script>
+        // Reemplaza con tu configuración de Firebase
+        var firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_AUTH_DOMAIN",
+            projectId: "TU_PROJECT_ID",
+            // ... otros parámetros si son necesarios
+        };
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+    </script>
+</head>
+<body>
+    <h1>Agregar Datos de Ejemplo</h1>
+    <button onclick="agregarDatos()">Agregar Facturas de Ejemplo</button>
+
+    <script>
+        const db = firebase.firestore();
+
+        function agregarDatos() {
+            const clienteId = '0rizFE6PITKoAifo3gO5';
+
+            // Crear datos de ejemplo para Facturas
+            const facturas = [
+                {
+                    ID_Firebase_Cliente: clienteId,
+                    '#Factura_Cliente': 'FAC-1001',
+                    Fecha_Hora_Factura: firebase.firestore.Timestamp.fromDate(new Date('2023-10-01T10:00:00')),
+                    Monto_Factura: 150.00,
+                    Tipo_Factura: 'Credito',
+                    Cancelada: 0
+                },
+                {
+                    ID_Firebase_Cliente: clienteId,
+                    '#Factura_Cliente': 'FAC-1002',
+                    Fecha_Hora_Factura: firebase.firestore.Timestamp.fromDate(new Date('2023-10-05T14:30:00')),
+                    Monto_Factura: 200.00,
+                    Tipo_Factura: 'Credito',
+                    Cancelada: 0
+                },
+                {
+                    ID_Firebase_Cliente: clienteId,
+                    '#Factura_Cliente': 'FAC-1003',
+                    Fecha_Hora_Factura: firebase.firestore.Timestamp.fromDate(new Date('2023-10-10T09:15:00')),
+                    Monto_Factura: 250.00,
+                    Tipo_Factura: 'Contado',
+                    Cancelada: 0
+                }
+            ];
+
+            // Agregar facturas a Firestore
+            facturas.forEach(async (factura) => {
+                try {
+                    const facturaRef = await db.collection('Facturas').add(factura);
+                    console.log('Factura agregada con ID:', facturaRef.id);
+
+                    // Ahora agregar detalles para cada factura
+                    agregarDetalleFactura(facturaRef.id);
+                } catch (error) {
+                    console.error('Error al agregar la factura:', error);
+                }
+            });
+        }
+
+        function agregarDetalleFactura(facturaId) {
+            // Crear datos de ejemplo para Detalle_Factura
+            const detalles = [
+                {
+                    ID_Firebase_Factura: facturaId,
+                    ID_Firebase_Articulo: 'ART-001',
+                    Cantidad: 2,
+                    Precio_Venta: 50.00,
+                    Precio_Venta_Real: 45.00
+                },
+                {
+                    ID_Firebase_Factura: facturaId,
+                    ID_Firebase_Articulo: 'ART-002',
+                    Cantidad: 1,
+                    Precio_Venta: 100.00,
+                    Precio_Venta_Real: 90.00
+                }
+            ];
+
+            detalles.forEach(async (detalle) => {
+                try {
+                    await db.collection('Detalle_Factura').add(detalle);
+                    console.log('Detalle de factura agregado para factura ID:', facturaId);
+                } catch (error) {
+                    console.error('Error al agregar el detalle de la factura:', error);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

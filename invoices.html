@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Facturas del Cliente</title>
+
+    <!-- Import Firebase SDK (v8 with namespaced API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+        }
+        th, td {
+            text-align: center;
+        }
+        .invoice-detail {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <a href="clientes.html">Volver a la Gestión de Clientes</a>
+    <div class="container">
+        <h1>Facturas del Cliente</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th># Factura Cliente</th>
+                    <th>Fecha y Hora</th>
+                    <th>Monto</th>
+                    <th>Tipo de Factura</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceTable">
+                <!-- Invoice rows will be populated here -->
+            </tbody>
+        </table>
+
+        <!-- Div to display invoice details -->
+        <div id="invoiceDetail" class="invoice-detail">
+            <!-- Invoice details will be shown here -->
+        </div>
+    </div>
+
+    <script>
+        // Initialize Firestore
+        const db = firebase.firestore();
+
+        // Function to get URL parameters
+        function getUrlParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
+
+        const clientId = getUrlParam('clientId');
+
+        if (!clientId) {
+            alert("ID de cliente no proporcionado");
+            window.location.href = "clientes.html";
+        }
+
+        // Function to load invoices
+        function loadInvoices() {
+            db.collection("Facturas")
+                .where("ID_Firebase_Cliente", "==", clientId)
+                .where("Tipo_Factura", "==", "Credito")
+                .where("Cancelada", "==", 0)
+                .get()
+                .then((querySnapshot) => {
+                    const invoiceTable = document.getElementById('invoiceTable');
+                    invoiceTable.innerHTML = '';
+                    querySnapshot.forEach((doc) => {
+                        const invoice = doc.data();
+                        const row = `<tr>
+                                        <td>${invoice['#Factura_Cliente'] || 'N/A'}</td>
+                                        <td>${invoice.Fecha_Hora_Factura || 'N/A'}</td>
+                                        <td>${invoice.Monto_Factura || 'N/A'}</td>
+                                        <td>${invoice.Tipo_Factura || 'N/A'}</td>
+                                        <td>
+                                            <button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button>
+                                        </td>
+                                     </tr>`;
+                        invoiceTable.innerHTML += row;
+                    });
+                })
+                .catch((error) => {
+                    console.error("Error al cargar las facturas: ", error);
+                });
+        }
+
+        // Function to show invoice detail
+        function showInvoiceDetail(invoiceId) {
+            const invoiceDetailDiv = document.getElementById('invoiceDetail');
+            invoiceDetailDiv.innerHTML = '<h2>Detalle de la Factura</h2>';
+
+            db.collection("Detalle_Factura")
+                .where("ID_Firebase_Factura", "==", invoiceId)
+                .get()
+                .then((querySnapshot) => {
+                    let total = 0;
+                    let detailTable = `<table>
+                                        <thead>
+                                            <tr>
+                                                <th>ID Artículo</th>
+                                                <th>Cantidad</th>
+                                                <th>Precio Venta</th>
+                                                <th>Precio Venta Real</th>
+                                                <th>Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+
+                    querySnapshot.forEach((doc) => {
+                        const detail = doc.data();
+                        const subtotal = detail.Cantidad * detail.Precio_Venta_Real;
+                        total += subtotal;
+
+                        detailTable += `<tr>
+                                            <td>${detail.ID_Firebase_Articulo || 'N/A'}</td>
+                                            <td>${detail.Cantidad || 'N/A'}</td>
+                                            <td>${detail.Precio_Venta || 'N/A'}</td>
+                                            <td>${detail.Precio_Venta_Real || 'N/A'}</td>
+                                            <td>${subtotal.toFixed(2)}</td>
+                                        </tr>`;
+                    });
+
+                    detailTable += `</tbody></table>`;
+                    detailTable += `<h3>Total de la Factura: ${total.toFixed(2)}</h3>`;
+                    invoiceDetailDiv.innerHTML += detailTable;
+                })
+                .catch((error) => {
+                    console.error("Error al cargar el detalle de la factura: ", error);
+                });
+        }
+
+        // Load invoices when the page loads
+        window.onload = function() {
+            loadInvoices();
+        };
+    </script>
+</body>
+</html>

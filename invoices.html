@@ -66,6 +66,26 @@
         // Initialize Firestore
         const db = firebase.firestore();
 
+        function formatDate(date) {
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            };
+            const datePart = date.toLocaleDateString('en-CA', options); // 'YYYY-MM-DD'
+        
+            let hours = date.getHours();
+            const minutes = date.getMinutes();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // la hora '0' debe ser '12'
+        
+            const timePart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+        
+            return `${datePart} ${timePart}`;
+        }
+
+
         // Function to get URL parameters
         function getUrlParam(param) {
             const urlParams = new URLSearchParams(window.location.search);
@@ -91,9 +111,17 @@
                     invoiceTable.innerHTML = '';
                     querySnapshot.forEach((doc) => {
                         const invoice = doc.data();
+
+                        // Convertir y formatear la fecha y hora
+                        let formattedDate = 'N/A';
+                        if (invoice.Fecha_Hora_Factura) {
+                            const date = invoice.Fecha_Hora_Factura.toDate();
+                            formattedDate = formatDate(date);
+                        }
+                        
                         const row = `<tr>
                                         <td>${invoice['#Factura_Cliente'] || 'N/A'}</td>
-                                        <td>${invoice.Fecha_Hora_Factura || 'N/A'}</td>
+                                        <td>${formattedDate}</td>
                                         <td>${invoice.Monto_Factura || 'N/A'}</td>
                                         <td>${invoice.Tipo_Factura || 'N/A'}</td>
                                         <td>

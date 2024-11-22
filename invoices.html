@@ -40,7 +40,7 @@
 <body>
     <a href="clientes.html">Volver a la Gestión de Clientes</a>
     <div class="container">
-        <h1>Facturas del Cliente</h1>
+        <h1 id="clientNameHeading">Facturas del Cliente</h1>
         <table>
             <thead>
                 <tr>
@@ -83,6 +83,25 @@
             const timePart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
         
             return `${datePart} ${timePart}`;
+        }
+
+        // Función para obtener el nombre del cliente
+        function getClientName() {
+            db.collection("clientes").doc(clientId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const clientData = doc.data();
+                        const clientName = clientData.nombreCliente || 'Cliente Desconocido';
+                        // Actualizar el encabezado con el nombre del cliente
+                        document.getElementById('clientNameHeading').innerText = `Facturas de ${clientName}`;
+                    } else {
+                        alert("Cliente no encontrado");
+                        window.location.href = "clientes.html";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error al obtener el nombre del cliente:", error);
+                });
         }
 
 
@@ -183,6 +202,7 @@
 
         // Load invoices when the page loads
         window.onload = function() {
+            getClientName(); // Obtener y mostrar el nombre del cliente
             loadInvoices();
         };
     </script>

@@ -144,7 +144,7 @@
                 querySnapshot.forEach((doc) => {
                     const client = doc.data();
                     const row = `<tr>
-                                    <td>${doc.id || 'N/A'}</td>
+                                    <td><a href="invoices.html?clientId=${doc.id}">${doc.id || 'N/A'}</a></td> 
                                     <td>${client.nombreCliente || 'N/A'}</td>
                                     <td>${client.nombreTienda || 'N/A'}</td>
                                     <td>${client.direccion || 'N/A'}</td>

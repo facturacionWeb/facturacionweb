@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Reporte Artículos con Ruta 📊</title>
+  <title>Reporte Artículos con Filtro de Ruta 📊</title>
   
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -18,10 +18,18 @@
     h1 {
       text-align: center;
     }
+    label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    select {
+      padding: 5px;
+      margin-bottom: 20px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 20px;
+      margin-top: 10px;
     }
     th, td {
       border: 1px solid #ccc;
@@ -31,9 +39,6 @@
     th {
       background-color: #f2f2f2;
     }
-    select {
-      padding: 5px;
-    }
     button {
       padding: 5px 10px;
       cursor: pointer;
@@ -41,97 +46,133 @@
   </style>
   
   <script>
-    // Inicializamos Firestore
+    // Inicializar Firestore
     const db = firebase.firestore();
 
-    // Función para cargar el reporte
+    // Función para cargar el reporte con filtro de Ruta
     function loadReport() {
       const reportTable = document.getElementById("reportTable");
       reportTable.innerHTML = ""; // Limpiar contenido previo
+
+      // Obtener el valor del filtro (TODOS, SIN RUTA o un número)
+      const filterValue = document.getElementById("filterRoute").value;
       
-      // Primero obtenemos todos los artículos para tener sus datos (marca, modelo)
+      // Primero obtenemos todos los artículos para armar un diccionario (clave = ID)
       db.collection("Articulos").get()
       .then((articlesSnapshot) => {
         let articlesDict = {};
         articlesSnapshot.forEach((doc) => {
           let art = doc.data();
-          articlesDict[art.id] = art; // Usamos el campo "id" del artículo como clave
+          articlesDict[art.id] = art; // Usamos el campo "id" del artículo
         });
-        // Ahora consultamos la colección de IMEI
+        // Luego obtenemos todos los registros de Articulos_X_IMEI
         return db.collection("Articulos_X_IMEI").get().then((imeiSnapshot) => {
+          let imeiList = [];
           imeiSnapshot.forEach((doc) => {
-            const imeiData = doc.data();
-            const articleId = imeiData.articleId;
-            const imeiValue = imeiData.imei;
-            const article = articlesDict[articleId] || {};
-            
-            // Creamos la fila de la tabla
-            let row = document.createElement("tr");
-            
-            // Columna ID
-            let cellID = document.createElement("td");
-            cellID.textContent = articleId;
-            row.appendChild(cellID);
-            
-            // Columna Marca
-            let cellMarca = document.createElement("td");
-            cellMarca.textContent = article.marca || "";
-            row.appendChild(cellMarca);
-            
-            // Columna Modelo
-            let cellModelo = document.createElement("td");
-            cellModelo.textContent = article.modelo || "";
-            row.appendChild(cellModelo);
-            
-            // Columna IMEI
-            let cellIMEI = document.createElement("td");
-            cellIMEI.textContent = imeiValue;
-            row.appendChild(cellIMEI);
-            
-            // Columna Ruta (select con opciones del 1 al 10 y "SIN RUTA")
-            let cellRuta = document.createElement("td");
-            let selectRuta = document.createElement("select");
-            selectRuta.id = "rutaSelect_" + doc.id;
-            
-            // Opción "SIN RUTA"
-            let optionSinRuta = document.createElement("option");
-            optionSinRuta.value = "SIN RUTA";
-            optionSinRuta.textContent = "SIN RUTA";
-            selectRuta.appendChild(optionSinRuta);
-            
-            // Opciones del 1 al 10
-            for (let i = 1; i <= 10; i++) {
-              let option = document.createElement("option");
-              option.value = i;
-              option.textContent = i;
-              selectRuta.appendChild(option);
-            }
-            cellRuta.appendChild(selectRuta);
-            row.appendChild(cellRuta);
-            
-            // Columna Acción (botón de guardar)
-            let cellAccion = document.createElement("td");
-            let btnGuardar = document.createElement("button");
-            btnGuardar.textContent = "Guardar";
-            btnGuardar.onclick = function() {
-              saveRuta(doc.id, imeiValue);
-            };
-            cellAccion.appendChild(btnGuardar);
-            row.appendChild(cellAccion);
-            
-            // Agregamos la fila a la tabla
-            reportTable.appendChild(row);
+            let data = doc.data();
+            data.docId = doc.id; // Guardamos el ID del documento
+            imeiList.push(data);
+          });
+          return imeiList;
+        }).then((imeiList) => {
+          // Ahora, obtenemos la información de rutas (Articulos_X_IMEI_X_Ruta)
+          return db.collection("Articulos_X_IMEI_X_Ruta").get().then((rutaSnapshot) => {
+            let rutaDict = {};
+            rutaSnapshot.forEach((doc) => {
+              let data = doc.data();
+              // Guardamos la ruta asociada al documento de Articulos_X_IMEI
+              rutaDict[doc.id] = String(data.Ruta);
+            });
+            return { imeiList, rutaDict, articlesDict };
           });
         });
+      })
+      .then(({ imeiList, rutaDict, articlesDict }) => {
+         // Recorrer cada registro de Articulos_X_IMEI
+         imeiList.forEach((imeiData) => {
+             const articleId = imeiData.articleId;
+             const imeiValue = imeiData.imei;
+             const docId = imeiData.docId;
+             
+             // Obtener la ruta asignada si existe; de lo contrario, "SIN RUTA"
+             let assignedRoute = rutaDict[docId];
+             if (assignedRoute === undefined) {
+                assignedRoute = "SIN RUTA";
+             }
+             
+             // Aplicar filtro: si el filtro no es "TODOS" y no coincide, se omite la fila
+             if (filterValue !== "TODOS" && filterValue !== assignedRoute) {
+                return; // Salta este registro
+             }
+             
+             // Crear la fila de la tabla
+             let row = document.createElement("tr");
+             
+             // Columna ID (del artículo)
+             let cellID = document.createElement("td");
+             cellID.textContent = articleId;
+             row.appendChild(cellID);
+             
+             // Columna Marca (desde Articulos)
+             let cellMarca = document.createElement("td");
+             cellMarca.textContent = (articlesDict[articleId] && articlesDict[articleId].marca) || "";
+             row.appendChild(cellMarca);
+             
+             // Columna Modelo (desde Articulos)
+             let cellModelo = document.createElement("td");
+             cellModelo.textContent = (articlesDict[articleId] && articlesDict[articleId].modelo) || "";
+             row.appendChild(cellModelo);
+             
+             // Columna IMEI
+             let cellIMEI = document.createElement("td");
+             cellIMEI.textContent = imeiValue;
+             row.appendChild(cellIMEI);
+             
+             // Columna Ruta: un select con opciones "SIN RUTA" y números del 1 al 10
+             let cellRuta = document.createElement("td");
+             let selectRuta = document.createElement("select");
+             selectRuta.id = "rutaSelect_" + docId;
+             
+             // Opción "SIN RUTA"
+             let optionSinRuta = document.createElement("option");
+             optionSinRuta.value = "SIN RUTA";
+             optionSinRuta.textContent = "SIN RUTA";
+             selectRuta.appendChild(optionSinRuta);
+             
+             // Opciones del 1 al 10
+             for (let i = 1; i <= 10; i++) {
+                let option = document.createElement("option");
+                option.value = i;
+                option.textContent = i;
+                selectRuta.appendChild(option);
+             }
+             // Seleccionar el valor asignado
+             selectRuta.value = assignedRoute;
+             cellRuta.appendChild(selectRuta);
+             row.appendChild(cellRuta);
+             
+             // Columna Acción: botón de Guardar
+             let cellAccion = document.createElement("td");
+             let btnGuardar = document.createElement("button");
+             btnGuardar.textContent = "Guardar";
+             btnGuardar.onclick = function() {
+                saveRuta(docId, imeiValue);
+             };
+             cellAccion.appendChild(btnGuardar);
+             row.appendChild(cellAccion);
+             
+             // Agregar la fila a la tabla
+             reportTable.appendChild(row);
+         });
       })
       .catch((error) => {
          console.error("Error al cargar el reporte: ", error);
       });
     }
     
-    // Función para guardar o eliminar la ruta
+    // Función para guardar o eliminar la ruta en Articulos_X_IMEI_X_Ruta
     function saveRuta(docId, imeiValue) {
-      // Obtenemos el valor seleccionado del dropdown
+      // Obtener el valor seleccionado del dropdown
       let selectElement = document.getElementById("rutaSelect_" + docId);
       let selectedRoute = selectElement.value;
       
@@ -140,13 +181,14 @@
         db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).delete()
         .then(() => {
           alert("Registro eliminado (SIN RUTA) 😎");
+          loadReport(); // Recargar el reporte para actualizar la vista
         })
         .catch((error) => {
           console.error("Error al eliminar registro: ", error);
           alert("Error al eliminar registro.");
         });
       } else {
-        // Si se seleccionó un número, guardamos o actualizamos el registro
+        // Si se seleccionó un número, se guarda o actualiza el registro
         db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).set({
           ID: docId,
           IMEI: imeiValue,
@@ -154,6 +196,7 @@
         })
         .then(() => {
           alert("Registro guardado con ruta " + selectedRoute + " 👍");
+          loadReport(); // Recargar el reporte
         })
         .catch((error) => {
           console.error("Error al guardar registro: ", error);
@@ -162,14 +205,33 @@
       }
     }
     
-    // Cargamos el reporte al iniciar la página
+    // Cargar el reporte al iniciar la página
     window.onload = function() {
       loadReport();
     }
   </script>
 </head>
 <body>
-  <h1>Reporte Artículos con Ruta</h1>
+  <h1>Reporte Artículos con Filtro de Ruta</h1>
+  
+  <!-- Selector para filtrar por Ruta -->
+  <label for="filterRoute">Filtrar por Ruta:</label>
+  <select id="filterRoute" onchange="loadReport()">
+    <option value="TODOS">TODOS</option>
+    <option value="SIN RUTA">SIN RUTA</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+    <option value="10">10</option>
+  </select>
+  
+  <!-- Tabla del reporte -->
   <table>
     <thead>
       <tr>
@@ -182,8 +244,9 @@
       </tr>
     </thead>
     <tbody id="reportTable">
-      <!-- Aquí se cargarán las filas dinámicamente -->
+      <!-- Se cargarán dinámicamente las filas -->
     </tbody>
   </table>
 </body>
 </html>
+

@@ -1,621 +1,288 @@
-<!DOCTYPE html> 
-<html lang="en">
+<!DOCTYPE html>
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Artículos</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Artículos y Existencias (IMEI) 😎</title>
 
-    <!-- Import Firebase SDK (v8 with namespaced API) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    
-    <!-- Import Firebase configuration -->
-    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-    
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-        input[type="text"],
-        input[type="number"],
-        input[type="datetime-local"],
-        select,
-        textarea,
-        button {
-            margin: 10px 0;
-            display: block;
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        textarea {
-            height: 100px;
-            resize: vertical;
-        }
-        label {
-            margin: 10px 0;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-        }
-        .checkbox-group label {
-            margin-left: 5px;
-            margin-bottom: 0;
-        }
-        .table-container {
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
-        }
-        table, th, td {
-            border: 1px solid black;
-        }
-        th, td {
-            padding: 5px;
-            text-align: center;
-            font-size: 12px;
-            word-wrap: break-word;
-        }
-        th {
-            background-color: #f2f2f2;
-            cursor: pointer;
-        }
-        .disabled {
-            background-color: #e9ecef;
-        }
-    </style>
-    <script>
-        (function loadVersionScript() {
-            const versionScript = document.createElement('script');
-            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-            document.head.appendChild(versionScript);
-        })();
-    </script>
+  <!-- Import Firebase SDK (v8 with namespaced API) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      margin-bottom: 40px;
+    }
+    input[type="text"],
+    input[type="number"],
+    button,
+    select {
+      margin: 10px 0;
+      display: block;
+      width: 100%;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+  </style>
+
+  <script>
+    // Script para cargar versión (opcional)
+    (function loadVersionScript() {
+      const versionScript = document.createElement('script');
+      versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+      document.head.appendChild(versionScript);
+    })();
+  </script>
 </head>
 <body>
-    <script>
-        window.onload = function() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-            } else {
-                loadArticulos();
-                loadProveedoresToDropdown();
-                loadUbicaciones();
-            }
-        };
-    </script>
+  <h1>Gestión de Artículos y Existencias (IMEI) 📱💾</h1>
 
-    <a href="index.html">Volver a la Página Principal</a>
-    
-    <div class="container">
-        <h1>Gestión de Artículos</h1>
+  <!-- Sección de Artículos -->
+  <div class="container" id="articlesSection">
+    <h2>Gestión de Artículos</h2>
+    <!-- Formulario para Artículos -->
+    <input type="text" id="articleId" placeholder="ID del Artículo" />
+    <input type="text" id="marca" placeholder="Marca" />
+    <input type="text" id="modelo" placeholder="Modelo" />
+    <input type="number" id="precioCompra" placeholder="Precio de Compra" step="0.01" />
+    <input type="number" id="precioVenta" placeholder="Precio de Venta" step="0.01" />
+    <button onclick="addOrUpdateArticle()">Agregar/Actualizar Artículo</button>
+    <button onclick="clearArticleFields()">Limpiar Campos</button>
 
-        <!-- Formulario para agregar o editar un artículo -->
-        <div class="form-group">
-            <input type="text" id="codigoArticulo" placeholder="Código del Artículo" />
-        </div>
-        <div class="form-group">
-            <select id="rubro">
-                <option value="">Seleccione un Rubro</option>
-                <option value="teléfonos">Teléfonos</option>
-                <option value="tablet">Tablet</option>
-                <option value="otros">Otros</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <input type="text" id="marca" placeholder="Marca" />
-        </div>
-        <div class="form-group">
-            <input type="text" id="modelo" placeholder="Modelo" />
-        </div>
-        <div class="form-group">
-            <textarea id="descripcion" placeholder="Descripción"></textarea>
-        </div>
-        <div class="form-group">
-            <input type="text" id="imei1" placeholder="IMEI 1" />
-        </div>
-        <div class="form-group">
-            <input type="text" id="imei2" placeholder="IMEI 2" />
-        </div>
-        <div class="form-group">
-            <select id="proveedor">
-                <option value="">Seleccione un Proveedor</option>
-                <!-- Opciones cargadas dinámicamente -->
-            </select>
-        </div>
-        <div class="form-group">
-            <input type="text" id="facturaProveedor" placeholder="Factura del Proveedor" />
-        </div>
-        <div class="form-group">
-            <input type="datetime-local" id="fechaEntrada" />
-        </div>
-        <div class="form-group">
-            <input type="text" id="semana" placeholder="Semana" />
-        </div>
-        <div class="form-group">
-            <select id="ubicacion">
-                <option value="">Seleccione Ubicación</option>
-                <!-- Opciones cargadas dinámicamente -->
-            </select>
-        </div>
-        <div class="form-group">
-            <input type="number" id="precioCompra" placeholder="Precio de Compra" />
-        </div>
-        <div class="form-group">
-            <input type="number" id="precioVenta" placeholder="Precio de Venta" />
-        </div>
-        <div class="form-group checkbox-group">
-            <input type="checkbox" id="activo" />
-            <label for="activo">Activo</label>
-        </div>
-        <div class="form-group">
-            <label for="existencias">Existencias</label>
-            <input type="number" id="existencias" placeholder="Existencias" />
-        </div>
+    <!-- Tabla de Artículos -->
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Marca</th>
+          <th>Modelo</th>
+          <th>Precio Compra</th>
+          <th>Precio Venta</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="articleTable">
+        <!-- Las filas se cargarán dinámicamente -->
+      </tbody>
+    </table>
+  </div>
 
-        <!-- Nuevo campo para ingresar la cantidad a transferir -->
-        <div class="form-group" id="transferDiv" style="display: none;">
-            <label for="transferCantidad">Cantidad a Transferir</label>
-            <input type="number" id="transferCantidad" placeholder="Cantidad a Transferir" />
-        </div>
+  <!-- Sección de IMEI -->
+  <div class="container" id="imeiSection">
+    <h2>Gestión de Existencias (IMEI)</h2>
+    <!-- Selector para elegir un Artículo -->
+    <select id="articleSelector">
+      <option value="">Seleccione un Artículo</option>
+      <!-- Opciones cargadas dinámicamente -->
+    </select>
+    <!-- Formulario para agregar IMEI -->
+    <input type="text" id="imei" placeholder="IMEI" />
+    <button onclick="addIMEI()">Agregar IMEI</button>
 
-        <!-- Campos ocultos para almacenar información adicional -->
-        <input type="hidden" id="documentId" />
-        <input type="hidden" id="isRouteOriginal" />
-        <input type="hidden" id="ubicacionOriginal" />
+    <!-- Tabla de IMEIs -->
+    <table>
+      <thead>
+        <tr>
+          <th>ID (Registro)</th>
+          <th>IMEI</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="imeiTable">
+        <!-- Las filas se cargarán dinámicamente -->
+      </tbody>
+    </table>
+  </div>
 
-        <button onclick="addOrUpdateArticulo()">Agregar/Actualizar Artículo</button>
-        <button onclick="clearFields()">Limpiar Campos</button>
+  <script>
+    // Inicializar Firestore
+    const db = firebase.firestore();
 
-        <!-- Tabla para mostrar los artículos existentes -->
-        <h2>Artículos Existentes</h2>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th onclick="sortTable(0)">Código</th>
-                        <th onclick="sortTable(1)">Descripción</th>
-                        <th onclick="sortTable(2)">Marca</th>
-                        <th onclick="sortTable(3)">Modelo</th>
-                        <th onclick="sortTable(4)">Rubro</th>
-                        <th onclick="sortTable(5)">IMEI 1</th>
-                        <th onclick="sortTable(6)">IMEI 2</th>
-                        <th onclick="sortTable(7)">Proveedor</th>
-                        <th onclick="sortTable(8)">Factura Proveedor</th>
-                        <th onclick="sortTable(9)">Fecha Entrada</th>
-                        <th onclick="sortTable(10)">Semana</th>
-                        <th onclick="sortTable(11)">Ubicación</th>
-                        <th onclick="sortTable(12)">Precio Compra</th>
-                        <th onclick="sortTable(13)">Precio Venta</th>
-                        <th onclick="sortTable(14)">Activo</th>
-                        <th onclick="sortTable(15)">Existencias</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="articuloTable">
-                    <!-- Filas de artículos se cargarán dinámicamente -->
-                </tbody>
-            </table>
-        </div>
-    </div>
+    /* =============================
+       Funciones para Artículos
+       ============================= */
+    function clearArticleFields() {
+      document.getElementById('articleId').value = '';
+      document.getElementById('marca').value = '';
+      document.getElementById('modelo').value = '';
+      document.getElementById('precioCompra').value = '';
+      document.getElementById('precioVenta').value = '';
+    }
 
-    <script>
-        const db = firebase.firestore();
-        let ubicacionesData = {};
+    function addOrUpdateArticle() {
+      const id = document.getElementById('articleId').value.trim();
+      const marca = document.getElementById('marca').value.trim();
+      const modelo = document.getElementById('modelo').value.trim();
+      const precioCompra = parseFloat(document.getElementById('precioCompra').value);
+      const precioVenta = parseFloat(document.getElementById('precioVenta').value);
 
-        function clearFields() {
-            document.getElementById('codigoArticulo').value = '';
-            document.getElementById('rubro').value = '';
-            document.getElementById('marca').value = '';
-            document.getElementById('modelo').value = '';
-            document.getElementById('descripcion').value = '';
-            document.getElementById('imei1').value = '';
-            document.getElementById('imei2').value = '';
-            document.getElementById('proveedor').value = '';
-            document.getElementById('facturaProveedor').value = '';
-            document.getElementById('fechaEntrada').value = '';
-            document.getElementById('semana').value = '';
-            document.getElementById('ubicacion').value = '';
-            document.getElementById('precioCompra').value = '';
-            document.getElementById('precioVenta').value = '';
-            document.getElementById('activo').checked = false;
-            document.getElementById('existencias').value = '';
-            document.getElementById('existencias').disabled = false;
-            document.getElementById('existencias').classList.remove('disabled');
-            document.getElementById('documentId').value = '';
-            document.getElementById('isRouteOriginal').value = '';
-            document.getElementById('ubicacionOriginal').value = '';
-            document.getElementById('transferDiv').style.display = 'none';
-            document.getElementById('transferCantidad').value = '';
-        }
+      if (!id) {
+        alert("El ID del artículo es requerido 😅");
+        return;
+      }
+      if (!marca || !modelo || isNaN(precioCompra) || isNaN(precioVenta)) {
+        alert("Por favor, complete todos los campos correctamente 😬");
+        return;
+      }
 
-        function addOrUpdateArticulo() {
-            const codigoArticulo = document.getElementById('codigoArticulo').value.trim();
-            const rubro = document.getElementById('rubro').value;
-            const marca = document.getElementById('marca').value.trim();
-            const modelo = document.getElementById('modelo').value.trim();
-            const descripcion = document.getElementById('descripcion').value.trim();
-            const imei1 = document.getElementById('imei1').value.trim();
-            const imei2 = document.getElementById('imei2').value.trim();
-            const proveedor = document.getElementById('proveedor').value;
-            const facturaProveedor = document.getElementById('facturaProveedor').value.trim();
-            const fechaEntrada = document.getElementById('fechaEntrada').value;
-            const semana = document.getElementById('semana').value.trim();
-            const ubicacion = document.getElementById('ubicacion').value;
-            const precioCompra = parseFloat(document.getElementById('precioCompra').value);
-            const precioVenta = parseFloat(document.getElementById('precioVenta').value);
-            const activo = document.getElementById('activo').checked;
-            const existencias = parseInt(document.getElementById('existencias').value);
-            const documentId = document.getElementById('documentId').value.trim();
-            const isRouteOriginal = document.getElementById('isRouteOriginal').value;
-            const ubicacionOriginal = document.getElementById('ubicacionOriginal').value;
+      // Guardar o actualizar el artículo en la colección "Articulos"
+      db.collection("Articulos").doc(id).set({
+        id,
+        marca,
+        modelo,
+        precioCompra,
+        precioVenta
+      })
+      .then(() => {
+        alert("Artículo guardado con éxito 😎");
+        loadArticles();
+        clearArticleFields();
+      })
+      .catch((error) => {
+        console.error("Error al guardar el artículo: ", error);
+      });
+    }
 
-            if (codigoArticulo) {
-                if (ubicacion === "") {
-                    alert("Debe seleccionar una ubicación");
-                    return;
-                }
+    function loadArticles() {
+      db.collection("Articulos").get().then((querySnapshot) => {
+        const articleTable = document.getElementById('articleTable');
+        const articleSelector = document.getElementById('articleSelector');
+        articleTable.innerHTML = '';
+        articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
 
-                const ubicacionData = ubicacionesData[ubicacion];
-                if (!ubicacionData) {
-                    alert("La ubicación seleccionada no existe");
-                    return;
-                }
-                const isRoute = ubicacionData.isRoute;
-
-                if (documentId) {
-                    // Actualizar artículo existente
-                    db.collection("articulos").doc(documentId).get().then((doc) => {
-                        if (doc.exists) {
-                            const articulo = doc.data();
-                            const existenciasOriginal = articulo.existencias;
-
-                            if (ubicacionOriginal !== ubicacion) {
-                                const transferCantidad = parseInt(document.getElementById('transferCantidad').value);
-                                if (isNaN(transferCantidad) || transferCantidad <= 0) {
-                                    alert("Debe ingresar una cantidad válida a transferir");
-                                    return;
-                                }
-
-                                if (transferCantidad > existenciasOriginal) {
-                                    alert("La cantidad a transferir no puede ser mayor que las existencias actuales");
-                                    return;
-                                }
-
-                                // Verificar que la nueva ubicación tenga isRoute == 0 si isRouteOriginal == 1
-                                const nuevaUbicacionData = ubicacionesData[ubicacion];
-                                if (isRouteOriginal == 1 && nuevaUbicacionData.isRoute !== 0) {
-                                    alert("La nueva ubicación debe tener 'isRoute' igual a 0");
-                                    return;
-                                }
-
-                                // Mover existencias a nueva ubicación
-                                const newDocumentId = codigoArticulo + "-" + ubicacion;
-                                const newArticuloRef = db.collection("articulos").doc(newDocumentId);
-                                newArticuloRef.get().then((newDoc) => {
-                                    if (newDoc.exists) {
-                                        // Sumar existencias en la nueva ubicación
-                                        const nuevasExistencias = newDoc.data().existencias + transferCantidad;
-                                        newArticuloRef.update({
-                                            existencias: nuevasExistencias
-                                        }).then(() => {
-                                            // Restar existencias de la ubicación original
-                                            const nuevasExistenciasOriginal = existenciasOriginal - transferCantidad;
-                                            db.collection("articulos").doc(documentId).update({
-                                                existencias: nuevasExistenciasOriginal
-                                            }).then(() => {
-                                                alert("Artículo actualizado con éxito");
-                                                loadArticulos();
-                                                clearFields();
-                                            });
-                                        });
-                                    } else {
-                                        // Crear nuevo documento en la nueva ubicación
-                                        newArticuloRef.set({
-                                            codigoArticulo: codigoArticulo,
-                                            rubro: rubro,
-                                            marca: marca,
-                                            modelo: modelo,
-                                            descripcion: descripcion,
-                                            imei1: imei1,
-                                            imei2: imei2,
-                                            proveedor: proveedor,
-                                            facturaProveedor: facturaProveedor,
-                                            fechaEntrada: fechaEntrada,
-                                            semana: semana,
-                                            ubicacion: ubicacion,
-                                            precioCompra: precioCompra,
-                                            precioVenta: precioVenta,
-                                            activo: activo,
-                                            existencias: transferCantidad
-                                        }).then(() => {
-                                            // Restar existencias de la ubicación original
-                                            const nuevasExistenciasOriginal = existenciasOriginal - transferCantidad;
-                                            db.collection("articulos").doc(documentId).update({
-                                                existencias: nuevasExistenciasOriginal
-                                            }).then(() => {
-                                                alert("Artículo actualizado con éxito");
-                                                loadArticulos();
-                                                clearFields();
-                                            });
-                                        });
-                                    }
-                                });
-                            } else {
-                                // Ubicación no ha cambiado
-                                if (isRouteOriginal == 1) {
-                                    // No se puede editar existencias en ubicaciones con isRoute == 1
-                                    alert("No puede editar las existencias en esta ubicación. Debe cambiar a una ubicación con 'isRoute' igual a 0");
-                                    return;
-                                } else {
-                                    // Actualizar artículo en la misma ubicación
-                                    db.collection("articulos").doc(documentId).update({
-                                        codigoArticulo: codigoArticulo,
-                                        rubro: rubro,
-                                        marca: marca,
-                                        modelo: modelo,
-                                        descripcion: descripcion,
-                                        imei1: imei1,
-                                        imei2: imei2,
-                                        proveedor: proveedor,
-                                        facturaProveedor: facturaProveedor,
-                                        fechaEntrada: fechaEntrada,
-                                        semana: semana,
-                                        ubicacion: ubicacion,
-                                        precioCompra: precioCompra,
-                                        precioVenta: precioVenta,
-                                        activo: activo,
-                                        existencias: existencias
-                                    }).then(() => {
-                                        alert("Artículo actualizado con éxito");
-                                        loadArticulos();
-                                        clearFields();
-                                    });
-                                }
-                            }
-                        }
-                    }).catch((error) => {
-                        console.error("Error al actualizar el artículo: ", error);
-                    });
-                } else {
-                    // Crear nuevo artículo
-                    const newDocumentId = codigoArticulo + "-" + ubicacion;
-
-                    // Validar si se puede agregar nuevo artículo en esta ubicación
-                    if (isRoute !== 0) {
-                        alert("Los nuevos artículos deben ingresarse inicialmente en una ubicación con 'isRoute' igual a 0");
-                        return;
-                    }
-
-                    db.collection("articulos").doc(newDocumentId).set({
-                        codigoArticulo: codigoArticulo,
-                        rubro: rubro,
-                        marca: marca,
-                        modelo: modelo,
-                        descripcion: descripcion,
-                        imei1: imei1,
-                        imei2: imei2,
-                        proveedor: proveedor,
-                        facturaProveedor: facturaProveedor,
-                        fechaEntrada: fechaEntrada,
-                        semana: semana,
-                        ubicacion: ubicacion,
-                        precioCompra: precioCompra,
-                        precioVenta: precioVenta,
-                        activo: activo,
-                        existencias: existencias
-                    }).then(() => {
-                        alert("Artículo agregado con éxito");
-                        loadArticulos();
-                        clearFields();
-                    }).catch((error) => {
-                        console.error("Error al agregar el artículo: ", error);
-                    });
-                }
-            } else {
-                alert("El código del artículo es requerido");
-            }
-        }
-
-        function loadArticulos() {
-            db.collection("articulos").get().then((querySnapshot) => {
-                const articuloTable = document.getElementById('articuloTable');
-                articuloTable.innerHTML = '';
-                querySnapshot.forEach((doc) => {
-                    const articulo = doc.data();
-                    db.collection("proveedores").doc(articulo.proveedor).get().then((proveedorDoc) => {
-                        const nombreProveedor = proveedorDoc.exists ? proveedorDoc.data().nombreProveedor : 'No disponible';
-                        const row = `<tr>
-                                        <td>${articulo.codigoArticulo || ''}</td>
-                                        <td>${articulo.descripcion || ''}</td>
-                                        <td>${articulo.marca || ''}</td>
-                                        <td>${articulo.modelo || ''}</td>
-                                        <td>${articulo.rubro || ''}</td>
-                                        <td>${articulo.imei1 || ''}</td>
-                                        <td>${articulo.imei2 || ''}</td>
-                                        <td>${nombreProveedor}</td>
-                                        <td>${articulo.facturaProveedor || ''}</td>
-                                        <td>${articulo.fechaEntrada || ''}</td>
-                                        <td>${articulo.semana || ''}</td>
-                                        <td>${ubicacionesData[articulo.ubicacion]?.name || articulo.ubicacion}</td>
-                                        <td>${articulo.precioCompra || ''}</td>
-                                        <td>${articulo.precioVenta || ''}</td>
-                                        <td>${articulo.activo ? 'Sí' : 'No'}</td>
-                                        <td>${articulo.existencias || ''}</td>
-                                        <td>
-                                            <button onclick="editArticulo('${doc.id}')">Editar</button>
-                                            <button onclick="deleteArticulo('${doc.id}')">Eliminar</button>
-                                        </td>
-                                    </tr>`;
-                        articuloTable.innerHTML += row;
-                    });
-                });
-            }).catch((error) => {
-                console.error("Error al cargar los artículos: ", error);
-            });
-        }
-
-        function sortTable(columnIndex) {
-            const table = document.querySelector("table tbody");
-            const rows = Array.from(table.rows);
-            const sortedRows = rows.sort((a, b) => {
-                const cellA = a.cells[columnIndex].innerText.toLowerCase();
-                const cellB = b.cells[columnIndex].innerText.toLowerCase();
-
-                if (cellA < cellB) {
-                    return -1;
-                } else if (cellA > cellB) {
-                    return 1;
-                } else {
-                    return 0;
-                }
-            });
-            table.innerHTML = '';
-            sortedRows.forEach(row => table.appendChild(row));
-        }
-
-        function loadProveedoresToDropdown() {
-            const proveedorDropdown = document.getElementById('proveedor');
-            db.collection("proveedores").get().then((querySnapshot) => {
-                proveedorDropdown.innerHTML = '<option value="">Seleccione un Proveedor</option>';
-                querySnapshot.forEach((doc) => {
-                    const proveedor = doc.data();
-                    const option = `<option value="${doc.id}">${proveedor.nombreProveedor}</option>`;
-                    proveedorDropdown.innerHTML += option;
-                });
-            }).catch((error) => {
-                console.error("Error al cargar los proveedores: ", error);
-            });
-        }
-
-        function loadUbicaciones() {
-            const ubicacionDropdown = document.getElementById('ubicacion');
-            db.collection("locations").get().then((querySnapshot) => {
-                ubicacionDropdown.innerHTML = '<option value="">Seleccione Ubicación</option>';
-                ubicacionesData = {};
-                querySnapshot.forEach((doc) => {
-                    const ubicacion = doc.data();
-                    ubicacionesData[doc.id] = ubicacion;
-                    const option = `<option value="${doc.id}">${ubicacion.name}</option>`;
-                    ubicacionDropdown.innerHTML += option;
-                });
-            }).catch((error) => {
-                console.error("Error al cargar las ubicaciones: ", error);
-            });
-        }
-
-        function editArticulo(id) {
-            db.collection("articulos").doc(id).get().then((doc) => {
-                if (doc.exists) {
-                    const articulo = doc.data();
-                    document.getElementById('documentId').value = id; // Almacenar el ID del documento
-                    document.getElementById('codigoArticulo').value = articulo.codigoArticulo;
-                    document.getElementById('rubro').value = articulo.rubro;
-                    document.getElementById('marca').value = articulo.marca;
-                    document.getElementById('modelo').value = articulo.modelo;
-                    document.getElementById('descripcion').value = articulo.descripcion;
-                    document.getElementById('imei1').value = articulo.imei1;
-                    document.getElementById('imei2').value = articulo.imei2;
-                    document.getElementById('proveedor').value = articulo.proveedor;
-                    document.getElementById('facturaProveedor').value = articulo.facturaProveedor;
-                    document.getElementById('fechaEntrada').value = articulo.fechaEntrada;
-                    document.getElementById('semana').value = articulo.semana;
-                    document.getElementById('ubicacion').value = articulo.ubicacion;
-                    document.getElementById('ubicacionOriginal').value = articulo.ubicacion;
-                    document.getElementById('precioCompra').value = articulo.precioCompra;
-                    document.getElementById('precioVenta').value = articulo.precioVenta;
-                    document.getElementById('activo').checked = articulo.activo;
-                    document.getElementById('existencias').value = articulo.existencias;
-
-                    const ubicacionData = ubicacionesData[articulo.ubicacion];
-                    if (ubicacionData && ubicacionData.isRoute == 1) {
-                        document.getElementById('existencias').disabled = true;
-                        document.getElementById('existencias').classList.add('disabled');
-                        document.getElementById('isRouteOriginal').value = 1;
-                    } else {
-                        document.getElementById('existencias').disabled = false;
-                        document.getElementById('existencias').classList.remove('disabled');
-                        document.getElementById('isRouteOriginal').value = 0;
-                    }
-                }
-            }).catch((error) => {
-                console.error("Error al obtener el artículo: ", error);
-            });
-        }
-
-        function deleteArticulo(id) {
-            if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
-                db.collection("articulos").doc(id).delete().then(() => {
-                    alert("Artículo eliminado con éxito");
-                    loadArticulos();
-                }).catch((error) => {
-                    console.error("Error al eliminar el artículo: ", error);
-                });
-            }
-        }
-
-        // Evento para detectar cambio de ubicación
-        document.getElementById('ubicacion').addEventListener('change', function() {
-            const nuevaUbicacion = this.value;
-            const ubicacionData = ubicacionesData[nuevaUbicacion];
-            if (!ubicacionData) {
-                alert("La ubicación seleccionada no existe");
-                return;
-            }
-            const isRouteNueva = ubicacionData.isRoute;
-            const isRouteOriginal = document.getElementById('isRouteOriginal').value;
-            const ubicacionOriginal = document.getElementById('ubicacionOriginal').value;
-
-            if (document.getElementById('documentId').value) {
-                // Si estamos editando un artículo
-                if (nuevaUbicacion !== ubicacionOriginal) {
-                    // Mostrar campo para ingresar cantidad a transferir
-                    document.getElementById('transferDiv').style.display = 'block';
-
-                    if (isRouteOriginal == 1) {
-                        // Si la ubicación original es isRoute == 1
-                        if (isRouteNueva != 0) {
-                            alert("La nueva ubicación debe tener 'isRoute' igual a 0");
-                            document.getElementById('ubicacion').value = ubicacionOriginal;
-                            document.getElementById('transferDiv').style.display = 'none';
-                        } else {
-                            document.getElementById('existencias').disabled = false;
-                            document.getElementById('existencias').classList.remove('disabled');
-                        }
-                    } else {
-                        // Si la ubicación original es isRoute == 0
-                        // Validar que la cantidad a transferir no sea mayor a las existencias
-                        document.getElementById('existencias').disabled = true;
-                        document.getElementById('existencias').classList.add('disabled');
-                    }
-                } else {
-                    // Ocultar campo de transferencia si la ubicación no cambia
-                    document.getElementById('transferDiv').style.display = 'none';
-                    document.getElementById('transferCantidad').value = '';
-                    if (isRouteOriginal == 1) {
-                        document.getElementById('existencias').disabled = true;
-                        document.getElementById('existencias').classList.add('disabled');
-                    } else {
-                        document.getElementById('existencias').disabled = false;
-                        document.getElementById('existencias').classList.remove('disabled');
-                    }
-                }
-            }
+        querySnapshot.forEach((doc) => {
+          const article = doc.data();
+          // Agregar fila a la tabla de artículos
+          const row = `<tr>
+                        <td>${article.id}</td>
+                        <td>${article.marca}</td>
+                        <td>${article.modelo}</td>
+                        <td>${article.precioCompra}</td>
+                        <td>${article.precioVenta}</td>
+                        <td><button onclick="editArticle('${doc.id}')">Editar</button></td>
+                      </tr>`;
+          articleTable.innerHTML += row;
+          // Agregar opción al selector de artículos
+          const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
+          articleSelector.innerHTML += option;
         });
-    </script>
+      }).catch((error) => {
+        console.error("Error al cargar los artículos: ", error);
+      });
+    }
+
+    function editArticle(id) {
+      db.collection("Articulos").doc(id).get().then((doc) => {
+        if (doc.exists) {
+          const article = doc.data();
+          document.getElementById('articleId').value = article.id;
+          document.getElementById('marca').value = article.marca;
+          document.getElementById('modelo').value = article.modelo;
+          document.getElementById('precioCompra').value = article.precioCompra;
+          document.getElementById('precioVenta').value = article.precioVenta;
+        }
+      }).catch((error) => {
+        console.error("Error al obtener el artículo: ", error);
+      });
+    }
+
+    /* =============================
+       Funciones para IMEI
+       ============================= */
+    function addIMEI() {
+      const articleId = document.getElementById('articleSelector').value;
+      const imei = document.getElementById('imei').value.trim();
+      if (!articleId) {
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
+      }
+      if (!imei) {
+        alert("Debes ingresar un IMEI válido 😬");
+        return;
+      }
+      // Guardar el IMEI en la colección "Articulos_X_IMEI"
+      db.collection("Articulos_X_IMEI").add({
+        articleId: articleId,
+        imei: imei
+      })
+      .then(() => {
+        alert("IMEI agregado con éxito 👍");
+        loadIMEIs(articleId);
+        document.getElementById('imei').value = '';
+      })
+      .catch((error) => {
+        console.error("Error al agregar el IMEI: ", error);
+      });
+    }
+
+    function loadIMEIs(articleId) {
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+      .then((querySnapshot) => {
+        const imeiTable = document.getElementById('imeiTable');
+        imeiTable.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const imeiData = doc.data();
+          const row = `<tr>
+                        <td>${doc.id}</td>
+                        <td>${imeiData.imei}</td>
+                        <td><button onclick="deleteIMEI('${doc.id}', '${articleId}')">Eliminar</button></td>
+                      </tr>`;
+          imeiTable.innerHTML += row;
+        });
+      })
+      .catch((error) => {
+        console.error("Error al cargar los IMEIs: ", error);
+      });
+    }
+
+    function deleteIMEI(docId, articleId) {
+      if (confirm("¿Está seguro de que desea eliminar este IMEI?")) {
+        db.collection("Articulos_X_IMEI").doc(docId).delete().then(() => {
+          alert("IMEI eliminado 😊");
+          loadIMEIs(articleId);
+        }).catch((error) => {
+          console.error("Error al eliminar el IMEI: ", error);
+        });
+      }
+    }
+
+    // Evento para cargar los IMEIs al seleccionar un artículo en el dropdown
+    document.getElementById('articleSelector').addEventListener('change', function() {
+      const articleId = this.value;
+      if (articleId) {
+        loadIMEIs(articleId);
+      } else {
+        document.getElementById('imeiTable').innerHTML = '';
+      }
+    });
+
+    // Cargar los artículos al iniciar la página
+    window.onload = function() {
+      loadArticles();
+    };
+  </script>
 </body>
 </html>

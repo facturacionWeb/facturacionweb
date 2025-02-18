@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
   <title>Reporte de Artículos 📊</title>
   
-  <!-- Import Firebase SDK (v8) -->
+  <!-- Importa Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Firebase Config -->
+  <!-- Tu configuración de Firebase -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
   
   <style>
@@ -16,34 +15,22 @@
       font-family: Arial, sans-serif;
       padding: 20px;
     }
-    a {
-      text-decoration: none;
-      color: #007bff;
-      margin-bottom: 20px;
-      display: inline-block;
-    }
-    h1, h2 {
+    h1 {
       text-align: center;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
     }
     button {
       padding: 10px 20px;
-      margin: 10px 0;
-      cursor: pointer;
       font-size: 16px;
+      margin-bottom: 20px;
+      cursor: pointer;
     }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 20px;
     }
-    table, th, td {
-      border: 1px solid #ccc;
-    }
     th, td {
+      border: 1px solid #ccc;
       padding: 8px;
       text-align: center;
     }
@@ -53,71 +40,74 @@
   </style>
 </head>
 <body>
-  <a href="index.html">Volver a la Página Principal</a>
-  <h1>Reporte de Artículos 📊</h1>
-  <div class="container">
-    <button onclick="loadReport()">Cargar Reporte 🔄</button>
-    <table>
-      <thead>
-        <tr>
-          <th>ID Artículo</th>
-          <th>Marca</th>
-          <th>Modelo</th>
-          <th>Precio Compra</th>
-          <th>Precio Venta</th>
-          <th>Cantidad (IMEI)</th>
-        </tr>
-      </thead>
-      <tbody id="reportTable">
-        <!-- Aquí se cargarán las filas del reporte -->
-      </tbody>
-    </table>
-  </div>
-
+  <h1>Reporte de Artículos</h1>
+  <button onclick="loadReport()">Cargar Reporte</button>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>ID del Artículo</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>Precio Compra</th>
+        <th>Precio Venta</th>
+        <th>Cantidad de IMEI</th>
+      </tr>
+    </thead>
+    <tbody id="reportTable">
+      <!-- Aquí se cargarán los datos del reporte -->
+    </tbody>
+  </table>
+  
   <script>
+    // Inicializar Firestore
     const db = firebase.firestore();
 
+    // Función que carga el reporte cruzando las colecciones Articulos y Articulos_X_IMEI
     function loadReport() {
-      const reportTable = document.getElementById('reportTable');
-      reportTable.innerHTML = ''; // Limpiar la tabla antes de cargar nuevos datos
-      // Obtenemos todos los artículos de la colección "Articulos"
-      db.collection("Articulos").get().then((querySnapshot) => {
-        const promises = [];
-        querySnapshot.forEach((doc) => {
-          const article = doc.data();
-          // Por cada artículo, consultamos la cantidad de IMEIs asociados en "Articulos_X_IMEI"
-          const p = db.collection("Articulos_X_IMEI")
-                      .where("articleId", "==", article.id)
-                      .get()
-                      .then((imeiSnapshot) => {
-                        const imeiCount = imeiSnapshot.size;
-                        const row = `<tr>
-                                      <td>${article.id}</td>
-                                      <td>${article.marca}</td>
-                                      <td>${article.modelo}</td>
-                                      <td>${article.precioCompra}</td>
-                                      <td>${article.precioVenta}</td>
-                                      <td>${imeiCount}</td>
-                                    </tr>`;
-                        reportTable.innerHTML += row;
-                      })
-                      .catch((error) => {
-                        console.error("Error al contar IMEIs: ", error);
-                      });
-          promises.push(p);
-        });
-        return Promise.all(promises);
-      }).then(() => {
-        console.log("Reporte cargado exitosamente 😊");
-      }).catch((error) => {
-        console.error("Error al cargar el reporte: ", error);
-      });
-    }
+      // Limpiar contenido previo del reporte
+      document.getElementById('reportTable').innerHTML = '';
+      
+      // Creamos un objeto para contar los IMEI por artículo
+      const imeiCounts = {};
 
-    // Cargar el reporte automáticamente al iniciar la página
-    window.onload = function() {
-      loadReport();
-    };
+      // Primero obtenemos todos los documentos de Articulos_X_IMEI y contamos cuántos hay por artículo
+      db.collection("Articulos_X_IMEI").get()
+        .then((querySnapshot) => {
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.articleId) {
+              if (!imeiCounts[data.articleId]) {
+                imeiCounts[data.articleId] = 0;
+              }
+              imeiCounts[data.articleId]++;
+            }
+          });
+          
+          // Luego obtenemos todos los artículos
+          return db.collection("Articulos").get();
+        })
+        .then((querySnapshot) => {
+          let tableContent = '';
+          querySnapshot.forEach((doc) => {
+            const article = doc.data();
+            // Obtenemos la cantidad de IMEI para este artículo (si no hay, será 0)
+            const count = imeiCounts[article.id] || 0;
+            tableContent += `<tr>
+              <td>${article.id}</td>
+              <td>${article.marca}</td>
+              <td>${article.modelo}</td>
+              <td>${article.precioCompra}</td>
+              <td>${article.precioVenta}</td>
+              <td>${count}</td>
+            </tr>`;
+          });
+          document.getElementById('reportTable').innerHTML = tableContent;
+        })
+        .catch((error) => {
+          console.error("Error al cargar el reporte: ", error);
+        });
+    }
   </script>
 </body>
 </html>

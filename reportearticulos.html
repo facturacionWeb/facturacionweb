@@ -116,4 +116,83 @@
               <td style="cursor:pointer; color: blue;" onclick="showIMEIModal('${article.id}')">${count}</td>
             </tr>`;
           });
-          doc
+          document.getElementById('reportTable').innerHTML = tableContent;
+        })
+        .catch((error) => {
+          console.error("Error al cargar el reporte: ", error);
+        });
+    }
+
+    // Función para mostrar el modal con el listado de IMEI de un artículo
+    function showIMEIModal(articleId) {
+      // Mostrar el ID del artículo en el modal
+      document.getElementById('modalArticleId').innerText = articleId;
+      // Limpiar la lista previa de IMEI
+      document.getElementById('imeiList').innerHTML = '';
+      
+      // Consultar los IMEI asociados a este artículo
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+        .then((querySnapshot) => {
+          if (querySnapshot.empty) {
+            document.getElementById('imeiList').innerHTML = '<li>No hay IMEI registrados 😬</li>';
+          } else {
+            querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              const li = document.createElement('li');
+              li.textContent = data.imei;
+              document.getElementById('imeiList').appendChild(li);
+            });
+          }
+          // Mostrar el modal
+          document.getElementById('imeiModal').style.display = 'block';
+        })
+        .catch((error) => {
+          console.error("Error al cargar los IMEI: ", error);
+        });
+    }
+
+    // Función para cerrar el modal
+    function closeModal() {
+      document.getElementById('imeiModal').style.display = 'none';
+    }
+
+    // Cerrar el modal si el usuario hace clic fuera de la caja del modal
+    window.addEventListener('click', function(event) {
+      if (event.target == document.getElementById('imeiModal')) {
+        closeModal();
+      }
+    });
+  </script>
+</head>
+<body>
+  <h1>Reporte de Artículos</h1>
+  <button onclick="loadReport()">Cargar Reporte</button>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>ID del Artículo</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>Precio Compra</th>
+        <th>Precio Venta</th>
+        <th>Cantidad de IMEI</th>
+      </tr>
+    </thead>
+    <tbody id="reportTable">
+      <!-- Aquí se cargarán los datos del reporte -->
+    </tbody>
+  </table>
+  
+  <!-- Modal para mostrar el listado de IMEI -->
+  <div id="imeiModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeModal" onclick="closeModal()">&times;</span>
+      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
+      <ul id="imeiList">
+        <!-- Aquí se listan los IMEI -->
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

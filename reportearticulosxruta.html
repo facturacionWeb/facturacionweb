@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte Artículos con Ruta 📊</title>
+  
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Tu configuración de Firebase -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    select {
+      padding: 5px;
+    }
+    button {
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+  
+  <script>
+    // Inicializamos Firestore
+    const db = firebase.firestore();
+
+    // Función para cargar el reporte
+    function loadReport() {
+      const reportTable = document.getElementById("reportTable");
+      reportTable.innerHTML = ""; // Limpiar contenido previo
+      
+      // Primero obtenemos todos los artículos para tener sus datos (marca, modelo)
+      db.collection("Articulos").get()
+      .then((articlesSnapshot) => {
+        let articlesDict = {};
+        articlesSnapshot.forEach((doc) => {
+          let art = doc.data();
+          articlesDict[art.id] = art; // Usamos el campo "id" del artículo como clave
+        });
+        // Ahora consultamos la colección de IMEI
+        return db.collection("Articulos_X_IMEI").get().then((imeiSnapshot) => {
+          imeiSnapshot.forEach((doc) => {
+            const imeiData = doc.data();
+            const articleId = imeiData.articleId;
+            const imeiValue = imeiData.imei;
+            const article = articlesDict[articleId] || {};
+            
+            // Creamos la fila de la tabla
+            let row = document.createElement("tr");
+            
+            // Columna ID
+            let cellID = document.createElement("td");
+            cellID.textContent = articleId;
+            row.appendChild(cellID);
+            
+            // Columna Marca
+            let cellMarca = document.createElement("td");
+            cellMarca.textContent = article.marca || "";
+            row.appendChild(cellMarca);
+            
+            // Columna Modelo
+            let cellModelo = document.createElement("td");
+            cellModelo.textContent = article.modelo || "";
+            row.appendChild(cellModelo);
+            
+            // Columna IMEI
+            let cellIMEI = document.createElement("td");
+            cellIMEI.textContent = imeiValue;
+            row.appendChild(cellIMEI);
+            
+            // Columna Ruta (select con opciones del 1 al 10 y "SIN RUTA")
+            let cellRuta = document.createElement("td");
+            let selectRuta = document.createElement("select");
+            selectRuta.id = "rutaSelect_" + doc.id;
+            
+            // Opción "SIN RUTA"
+            let optionSinRuta = document.createElement("option");
+            optionSinRuta.value = "SIN RUTA";
+            optionSinRuta.textContent = "SIN RUTA";
+            selectRuta.appendChild(optionSinRuta);
+            
+            // Opciones del 1 al 10
+            for (let i = 1; i <= 10; i++) {
+              let option = document.createElement("option");
+              option.value = i;
+              option.textContent = i;
+              selectRuta.appendChild(option);
+            }
+            cellRuta.appendChild(selectRuta);
+            row.appendChild(cellRuta);
+            
+            // Columna Acción (botón de guardar)
+            let cellAccion = document.createElement("td");
+            let btnGuardar = document.createElement("button");
+            btnGuardar.textContent = "Guardar";
+            btnGuardar.onclick = function() {
+              saveRuta(doc.id, imeiValue);
+            };
+            cellAccion.appendChild(btnGuardar);
+            row.appendChild(cellAccion);
+            
+            // Agregamos la fila a la tabla
+            reportTable.appendChild(row);
+          });
+        });
+      })
+      .catch((error) => {
+         console.error("Error al cargar el reporte: ", error);
+      });
+    }
+    
+    // Función para guardar o eliminar la ruta
+    function saveRuta(docId, imeiValue) {
+      // Obtenemos el valor seleccionado del dropdown
+      let selectElement = document.getElementById("rutaSelect_" + docId);
+      let selectedRoute = selectElement.value;
+      
+      if (selectedRoute === "SIN RUTA") {
+        // Si se seleccionó SIN RUTA, eliminamos el registro de la colección
+        db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).delete()
+        .then(() => {
+          alert("Registro eliminado (SIN RUTA) 😎");
+        })
+        .catch((error) => {
+          console.error("Error al eliminar registro: ", error);
+          alert("Error al eliminar registro.");
+        });
+      } else {
+        // Si se seleccionó un número, guardamos o actualizamos el registro
+        db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).set({
+          ID: docId,
+          IMEI: imeiValue,
+          Ruta: selectedRoute
+        })
+        .then(() => {
+          alert("Registro guardado con ruta " + selectedRoute + " 👍");
+        })
+        .catch((error) => {
+          console.error("Error al guardar registro: ", error);
+          alert("Error al guardar registro.");
+        });
+      }
+    }
+    
+    // Cargamos el reporte al iniciar la página
+    window.onload = function() {
+      loadReport();
+    }
+  </script>
+</head>
+<body>
+  <h1>Reporte Artículos con Ruta</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>IMEI</th>
+        <th>Ruta</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="reportTable">
+      <!-- Aquí se cargarán las filas dinámicamente -->
+    </tbody>
+  </table>
+</body>
+</html>

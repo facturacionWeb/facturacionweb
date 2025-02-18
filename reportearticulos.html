@@ -37,6 +37,39 @@
     th {
       background-color: #f2f2f2;
     }
+    /* Estilos para el modal */
+    .modal {
+      display: none; /* Se oculta por defecto */
+      position: fixed;
+      z-index: 1;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5); /* Fondo semi-transparente */
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      border: 1px solid #888;
+      width: 80%;
+      max-width: 500px;
+      position: relative;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .close:hover,
+    .close:focus {
+      color: black;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -59,55 +92,32 @@
     </tbody>
   </table>
   
+  <!-- Modal para mostrar el listado de IMEI -->
+  <div id="imeiModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeModal">&times;</span>
+      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
+      <ul id="imeiList">
+        <!-- Aquí se listan los IMEI -->
+      </ul>
+    </div>
+  </div>
+  
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
 
-    // Función que carga el reporte cruzando las colecciones Articulos y Articulos_X_IMEI
+    // Función para cargar el reporte cruzando las colecciones Articulos y Articulos_X_IMEI
     function loadReport() {
-      // Limpiar contenido previo del reporte
+      // Limpiar el contenido previo
       document.getElementById('reportTable').innerHTML = '';
       
-      // Creamos un objeto para contar los IMEI por artículo
+      // Objeto para contar los IMEI por artículo
       const imeiCounts = {};
-
-      // Primero obtenemos todos los documentos de Articulos_X_IMEI y contamos cuántos hay por artículo
+  
+      // Primero, obtenemos todos los documentos de Articulos_X_IMEI y contamos los IMEI
       db.collection("Articulos_X_IMEI").get()
         .then((querySnapshot) => {
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.articleId) {
-              if (!imeiCounts[data.articleId]) {
-                imeiCounts[data.articleId] = 0;
-              }
-              imeiCounts[data.articleId]++;
-            }
-          });
-          
-          // Luego obtenemos todos los artículos
-          return db.collection("Articulos").get();
-        })
-        .then((querySnapshot) => {
-          let tableContent = '';
-          querySnapshot.forEach((doc) => {
-            const article = doc.data();
-            // Obtenemos la cantidad de IMEI para este artículo (si no hay, será 0)
-            const count = imeiCounts[article.id] || 0;
-            tableContent += `<tr>
-              <td>${article.id}</td>
-              <td>${article.marca}</td>
-              <td>${article.modelo}</td>
-              <td>${article.precioCompra}</td>
-              <td>${article.precioVenta}</td>
-              <td>${count}</td>
-            </tr>`;
-          });
-          document.getElementById('reportTable').innerHTML = tableContent;
-        })
-        .catch((error) => {
-          console.error("Error al cargar el reporte: ", error);
-        });
-    }
-  </script>
-</body>
-</html>
+            if (data.articleId

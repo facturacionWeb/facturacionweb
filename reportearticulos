@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporte de Artículos 📊</title>
+  
+  <!-- Import Firebase SDK (v8) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    a {
+      text-decoration: none;
+      color: #007bff;
+      margin-bottom: 20px;
+      display: inline-block;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 0;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html">Volver a la Página Principal</a>
+  <h1>Reporte de Artículos 📊</h1>
+  <div class="container">
+    <button onclick="loadReport()">Cargar Reporte 🔄</button>
+    <table>
+      <thead>
+        <tr>
+          <th>ID Artículo</th>
+          <th>Marca</th>
+          <th>Modelo</th>
+          <th>Precio Compra</th>
+          <th>Precio Venta</th>
+          <th>Cantidad (IMEI)</th>
+        </tr>
+      </thead>
+      <tbody id="reportTable">
+        <!-- Aquí se cargarán las filas del reporte -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    const db = firebase.firestore();
+
+    function loadReport() {
+      const reportTable = document.getElementById('reportTable');
+      reportTable.innerHTML = ''; // Limpiar la tabla antes de cargar nuevos datos
+      // Obtenemos todos los artículos de la colección "Articulos"
+      db.collection("Articulos").get().then((querySnapshot) => {
+        const promises = [];
+        querySnapshot.forEach((doc) => {
+          const article = doc.data();
+          // Por cada artículo, consultamos la cantidad de IMEIs asociados en "Articulos_X_IMEI"
+          const p = db.collection("Articulos_X_IMEI")
+                      .where("articleId", "==", article.id)
+                      .get()
+                      .then((imeiSnapshot) => {
+                        const imeiCount = imeiSnapshot.size;
+                        const row = `<tr>
+                                      <td>${article.id}</td>
+                                      <td>${article.marca}</td>
+                                      <td>${article.modelo}</td>
+                                      <td>${article.precioCompra}</td>
+                                      <td>${article.precioVenta}</td>
+                                      <td>${imeiCount}</td>
+                                    </tr>`;
+                        reportTable.innerHTML += row;
+                      })
+                      .catch((error) => {
+                        console.error("Error al contar IMEIs: ", 

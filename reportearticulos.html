@@ -102,4 +102,22 @@
                         reportTable.innerHTML += row;
                       })
                       .catch((error) => {
-                        console.error("Error al contar IMEIs: ", 
+                        console.error("Error al contar IMEIs: ", error);
+                      });
+          promises.push(p);
+        });
+        return Promise.all(promises);
+      }).then(() => {
+        console.log("Reporte cargado exitosamente 😊");
+      }).catch((error) => {
+        console.error("Error al cargar el reporte: ", error);
+      });
+    }
+
+    // Cargar el reporte automáticamente al iniciar la página
+    window.onload = function() {
+      loadReport();
+    };
+  </script>
+</body>
+</html>

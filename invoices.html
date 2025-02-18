@@ -1,288 +1,274 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gestión de Artículos y Existencias (IMEI) 😎</title>
+    <meta charset="UTF-8">
+    <title>Facturas del Cliente</title>
 
-  <!-- Import Firebase SDK (v8 with namespaced API) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Firebase Config -->
-  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-      margin-bottom: 40px;
-    }
-    input[type="text"],
-    input[type="number"],
-    button,
-    select {
-      margin: 10px 0;
-      display: block;
-      width: 100%;
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    table, th, td {
-      border: 1px solid #ccc;
-    }
-    th, td {
-      padding: 8px;
-      text-align: left;
-    }
-    h1, h2 {
-      text-align: center;
-    }
-  </style>
+    <!-- Import Firebase SDK (v8 with namespaced API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
-  <script>
-    // Script para cargar versión (opcional)
-    (function loadVersionScript() {
-      const versionScript = document.createElement('script');
-      versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-      document.head.appendChild(versionScript);
-    })();
-  </script>
+    <!-- Import Firebase configuration -->
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+            padding: 10px;
+        }
+        th, td {
+            text-align: center;
+        }
+        .invoice-detail {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-  <h1>Gestión de Artículos y Existencias (IMEI) 📱💾</h1>
+    <a href="clientes.html">Volver a la Gestión de Clientes</a>
+    <div class="container">
+        <h1 id="clientNameHeading">Facturas del Cliente</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th># Factura Cliente</th>
+                    <th>Fecha y Hora</th>
+                    <th>Monto</th>
+                    <th>Tipo de Factura</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceTable">
+                <!-- Invoice rows will be populated here -->
+            </tbody>
+        </table>
 
-  <!-- Sección de Artículos -->
-  <div class="container" id="articlesSection">
-    <h2>Gestión de Artículos</h2>
-    <!-- Formulario para Artículos -->
-    <input type="text" id="articleId" placeholder="ID del Artículo" />
-    <input type="text" id="marca" placeholder="Marca" />
-    <input type="text" id="modelo" placeholder="Modelo" />
-    <input type="number" id="precioCompra" placeholder="Precio de Compra" step="0.01" />
-    <input type="number" id="precioVenta" placeholder="Precio de Venta" step="0.01" />
-    <button onclick="addOrUpdateArticle()">Agregar/Actualizar Artículo</button>
-    <button onclick="clearArticleFields()">Limpiar Campos</button>
+        <!-- Div to display invoice details -->
+        <div id="invoiceDetail" class="invoice-detail">
+            <!-- Invoice details will be shown here -->
+        </div>
+    </div>
 
-    <!-- Tabla de Artículos -->
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Marca</th>
-          <th>Modelo</th>
-          <th>Precio Compra</th>
-          <th>Precio Venta</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="articleTable">
-        <!-- Las filas se cargarán dinámicamente -->
-      </tbody>
-    </table>
-  </div>
+    <script>
+        // Initialize Firestore
+        const db = firebase.firestore();
 
-  <!-- Sección de IMEI -->
-  <div class="container" id="imeiSection">
-    <h2>Gestión de Existencias (IMEI)</h2>
-    <!-- Selector para elegir un Artículo -->
-    <select id="articleSelector">
-      <option value="">Seleccione un Artículo</option>
-      <!-- Opciones cargadas dinámicamente -->
-    </select>
-    <!-- Formulario para agregar IMEI -->
-    <input type="text" id="imei" placeholder="IMEI" />
-    <button onclick="addIMEI()">Agregar IMEI</button>
-
-    <!-- Tabla de IMEIs -->
-    <table>
-      <thead>
-        <tr>
-          <th>ID (Registro)</th>
-          <th>IMEI</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="imeiTable">
-        <!-- Las filas se cargarán dinámicamente -->
-      </tbody>
-    </table>
-  </div>
-
-  <script>
-    // Inicializar Firestore
-    const db = firebase.firestore();
-
-    /* =============================
-       Funciones para Artículos
-       ============================= */
-    function clearArticleFields() {
-      document.getElementById('articleId').value = '';
-      document.getElementById('marca').value = '';
-      document.getElementById('modelo').value = '';
-      document.getElementById('precioCompra').value = '';
-      document.getElementById('precioVenta').value = '';
-    }
-
-    function addOrUpdateArticle() {
-      const id = document.getElementById('articleId').value.trim();
-      const marca = document.getElementById('marca').value.trim();
-      const modelo = document.getElementById('modelo').value.trim();
-      const precioCompra = parseFloat(document.getElementById('precioCompra').value);
-      const precioVenta = parseFloat(document.getElementById('precioVenta').value);
-
-      if (!id) {
-        alert("El ID del artículo es requerido 😅");
-        return;
-      }
-      if (!marca || !modelo || isNaN(precioCompra) || isNaN(precioVenta)) {
-        alert("Por favor, complete todos los campos correctamente 😬");
-        return;
-      }
-
-      // Guardar o actualizar el artículo en la colección "Articulos"
-      db.collection("Articulos").doc(id).set({
-        id,
-        marca,
-        modelo,
-        precioCompra,
-        precioVenta
-      })
-      .then(() => {
-        alert("Artículo guardado con éxito 😎");
-        loadArticles();
-        clearArticleFields();
-      })
-      .catch((error) => {
-        console.error("Error al guardar el artículo: ", error);
-      });
-    }
-
-    function loadArticles() {
-      db.collection("Articulos").get().then((querySnapshot) => {
-        const articleTable = document.getElementById('articleTable');
-        const articleSelector = document.getElementById('articleSelector');
-        articleTable.innerHTML = '';
-        articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
-
-        querySnapshot.forEach((doc) => {
-          const article = doc.data();
-          // Agregar fila a la tabla de artículos
-          const row = `<tr>
-                        <td>${article.id}</td>
-                        <td>${article.marca}</td>
-                        <td>${article.modelo}</td>
-                        <td>${article.precioCompra}</td>
-                        <td>${article.precioVenta}</td>
-                        <td><button onclick="editArticle('${doc.id}')">Editar</button></td>
-                      </tr>`;
-          articleTable.innerHTML += row;
-          // Agregar opción al selector de artículos
-          const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
-          articleSelector.innerHTML += option;
-        });
-      }).catch((error) => {
-        console.error("Error al cargar los artículos: ", error);
-      });
-    }
-
-    function editArticle(id) {
-      db.collection("Articulos").doc(id).get().then((doc) => {
-        if (doc.exists) {
-          const article = doc.data();
-          document.getElementById('articleId').value = article.id;
-          document.getElementById('marca').value = article.marca;
-          document.getElementById('modelo').value = article.modelo;
-          document.getElementById('precioCompra').value = article.precioCompra;
-          document.getElementById('precioVenta').value = article.precioVenta;
+        function formatDate(date) {
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            };
+            const datePart = date.toLocaleDateString('en-CA', options); // 'YYYY-MM-DD'
+        
+            let hours = date.getHours();
+            const minutes = date.getMinutes();
+            const ampm = hours >= 12 ? 'pm' : 'am';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // la hora '0' debe ser '12'
+        
+            const timePart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+        
+            return `${datePart} ${timePart}`;
         }
-      }).catch((error) => {
-        console.error("Error al obtener el artículo: ", error);
-      });
-    }
 
-    /* =============================
-       Funciones para IMEI
-       ============================= */
-    function addIMEI() {
-      const articleId = document.getElementById('articleSelector').value;
-      const imei = document.getElementById('imei').value.trim();
-      if (!articleId) {
-        alert("Debes seleccionar un artículo primero 😅");
-        return;
-      }
-      if (!imei) {
-        alert("Debes ingresar un IMEI válido 😬");
-        return;
-      }
-      // Guardar el IMEI en la colección "Articulos_X_IMEI"
-      db.collection("Articulos_X_IMEI").add({
-        articleId: articleId,
-        imei: imei
-      })
-      .then(() => {
-        alert("IMEI agregado con éxito 👍");
-        loadIMEIs(articleId);
-        document.getElementById('imei').value = '';
-      })
-      .catch((error) => {
-        console.error("Error al agregar el IMEI: ", error);
-      });
-    }
+        // Función para obtener el nombre del cliente
+        function getClientName() {
+            db.collection("clientes").doc(clientId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const clientData = doc.data();
+                        const clientName = clientData.nombreCliente || 'Cliente Desconocido';
+                        // Actualizar el encabezado con el nombre del cliente
+                        document.getElementById('clientNameHeading').innerText = `Facturas de ${clientName}`;
+                    } else {
+                        alert("Cliente no encontrado");
+                        window.location.href = "clientes.html";
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error al obtener el nombre del cliente:", error);
+                });
+        }
 
-    function loadIMEIs(articleId) {
-      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
-      .then((querySnapshot) => {
-        const imeiTable = document.getElementById('imeiTable');
-        imeiTable.innerHTML = '';
-        querySnapshot.forEach((doc) => {
-          const imeiData = doc.data();
-          const row = `<tr>
-                        <td>${doc.id}</td>
-                        <td>${imeiData.imei}</td>
-                        <td><button onclick="deleteIMEI('${doc.id}', '${articleId}')">Eliminar</button></td>
-                      </tr>`;
-          imeiTable.innerHTML += row;
-        });
-      })
-      .catch((error) => {
-        console.error("Error al cargar los IMEIs: ", error);
-      });
-    }
 
-    function deleteIMEI(docId, articleId) {
-      if (confirm("¿Está seguro de que desea eliminar este IMEI?")) {
-        db.collection("Articulos_X_IMEI").doc(docId).delete().then(() => {
-          alert("IMEI eliminado 😊");
-          loadIMEIs(articleId);
-        }).catch((error) => {
-          console.error("Error al eliminar el IMEI: ", error);
-        });
-      }
-    }
+        // Function to get URL parameters
+        function getUrlParam(param) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(param);
+        }
 
-    // Evento para cargar los IMEIs al seleccionar un artículo en el dropdown
-    document.getElementById('articleSelector').addEventListener('change', function() {
-      const articleId = this.value;
-      if (articleId) {
-        loadIMEIs(articleId);
-      } else {
-        document.getElementById('imeiTable').innerHTML = '';
-      }
-    });
+        const clientId = getUrlParam('clientId');
 
-    // Cargar los artículos al iniciar la página
-    window.onload = function() {
-      loadArticles();
-    };
-  </script>
+        if (!clientId) {
+            alert("ID de cliente no proporcionado");
+            window.location.href = "clientes.html";
+        }
+
+        // Function to load invoices
+        function loadInvoices() {
+            db.collection("Facturas")
+                .where("ID_Firebase_Cliente", "==", clientId)
+                .where("Tipo_Factura", "==", "Credito")
+                .where("Cancelada", "==", 0)
+                .get()
+                .then((querySnapshot) => {
+                    const invoiceTable = document.getElementById('invoiceTable');
+                    invoiceTable.innerHTML = '';
+                    querySnapshot.forEach((doc) => {
+                        const invoice = doc.data();
+
+                        // Convertir y formatear la fecha y hora
+                        let formattedDate = 'N/A';
+                        if (invoice.Fecha_Hora_Factura) {
+                            const date = invoice.Fecha_Hora_Factura.toDate();
+                            formattedDate = formatDate(date);
+                        }
+                        
+                        const row = `<tr>
+                                        <td>${invoice['#Factura_Cliente'] || 'N/A'}</td>
+                                        <td>${formattedDate}</td>
+                                        <td>${invoice.Monto_Factura || 'N/A'}</td>
+                                        <td>${invoice.Tipo_Factura || 'N/A'}</td>
+                                        <td>
+                                            <button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button>
+                                        </td>
+                                     </tr>`;
+                        invoiceTable.innerHTML += row;
+                    });
+                })
+                .catch((error) => {
+                    console.error("Error al cargar las facturas: ", error);
+                });
+        }
+
+        // Function to show invoice detail
+        /*function showInvoiceDetail(invoiceId) {
+            const invoiceDetailDiv = document.getElementById('invoiceDetail');
+            invoiceDetailDiv.innerHTML = '<h2>Detalle de la Factura</h2>';
+
+            db.collection("Detalle_Factura")
+                .where("ID_Firebase_Factura", "==", invoiceId)
+                .get()
+                .then((querySnapshot) => {
+                    let total = 0;
+                    let detailTable = `<table>
+                                        <thead>
+                                            <tr>
+                                                <th>ID Artículo</th>
+                                                <th>Cantidad</th>
+                                                <th>Precio Venta</th>
+                                                <th>Precio Venta Real</th>
+                                                <th>Subtotal</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+
+                    querySnapshot.forEach((doc) => {
+                        const detail = doc.data();
+                        const subtotal = detail.Cantidad * detail.Precio_Venta_Real;
+                        total += subtotal;
+
+                        detailTable += `<tr>
+                                            <td>${detail.ID_Firebase_Articulo || 'N/A'}</td>
+                                            <td>${detail.Cantidad || 'N/A'}</td>
+                                            <td>${detail.Precio_Venta || 'N/A'}</td>
+                                            <td>${detail.Precio_Venta_Real || 'N/A'}</td>
+                                            <td>${subtotal.toFixed(2)}</td>
+                                        </tr>`;
+                    });
+
+                    detailTable += `</tbody></table>`;
+                    detailTable += `<h3>Total de la Factura: ${total.toFixed(2)}</h3>`;
+                    invoiceDetailDiv.innerHTML += detailTable;
+                })
+                .catch((error) => {
+                    console.error("Error al cargar el detalle de la factura: ", error);
+                });
+        }*/
+        // Función para mostrar el detalle de la factura
+        function showInvoiceDetail(invoiceId) {
+            const invoiceDetailDiv = document.getElementById('invoiceDetail');
+
+            // Primero, obtener los datos de la factura para obtener '#Factura_Cliente'
+            db.collection("Facturas").doc(invoiceId).get()
+                .then((doc) => {
+                    if (doc.exists) {
+                        const invoice = doc.data();
+                        const facturaCliente = invoice['#Factura_Cliente'] || 'N/A';
+
+                        // Actualizar el encabezado con el código de la factura
+                        invoiceDetailDiv.innerHTML = `<h2>Detalle de la Factura ${facturaCliente}</h2>`;
+
+                        // Ahora, obtener el detalle de la factura
+                        db.collection("Detalle_Factura")
+                            .where("ID_Firebase_Factura", "==", invoiceId)
+                            .get()
+                            .then((querySnapshot) => {
+                                let total = 0;
+                                let detailTable = `<table>
+                                                    <thead>
+                                                        <tr>
+                                                            <th>ID Artículo</th>
+                                                            <th>Cantidad</th>
+                                                            <th>Precio Venta</th>
+                                                            <th>Precio Venta Real</th>
+                                                            <th>Subtotal</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>`;
+
+                                querySnapshot.forEach((doc) => {
+                                    const detail = doc.data();
+                                    const subtotal = detail.Cantidad * detail.Precio_Venta_Real;
+                                    total += subtotal;
+
+                                    detailTable += `<tr>
+                                                        <td>${detail.ID_Firebase_Articulo || 'N/A'}</td>
+                                                        <td>${detail.Cantidad || 'N/A'}</td>
+                                                        <td>${detail.Precio_Venta || 'N/A'}</td>
+                                                        <td>${detail.Precio_Venta_Real || 'N/A'}</td>
+                                                        <td>${subtotal.toFixed(2)}</td>
+                                                    </tr>`;
+                                });
+
+                                detailTable += `</tbody></table>`;
+                                detailTable += `<h3>Total de la Factura: ${total.toFixed(2)}</h3>`;
+                                invoiceDetailDiv.innerHTML += detailTable;
+                            })
+                            .catch((error) => {
+                                console.error("Error al cargar el detalle de la factura: ", error);
+                                invoiceDetailDiv.innerHTML += '<p>Error al cargar el detalle de la factura.</p>';
+                            });
+                    } else {
+                        console.error("Factura no encontrada");
+                        invoiceDetailDiv.innerHTML = '<p>Factura no encontrada.</p>';
+                    }
+                })
+                .catch((error) => {
+                    console.error("Error al obtener la factura:", error);
+                    invoiceDetailDiv.innerHTML = '<p>Error al obtener la factura.</p>';
+                });
+        }
+
+        // Load invoices when the page loads
+        window.onload = function() {
+            getClientName(); // Obtener y mostrar el nombre del cliente
+            loadInvoices();
+        };
+    </script>
 </body>
 </html>

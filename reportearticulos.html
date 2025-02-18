@@ -71,45 +71,15 @@
       text-decoration: none;
     }
   </style>
-</head>
-<body>
-  <h1>Reporte de Artículos</h1>
-  <button onclick="loadReport()">Cargar Reporte</button>
   
-  <table>
-    <thead>
-      <tr>
-        <th>ID del Artículo</th>
-        <th>Marca</th>
-        <th>Modelo</th>
-        <th>Precio Compra</th>
-        <th>Precio Venta</th>
-        <th>Cantidad de IMEI</th>
-      </tr>
-    </thead>
-    <tbody id="reportTable">
-      <!-- Aquí se cargarán los datos del reporte -->
-    </tbody>
-  </table>
-  
-  <!-- Modal para mostrar el listado de IMEI -->
-  <div id="imeiModal" class="modal">
-    <div class="modal-content">
-      <span class="close" id="closeModal">&times;</span>
-      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
-      <ul id="imeiList">
-        <!-- Aquí se listan los IMEI -->
-      </ul>
-    </div>
-  </div>
-  
+  <!-- Defino las funciones en el head para asegurar que estén disponibles globalmente -->
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
 
     // Función para cargar el reporte cruzando las colecciones Articulos y Articulos_X_IMEI
     function loadReport() {
-      // Limpiar el contenido previo
+      // Limpiar contenido previo del reporte
       document.getElementById('reportTable').innerHTML = '';
       
       // Objeto para contar los IMEI por artículo
@@ -120,4 +90,30 @@
         .then((querySnapshot) => {
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.articleId
+            if (data.articleId) {
+              if (!imeiCounts[data.articleId]) {
+                imeiCounts[data.articleId] = 0;
+              }
+              imeiCounts[data.articleId]++;
+            }
+          });
+          // Luego, obtenemos los artículos
+          return db.collection("Articulos").get();
+        })
+        .then((querySnapshot) => {
+          let tableContent = '';
+          querySnapshot.forEach((doc) => {
+            const article = doc.data();
+            // Si no hay IMEI para el artículo, el contador es 0
+            const count = imeiCounts[article.id] || 0;
+            // La columna de cantidad es clickeable para abrir el modal
+            tableContent += `<tr>
+              <td>${article.id}</td>
+              <td>${article.marca}</td>
+              <td>${article.modelo}</td>
+              <td>${article.precioCompra}</td>
+              <td>${article.precioVenta}</td>
+              <td style="cursor:pointer; color: blue;" onclick="showIMEIModal('${article.id}')">${count}</td>
+            </tr>`;
+          });
+          doc

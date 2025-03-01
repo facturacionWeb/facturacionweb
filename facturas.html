@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facturación de Artículos</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- Select2 CSS y JS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <style>
+    /* Estilos básicos para la página */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    label, input, select, button {
+      margin: 10px 0;
+      padding: 10px;
+      width: calc(100% - 20px);
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+      color: #fff;
+    }
+    .invoice-container {
+      width: 800px;
+      background: #fff;
+      padding: 20px;
+      margin: 20px auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .invoice-header {
+      text-align: center;
+      border-bottom: 2px solid #000;
+      margin-bottom: 20px;
+    }
+    .invoice-header h2 {
+      margin: 0;
+      color: #333;
+    }
+    .invoice-header .currency, .invoice-header .route {
+      font-size: 16px;
+      color: #555;
+      margin-top: 5px;
+    }
+    .invoice-body {
+      margin-bottom: 20px;
+    }
+    .details-table, .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    .details-table td, .items-table th, .items-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    .items-table th {
+      background: #333;
+      color: #fff;
+      text-align: left;
+    }
+    .signature {
+      margin-top: 30px;
+      text-align: right;
+    }
+    .print-btn {
+      display: block;
+      width: 200px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    /* Estilos para el modal de detalle de factura */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      width: 90%;
+      max-width: 800px;
+      position: relative;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <a href="index.html">Volver a la Página Principal</a>
+  <div class="container">
+    <h1>Facturación de Artículos 📄💰</h1>
+    
+    <!-- Sección: Crear Nueva Factura -->
+    <h2>Crear Nueva Factura</h2>
+    <label for="clientSelect">Selecciona Cliente:</label>
+    <select id="clientSelect"></select>
+
+    <label for="invoiceRoute">Ruta de la Factura:</label>
+    <select id="invoiceRoute">
+      <option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+
+    <label for="paymentMethod">Método de Pago:</label>
+    <input type="text" id="paymentMethod" placeholder="Ej: Efectivo, Transferencia...">
+
+    <!-- Tabla para los items de la factura -->
+    <h3>Items de Factura</h3>
+    <table id="invoiceItemsTable">
+      <thead>
+        <tr>
+          <th>Artículo</th>
+          <th>IMEI (si aplica)</th>
+          <th>Cantidad</th>
+          <th>Precio Venta</th>
+          <th>Descuento (%)</th>
+          <th>Total</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Aquí se agregan las filas dinámicamente -->
+      </tbody>
+    </table>
+    <button onclick="addInvoiceItem()">Agregar Item ➕</button>
+    <h3>Total a Pagar: $<span id="invoiceTotal">0.00</span></h3>
+    <button onclick="createInvoice()">Crear Factura 💵</button>
+
+    <!-- Sección para mostrar la factura creada -->
+    <div id="invoiceDisplay" style="display:none;">
+      <h2>Factura Generada</h2>
+      <div class="invoice-container" id="invoiceContainer">
+        <!-- Aquí se mostrará la factura con el detalle -->
+      </div>
+      <button class="print-btn" onclick="window.print()">Imprimir Factura 🖨️</button>
+    </div>
+
+    <hr>
+    <!-- Sección: Listado de Facturas -->
+    <h2>Listado de Facturas</h2>
+    <label for="filterDate">Filtrar por Fecha:</label>
+    <input type="date" id="filterDate">
+    <label for="filterRoute">Filtrar por Ruta:</label>
+    <select id="filterRoute">
+      <option value="">-- Todas --</option>
+      <option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+    <button onclick="filterInvoices()">Filtrar Facturas 🔍</button>
+
+    <table id="invoicesTable">
+      <thead>
+        <tr>
+          <th>ID Factura</th>
+          <th>Fecha y Hora</th>
+          <th>Cliente</th>
+          <th>Ruta</th>
+          <th>Total</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Aquí se listan las facturas -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal para ver el detalle de una factura -->
+  <div id="invoiceModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeInvoiceModal()">&times;</span>
+      <div id="modalInvoiceContent">
+        <!-- Detalle de factura -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Inicializar Firestore
+    const db = firebase.firestore();
+
+    // Variable global para el total de la factura
+    let invoiceTotal = 0;
+
+    // Cargar clientes en el select de facturación
+    function loadClients() {
+      db.collection("clientes").get().then((querySnapshot) => {
+        const clientSelect = document.getElementById('clientSelect');
+        clientSelect.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const client = doc.data();
+          const option = document.createElement('option');
+          option.value = doc.id;
+          option.textContent = client.nombreCliente + " - " + client.nombreTienda;
+          clientSelect.appendChild(option);
+        });
+      }).catch((error) => {
+        console.error("Error al cargar clientes: ", error);
+      });
+    }
+
+    // Función para poblar un select con los artículos (combinando Articulos y Articulos_X_IMEI)
+    function populateArticleSelect($select) {
+      $select.empty();
+      db.collection("Articulos").get().then((articlesSnapshot) => {
+        let promises = [];
+        articlesSnapshot.forEach((articleDoc) => {
+          const articleData = articleDoc.data();
+          const p = db.collection("Articulos_X_IMEI")
+            .where("articleId", "==", articleDoc.id)
+            .get()
+            .then((imeiSnapshot) => {
+              if (!imeiSnapshot.empty) {
+                imeiSnapshot.forEach((imeiDoc) => {
+                  const imeiData = imeiDoc.data();
+                  const optionText = `${articleData.marca} ${articleData.modelo} - IMEI: ${imeiData.imei}`;
+                  const optionValue = `${articleDoc.id}_${imeiData.imei}`;
+                  $select.append(new Option(optionText, optionValue));
+                });
+              } else {
+                const optionText = `${articleData.marca} ${articleData.modelo}`;
+                $select.append(new Option(optionText, articleDoc.id));
+              }
+            })
+            .catch((error) => {
+              console.error("Error al cargar IMEI para el artículo: ", error);
+            });
+          promises.push(p);
+        });
+        Promise.all(promises).then(() => {
+          $select.select2({
+            placeholder: "Busca por marca, modelo o IMEI",
+            allowClear: true,
+            width: '100%'
+          });
+        });
+      })
+      .catch((error) => {
+        console.error("Error al cargar artículos: ", error);
+      });
+    }
+
+    // Función para agregar una nueva fila de item en la factura
+    function addInvoiceItem() {
+      const tbody = document.querySelector('#invoiceItemsTable tbody');
+      const row = document.createElement('tr');
+
+      // Columna: Artículo (select con búsqueda)
+      const articleCell = document.createElement('td');
+      const articleSelect = document.createElement('select');
+      $(articleSelect).css('width', '100%');
+      articleCell.appendChild(articleSelect);
+      row.appendChild(articleCell);
+      populateArticleSelect($(articleSelect));
+
+      // Columna: IMEI (opcional; para ingresar IMEI manualmente si es necesario)
+      const imeiCell = document.createElement('td');
+      const imeiInput = document.createElement('input');
+      imeiInput.type = 'text';
+      imeiInput.placeholder = 'IMEI(s) separados por coma';
+      imeiCell.appendChild(imeiInput);
+      row.appendChild(imeiCell);
+
+      // Columna: Cantidad
+      const quantityCell = document.createElement('td');
+      const quantityInput = document.createElement('input');
+      quantityInput.type = 'number';
+      quantityInput.value = 1;
+      quantityInput.min = 1;
+      quantityCell.appendChild(quantityInput);
+      row.appendChild(quantityCell);
+
+      // Columna: Precio Venta
+      const priceCell = document.createElement('td');
+      const priceInput = document.createElement('input');
+      priceInput.type = 'number';
+      priceInput.placeholder = 'Precio Venta';
+      priceCell.appendChild(priceInput);
+      row.appendChild(priceCell);
+
+      // Columna: Descuento (%)
+      const discountCell = document.createElement('td');
+      const discountInput = document.createElement('input');
+      discountInput.type = 'number';
+      discountInput.value = 0;
+      discountInput.min = 0;
+      discountCell.appendChild(discountInput);
+      row.appendChild(discountCell);
+
+      // Columna: Total (calculado)
+      const totalCell = document.createElement('td');
+      totalCell.textContent = "0.00";
+      row.appendChild(totalCell);
+
+      // Columna: Acciones (botón para eliminar la fila)
+      const actionsCell = document.createElement('td');
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = "Eliminar";
+      deleteBtn.onclick = function() {
+        tbody.removeChild(row);
+        recalculateInvoice();
+      };
+      actionsCell.appendChild(deleteBtn);
+      row.appendChild(actionsCell);
+
+      // Actualizar el total de la fila al modificar cantidad, precio o descuento
+      [quantityInput, priceInput, discountInput].forEach(input => {
+        input.addEventListener('input', function() {
+          const qty = parseFloat(quantityInput.value) || 0;
+          const price = parseFloat(priceInput.value) || 0;
+          const discount = parseFloat(discountInput.value) || 0;
+          let total = qty * price;
+          if (discount > 0) {
+            total = total - (total * discount / 100);
+          }
+          totalCell.textContent = total.toFixed(2);
+          recalculateInvoice();
+        });
+      });
+
+      tbody.appendChild(row);
+    }
+
+    // Recalcular el total de la factura
+    function recalculateInvoice() {
+      const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
+      let total = 0;
+      rows.forEach(row => {
+        const totalCell = row.children[5];
+        total += parseFloat(totalCell.textContent) || 0;
+      });
+      invoiceTotal = total;
+      document.getElementById('invoiceTotal').textContent = total.toFixed(2);
+    }
+
+    // Crear factura y guardar en Firestore
+    function createInvoice() {
+      const clientId = document.getElementById('clientSelect').value;
+      const route = document.getElementById('invoiceRoute').value;
+      const paymentMethod = document.getElementById('paymentMethod').value;
+      const items = [];
+
+      // Recopilar items de la factura
+      const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
+      rows.forEach(row => {
+        // Obtener el valor seleccionado del select de artículo
+        const articleSelectElem = row.children[0].querySelector('select');
+        const article = articleSelectElem.value;
+        const imeis = row.children[1].querySelector('input').value;
+        const quantity = parseFloat(row.children[2].querySelector('input').value) || 0;
+        const price = parseFloat(row.children[3].querySelector('input').value) || 0;
+        const discount = parseFloat(row.children[4].querySelector('input').value) || 0;
+        const total = parseFloat(row.children[5].textContent) || 0;
+
+        items.push({
+          article: article,
+          imeis: imeis ? imeis.split(',').map(i => i.trim()) : [],
+          quantity: quantity,
+          price: price,
+          discount: discount,
+          total: total
+        });
+      });
+
+      // Crear objeto de factura
+      const invoice = {
+        clientId: clientId,
+        route: route,
+        paymentMethod: paymentMethod,
+        items: items,
+        total: invoiceTotal,
+        fecha: new Date() // Timestamp
+      };
+
+      db.collection("facturas").add(invoice).then((docRef) => {
+        alert("Factura creada con éxito, Gustavo! 🎉");
+        displayInvoice(docRef.id, invoice);
+        loadInvoices(); // Actualiza el listado de facturas
+        // Limpiar la tabla de items y reiniciar total
+        document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
+        document.getElementById('invoiceTotal').textContent = "0.00";
+      }).catch((error) => {
+        console.error("Error al crear factura: ", error);
+      });
+    }
+
+    // Mostrar la factura creada en la sección de detalle
+    function displayInvoice(invoiceId, invoice) {
+      db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
+        const client = doc.data();
+        const invoiceHTML = `
+          <div class="invoice-header">
+            <h2>Factura - ${invoiceId}</h2>
+            <p class="currency"><strong>Moneda:</strong> USD ($)</p>
+            <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
+          </div>
+          <div class="invoice-body">
+            <table class="details-table">
+              <tr>
+                <td><strong>Fecha y Hora:</strong> ${new Date(invoice.fecha).toLocaleString()}</td>
+                <td><strong>Cliente:</strong> ${client.nombreCliente}</td>
+              </tr>
+              <tr>
+                <td><strong>Tienda:</strong> ${client.nombreTienda}</td>
+                <td><strong>Dirección:</strong> ${client.direccion}</td>
+              </tr>
+              <tr>
+                <td><strong>Teléfono:</strong> ${client.telefono}</td>
+                <td><strong>Pago:</strong> ${invoice.paymentMethod || 'N/A'}</td>
+              </tr>
+            </table>
+            <table class="items-table">
+              <tr>
+                <th>Cantidad</th>
+                <th>Descripción</th>
+                <th>Precio Venta</th>
+                <th>Descuento</th>
+                <th>Total</th>
+              </tr>
+              ${invoice.items.map(item => `
+                <tr>
+                  <td>${item.quantity}</td>
+                  <td>${item.article} ${item.imeis.length ? ' (IMEI: ' + item.imeis.join(', ') + ')' : ''}</td>
+                  <td>$${item.price.toFixed(2)}</td>
+                  <td>${item.discount}%</td>
+                  <td>$${item.total.toFixed(2)}</td>
+                </tr>
+              `).join('')}
+              <tr>
+                <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
+                <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+              </tr>
+            </table>
+            <div class="signature">
+              <p>_______________________</p>
+              <p>Firma del Cliente</p>
+            </div>
+          </div>
+        `;
+        document.getElementById('invoiceContainer').innerHTML = invoiceHTML;
+        document.getElementById('invoiceDisplay').style.display = 'block';
+      }).catch((error) => {
+        console.error("Error al obtener datos del cliente: ", error);
+      });
+    }
+
+    // Función para listar las facturas
+    function loadInvoices() {
+      db.collection("facturas").orderBy("fecha", "desc").get().then((querySnapshot) => {
+        const tbody = document.querySelector('#invoicesTable tbody');
+        tbody.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const invoice = doc.data();
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${doc.id}</td>
+            <td>${new Date(invoice.fecha).toLocaleString()}</td>
+            <td>${invoice.clientId}</td>
+            <td>${invoice.route}</td>
+            <td>$${invoice.total.toFixed(2)}</td>
+            <td>
+              <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      }).catch((error) => {
+        console.error("Error al cargar facturas: ", error);
+      });
+    }
+
+    // Función para filtrar facturas por fecha y ruta
+    function filterInvoices() {
+      const filterDate = document.getElementById('filterDate').value;
+      const filterRoute = document.getElementById('filterRoute').value;
+      let query = db.collection("facturas");
+
+      if(filterDate) {
+        const start = new Date(filterDate);
+        start.setHours(0,0,0,0);
+        const end = new Date(filterDate);
+        end.setHours(23,59,59,999);
+        query = query.where("fecha", ">=", start).where("fecha", "<=", end);
+      }
+      if(filterRoute) {
+        query = query.where("route", "==", filterRoute);
+      }
+
+      query.orderBy("fecha", "desc").get().then((querySnapshot) => {
+        const tbody = document.querySelector('#invoicesTable tbody');
+        tbody.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const invoice = doc.data();
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${doc.id}</td>
+            <td>${new Date(invoice.fecha).toLocaleString()}</td>
+            <td>${invoice.clientId}</td>
+            <td>${invoice.route}</td>
+            <td>$${invoice.total.toFixed(2)}</td>
+            <td>
+              <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+      }).catch((error) => {
+        console.error("Error al filtrar facturas: ", error);
+      });
+    }
+
+    // Función para ver el detalle de una factura en modal
+    function viewInvoiceDetail(invoiceId) {
+      db.collection("facturas").doc(invoiceId).get().then((doc) => {
+        if(doc.exists) {
+          const invoice = doc.data();
+          db.collection("clientes").doc(invoice.clientId).get().then((clientDoc) => {
+            const client = clientDoc.data();
+            const invoiceHTML = `
+              <div class="invoice-header">
+                <h2>Factura - ${invoiceId}</h2>
+                <p class="currency"><strong>Moneda:</strong> USD ($)</p>
+                <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
+              </div>
+              <div class="invoice-body">
+                <table class="details-table">
+                  <tr>
+                    <td><strong>Fecha y Hora:</strong> ${new Date(invoice.fecha).toLocaleString()}</td>
+                    <td><strong>Cliente:</strong> ${client.nombreCliente}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Tienda:</strong> ${client.nombreTienda}</td>
+                    <td><strong>Dirección:</strong> ${client.direccion}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Teléfono:</strong> ${client.telefono}</td>
+                    <td><strong>Pago:</strong> ${invoice.paymentMethod || 'N/A'}</td>
+                  </tr>
+                </table>
+                <table class="items-table">
+                  <tr>
+                    <th>Cantidad</th>
+                    <th>Descripción</th>
+                    <th>Precio Venta</th>
+                    <th>Descuento</th>
+                    <th>Total</th>
+                  </tr>
+                  ${invoice.items.map(item => `
+                    <tr>
+                      <td>${item.quantity}</td>
+                      <td>${item.article} ${item.imeis.length ? ' (IMEI: ' + item.imeis.join(', ') + ')' : ''}</td>
+                      <td>$${item.price.toFixed(2)}</td>
+                      <td>${item.discount}%</td>
+                      <td>$${item.total.toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                  <tr>
+                    <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
+                    <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+                  </tr>
+                </table>
+                <div class="signature">
+                  <p>_______________________</p>
+                  <p>Firma del Cliente</p>
+                </div>
+              </div>
+            `;
+            document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
+            document.getElementById('invoiceModal').style.display = 'block';
+          });
+        }
+      }).catch((error) => {
+        console.error("Error al ver factura: ", error);
+      });
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('invoiceModal').style.display = 'none';
+    }
+
+    // Inicializar la página: carga de clientes y facturas
+    window.onload = function() {
+      loadClients();
+      loadInvoices();
+    };
+  </script>
+</body>
+</html>

@@ -648,7 +648,7 @@
             <td>${invoice.anulada ? "ANULADA" : "ACTIVA"}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
-              <button onclick="anularInvoice('${doc.id}')">ANULAR</button>
+              ${invoice.anulada ? "" : `<button onclick="anularInvoice('${doc.id}')">ANULAR</button>`}
             </td>
           `;
           tbody.appendChild(row);

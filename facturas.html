@@ -500,6 +500,8 @@
         const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
         const total = parseFloat(row.children[4].textContent) || 0;
         if (!articleSelectElem.value) return; // Sin artículo seleccionado
+        // 2) Si el total es 0, también ignora esa fila
+        if (total <= 0) return;
         const parsedValue = JSON.parse(articleSelectElem.value);
         const brand = parsedValue.marca;
         const model = parsedValue.modelo;

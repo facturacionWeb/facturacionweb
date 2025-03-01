@@ -627,12 +627,13 @@
       });
     }
 
-    // Filtrar facturas por fecha y ruta
+    // Filtrar facturas por fecha y ruta (AQUÍ ES DONDE SE MODIFICÓ)
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
       let query = db.collection("facturas");
 
+      // Filtro por fecha (rango entre 00:00 y 23:59 del mismo día)
       if(filterDate) {
         const start = new Date(filterDate);
         start.setHours(0,0,0,0);
@@ -640,11 +641,17 @@
         end.setHours(23,59,59,999);
         query = query.where("fecha", ">=", start).where("fecha", "<=", end);
       }
+
+      // Filtro por ruta
       if(filterRoute) {
         query = query.where("route", "==", filterRoute);
       }
 
-      query.orderBy("fecha", "desc").get().then((querySnapshot) => {
+      // Orden por fecha descendente
+      query = query.orderBy("fecha", "desc");
+
+      query.get()
+      .then((querySnapshot) => {
         const tbody = document.querySelector('#invoicesTable tbody');
         tbody.innerHTML = '';
         querySnapshot.forEach((doc) => {
@@ -663,8 +670,11 @@
           `;
           tbody.appendChild(row);
         });
-      }).catch((error) => {
+      })
+      .catch((error) => {
         console.error("Error al filtrar facturas: ", error);
+        // Si es un error de índice, lo mostrará aquí
+        // Aparecerá un link en la consola para crear el índice compuesto
       });
     }
 

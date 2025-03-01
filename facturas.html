@@ -663,7 +663,7 @@
               <div class="invoice-body">
                 <table class="details-table">
                   <tr>
-                    <td><strong>Fecha y Hora:</strong><br>${new Date(invoice.fecha).toLocaleString()}</td>
+                    <td><strong>Fecha y Hora:</strong><br>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
                     <td><strong>Cliente:</strong><br>${client.nombreCliente}</td>
                   </tr>
                   <tr>

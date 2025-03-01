@@ -41,41 +41,8 @@
             text-align: center;
         }
     </style>
-    <script>
-        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
-        (function loadVersionScript() {
-            const versionScript = document.createElement('script');
-            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-            document.head.appendChild(versionScript);
-        })();
-    </script>
 </head>
 <body>
-    <script>
-        // Check if the user is already authenticated
-        window.onload = function() {
-            debugger;
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
-            } else {
-                // Load users if authenticated
-                loadUsers();
-                loadLocations();
-            }
-
-           document.getElementById('showPassword').addEventListener('change', togglePasswordVisibility);
-    
-            function togglePasswordVisibility() {
-                const passwordInput = document.getElementById('password');
-                const showPasswordCheckbox = document.getElementById('showPassword');
-                passwordInput.type = showPasswordCheckbox.checked ? 'text' : 'password';
-            }
-            
-        };
-    </script>
-
     <a href="index.html">Volver a la Página Principal</a>
     
     <div class="container">
@@ -88,11 +55,19 @@
         </label>
         <input type="password" id="password" placeholder="Password" />
         <input type="text" id="fullName" placeholder="Nombre Completo" />
-        <label>
-            <input type="checkbox" id="isAdmin" /> Administrador
-        </label>
         <select id="location">
-            <option value="">Seleccione una Ubicación</option>
+            <option value="TODOS">TODOS</option>
+            <option value="SIN RUTA">SIN RUTA</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
         </select>
         <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
         <button onclick="clearFields()">Limpiar Campos</button>
@@ -104,7 +79,6 @@
                 <tr>
                     <th>Username</th>
                     <th>Nombre Completo</th>
-                    <th>Administrador</th>
                     <th>Ubicación</th>
                     <th>Acciones</th>
                 </tr>
@@ -116,29 +90,21 @@
     </div>
 
     <script>
+        const db = firebase.firestore();
+
         // Function to clear input fields
         function clearFields() {
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
             document.getElementById('fullName').value = '';
-            document.getElementById('isAdmin').checked = false;
             document.getElementById('location').value = '';
         }
 
-        const db = firebase.firestore();
-
         // Function to add or update user
         function addOrUpdateUser() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             const fullName = document.getElementById('fullName').value.trim();
-            const isAdmin = document.getElementById('isAdmin').checked ? 1 : 0;
             const location = document.getElementById('location').value;
 
             if (username) {
@@ -146,7 +112,6 @@
                     username: username,
                     password: password,
                     fullName: fullName,
-                    admin: isAdmin,
                     location: location
                 }).then(() => {
                     alert("Usuario agregado o actualizado con éxito");
@@ -161,22 +126,14 @@
 
         // Function to load users
         function loadUsers() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
             db.collection("users").get().then((querySnapshot) => {
                 const userTable = document.getElementById('userTable');
                 userTable.innerHTML = '';
                 querySnapshot.forEach((doc) => {
                     const user = doc.data();
-                    if (user.username === 'Administrador') return;
                     const row = `<tr>
                                     <td>${user.username || 'N/A'}</td>
                                     <td>${user.fullName || 'N/A'}</td>
-                                    <td>${user.admin === 1 ? 'Sí' : 'No'}</td>
                                     <td>${user.location || 'N/A'}</td>
                                     <td>
                                         <button onclick="editUser('${user.username}')">Editar</button>
@@ -190,38 +147,14 @@
             });
         }
 
-        // Function to load locations into the select element
-        function loadLocations() {
-            db.collection("locations").where("isRoute", "==", 1).get().then((querySnapshot) => {
-                const locationSelect = document.getElementById('location');
-                locationSelect.innerHTML = '<option value="">Seleccione una Ubicación</option>';
-                querySnapshot.forEach((doc) => {
-                    const location = doc.data();
-                    const option = document.createElement('option');
-                    option.value = location.name;
-                    option.textContent = location.name;
-                    locationSelect.appendChild(option);
-                });
-            }).catch((error) => {
-                console.error("Error al cargar las ubicaciones: ", error);
-            });
-        }
-
         // Function to edit user
         function editUser(username) {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
             db.collection("users").doc(username).get().then((doc) => {
                 if (doc.exists) {
                     const user = doc.data();
                     document.getElementById('username').value = user.username;
                     document.getElementById('password').value = user.password;
                     document.getElementById('fullName').value = user.fullName;
-                    document.getElementById('isAdmin').checked = user.admin === 1;
                     document.getElementById('location').value = user.location || '';
                 } else {
                     alert("El usuario no existe");
@@ -233,12 +166,6 @@
 
         // Function to delete user
         function deleteUser(username) {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html";
-                return;
-            }
             db.collection("users").doc(username).delete().then(() => {
                 alert("Usuario eliminado con éxito");
                 loadUsers();
@@ -246,6 +173,10 @@
                 console.error("Error al eliminar el usuario: ", error);
             });
         }
+
+        window.onload = function() {
+            loadUsers();
+        };
     </script>
 </body>
 </html>

@@ -176,7 +176,6 @@
       <option value="Credito">Crédito</option>
     </select>
       
-
     <!-- Información adicional para Transferencia -->
     <div id="transferInfo" style="display: none;">
       <label for="bankSelect">Selecciona Banco:</label>
@@ -223,8 +222,11 @@
     <hr>
     <!-- Sección: Listado de Facturas -->
     <h2>Listado de Facturas</h2>
+
+    <!-- Filtros -->
     <label for="filterDate">Filtrar por Fecha:</label>
     <input type="date" id="filterDate">
+
     <label for="filterRoute">Filtrar por Ruta:</label>
     <select id="filterRoute">
       <option value="">-- Todas --</option>
@@ -235,6 +237,24 @@
       <option value="4">4</option>
       <option value="5">5</option>
     </select>
+
+    <!-- Nuevo filtro: Facturas Anuladas -->
+    <label for="filterAnulada">Estado:</label>
+    <select id="filterAnulada">
+      <option value="">-- Todas --</option>
+      <option value="false">No Anuladas</option>
+      <option value="true">Anuladas</option>
+    </select>
+
+    <!-- Nuevo filtro: Método de Pago -->
+    <label for="filterPaymentMethod">Método de Pago:</label>
+    <select id="filterPaymentMethod">
+      <option value="">-- Todos --</option>
+      <option value="Efectivo">Efectivo</option>
+      <option value="Transferencia">Transferencia</option>
+      <option value="Credito">Crédito</option>
+    </select>
+
     <button onclick="filterInvoices()">Filtrar Facturas 🔍</button>
 
     <table id="invoicesTable">
@@ -245,6 +265,7 @@
           <th>Cliente</th>
           <th>Ruta</th>
           <th>Total</th>
+          <th>Estado</th>
           <th>Acciones</th>
         </tr>
       </thead>
@@ -309,24 +330,28 @@
               if (!imeiSnapshot.empty) {
                 imeiSnapshot.forEach((imeiDoc) => {
                   const imeiData = imeiDoc.data();
+                  // Guardamos también el doc ID de 'Articulos_X_IMEI'
                   const payload = {
                     articleId: articleDoc.id,
                     marca: articleData.marca,
                     modelo: articleData.modelo,
                     imei: imeiData.imei,
-                    precioVenta: articleData.precioVenta || 0
+                    precioVenta: articleData.precioVenta || 0,
+                    imeiDocId: imeiDoc.id
                   };
                   const optionText = `${articleData.marca} ${articleData.modelo} - IMEI: ${imeiData.imei}`;
                   const optionValue = JSON.stringify(payload);
                   $select.append(new Option(optionText, optionValue));
                 });
               } else {
+                // Artículo sin IMEI
                 const payload = {
                   articleId: articleDoc.id,
                   marca: articleData.marca,
                   modelo: articleData.modelo,
                   imei: "",
-                  precioVenta: articleData.precioVenta || 0
+                  precioVenta: articleData.precioVenta || 0,
+                  imeiDocId: null
                 };
                 const optionText = `${articleData.marca} ${articleData.modelo}`;
                 const optionValue = JSON.stringify(payload);
@@ -356,6 +381,7 @@
       const tbody = document.querySelector('#invoiceItemsTable tbody');
       const row = document.createElement('tr');
 
+      // Columna Artículo
       const articleCell = document.createElement('td');
       const articleSelect = document.createElement('select');
       $(articleSelect).css('width', '100%');
@@ -363,14 +389,17 @@
       row.appendChild(articleCell);
       populateArticleSelect($(articleSelect));
 
+      // Columna Cantidad (fija en 1 y no editable)
       const quantityCell = document.createElement('td');
       const quantityInput = document.createElement('input');
       quantityInput.type = 'number';
-      quantityInput.value = 0;
-      quantityInput.min = 0;
+      quantityInput.value = 1;
+      quantityInput.min = 1;
+      quantityInput.disabled = true; // Deshabilitado
       quantityCell.appendChild(quantityInput);
       row.appendChild(quantityCell);
 
+      // Columna Precio Venta
       const priceCell = document.createElement('td');
       const priceInput = document.createElement('input');
       priceInput.type = 'number';
@@ -378,6 +407,7 @@
       priceCell.appendChild(priceInput);
       row.appendChild(priceCell);
 
+      // Columna Descuento
       const discountCell = document.createElement('td');
       const discountInput = document.createElement('input');
       discountInput.type = 'number';
@@ -386,10 +416,12 @@
       discountCell.appendChild(discountInput);
       row.appendChild(discountCell);
 
+      // Columna Total
       const totalCell = document.createElement('td');
       totalCell.textContent = "0.00";
       row.appendChild(totalCell);
 
+      // Columna Acciones
       const actionsCell = document.createElement('td');
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = "Eliminar";
@@ -400,6 +432,7 @@
       actionsCell.appendChild(deleteBtn);
       row.appendChild(actionsCell);
 
+      // Cuando cambie el artículo, actualizamos precio y total
       $(articleSelect).on('change', function() {
         if ($(this).val()) {
           const parsedValue = JSON.parse($(this).val());
@@ -408,8 +441,9 @@
         }
       });
 
+      // Función para recalcular la fila
       function recalcRow() {
-        const qty = parseFloat(quantityInput.value) || 0;
+        const qty = parseFloat(quantityInput.value) || 1;
         const price = parseFloat(priceInput.value) || 0;
         const discount = parseFloat(discountInput.value) || 0;
         let total = qty * price;
@@ -420,7 +454,7 @@
         recalculateInvoice();
       }
 
-      [quantityInput, priceInput, discountInput].forEach(input => {
+      [priceInput, discountInput].forEach(input => {
         input.addEventListener('input', recalcRow);
       });
 
@@ -439,7 +473,7 @@
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
-    // Crear factura y guardar en Firestore (modificado para agregar fechaStr)
+    // Crear factura y guardar en Firestore (y aquí se eliminan los IMEIs)
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
@@ -447,10 +481,12 @@
 
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;
-      if(paymentType === "Transferencia") {
+      if (paymentType === "Transferencia") {
         let bank = document.getElementById('bankSelect').value;
         let bankReference = document.getElementById('bankReference').value;
         paymentMethod = `Transferencia - Banco: ${bank} (#Ref: ${bankReference})`;
+      } else if (paymentType === "Credito") {
+        paymentMethod = "Crédito a 30 días"; // Ejemplo
       } else {
         paymentMethod = "Efectivo";
       }
@@ -459,32 +495,32 @@
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       rows.forEach(row => {
         const articleSelectElem = row.children[0].querySelector('select');
-        const quantity = parseFloat(row.children[1].querySelector('input').value) || 0;
+        const quantity = parseFloat(row.children[1].querySelector('input').value) || 1;
         const price = parseFloat(row.children[2].querySelector('input').value) || 0;
         const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
         const total = parseFloat(row.children[4].textContent) || 0;
-        if (quantity === 0) return;
-        let brand = "", model = "", imei = "", articleId = "";
-        if (articleSelectElem.value) {
-          const parsedValue = JSON.parse(articleSelectElem.value);
-          brand = parsedValue.marca;
-          model = parsedValue.modelo;
-          imei = parsedValue.imei;
-          articleId = parsedValue.articleId;
-        }
+        if (!articleSelectElem.value) return; // Sin artículo seleccionado
+        const parsedValue = JSON.parse(articleSelectElem.value);
+        const brand = parsedValue.marca;
+        const model = parsedValue.modelo;
+        const imei = parsedValue.imei;
+        const articleId = parsedValue.articleId;
+        const imeiDocId = parsedValue.imeiDocId; // Para eliminar luego
+
         items.push({
-          articleId: articleId,
-          brand: brand,
-          model: model,
-          imei: imei,
-          quantity: quantity,
-          price: price,
-          discount: discount,
-          total: total
+          articleId,
+          brand,
+          model,
+          imei,
+          imeiDocId,
+          quantity,
+          price,
+          discount,
+          total
         });
       });
 
-      // Crear fecha y fechaStr (solo fecha en formato "YYYY-MM-DD")
+      // Crear fecha y fechaStr
       const now = new Date();
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -492,20 +528,33 @@
       const fechaStr = `${yyyy}-${mm}-${dd}`;
 
       const invoice = {
-        clientId: clientId,
-        route: route,
-        currency: currency,
-        paymentMethod: paymentMethod,
-        items: items,
+        clientId,
+        route,
+        currency,
+        paymentType,     // Efectivo/Transferencia/Crédito
+        paymentMethod,   // Detalle
+        items,
         total: invoiceTotal,
         fecha: now,       // Timestamp completo
-        fechaStr: fechaStr  // Solo la fecha (para filtrar)
+        fechaStr,
+        anulada: false    // Por defecto, la factura NO está anulada
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
         alert("¡Factura creada con éxito! 🎉");
+
+        // Ahora que la factura se creó correctamente, eliminamos los IMEIs seleccionados
+        items.forEach(item => {
+          if (item.imeiDocId) {
+            db.collection("Articulos_X_IMEI").doc(item.imeiDocId).delete()
+              .then(() => console.log(`IMEI doc ${item.imeiDocId} eliminado de Articulos_X_IMEI`))
+              .catch(err => console.error("Error al eliminar IMEI doc:", err));
+          }
+        });
+
         displayInvoice(docRef.id, invoice);
         loadInvoices();
+        // Limpieza
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
       }).catch((error) => {
@@ -528,15 +577,15 @@
           <div class="invoice-body">
             <table class="details-table">
               <tr>
-                <td><strong>Fecha y Hora:</strong><br>${new Date(invoice.fecha).toLocaleString()}</td>
-                <td><strong>Cliente:</strong><br>${client.nombreCliente}</td>
+                <td><strong>Fecha y Hora:</strong><br>${invoice.fecha ? invoice.fecha.toLocaleString() : ""}</td>
+                <td><strong>Cliente:</strong><br>${client ? client.nombreCliente : "N/A"}</td>
               </tr>
               <tr>
-                <td><strong>Tienda:</strong><br>${client.nombreTienda}</td>
-                <td><strong>Dirección:</strong><br>${client.direccion}</td>
+                <td><strong>Tienda:</strong><br>${client ? client.nombreTienda : "N/A"}</td>
+                <td><strong>Dirección:</strong><br>${client ? client.direccion : "N/A"}</td>
               </tr>
               <tr>
-                <td><strong>Teléfono:</strong><br>${client.telefono}</td>
+                <td><strong>Teléfono:</strong><br>${client ? client.telefono : "N/A"}</td>
                 <td><strong>Pago:</strong><br>${invoice.paymentMethod || 'N/A'}</td>
               </tr>
             </table>
@@ -594,9 +643,10 @@
             <td>${invoice.clientId}</td>
             <td>${invoice.route}</td>
             <td>${invoice.total.toFixed(2)}</td>
+            <td>${invoice.anulada ? "ANULADA" : "ACTIVA"}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
-              <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
+              <button onclick="anularInvoice('${doc.id}')">ANULAR</button>
             </td>
           `;
           tbody.appendChild(row);
@@ -606,17 +656,46 @@
       });
     }
 
-    // Filtrar facturas por fecha (usando fechaStr) y ruta
+    // Anular factura (en lugar de eliminar)
+    function anularInvoice(invoiceId) {
+      if (confirm("¿Está seguro de ANULAR la factura?")) {
+        db.collection("facturas").doc(invoiceId).update({ anulada: true })
+          .then(() => {
+            alert("Factura ANULADA con éxito.");
+            loadInvoices();
+          })
+          .catch((error) => {
+            console.error("Error al anular factura:", error);
+          });
+      }
+    }
+
+    // Filtrar facturas (fechaStr, route, anulada, paymentType)
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
+      const filterAnulada = document.getElementById('filterAnulada').value;
+      const filterPaymentMethod = document.getElementById('filterPaymentMethod').value;
+
       let query = db.collection("facturas");
 
-      if(filterDate) {
+      // Filtro por fecha
+      if (filterDate) {
         query = query.where("fechaStr", "==", filterDate);
       }
-      if(filterRoute) {
+      // Filtro por ruta
+      if (filterRoute) {
         query = query.where("route", "==", filterRoute);
+      }
+      // Filtro por anulada
+      if (filterAnulada) {
+        // filterAnulada es "true" o "false"
+        const boolVal = (filterAnulada === "true");
+        query = query.where("anulada", "==", boolVal);
+      }
+      // Filtro por método de pago
+      if (filterPaymentMethod) {
+        query = query.where("paymentType", "==", filterPaymentMethod);
       }
 
       query = query.orderBy("fecha", "desc");
@@ -630,13 +709,14 @@
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${doc.id}</td>
-              <td>${new Date(invoice.fecha).toLocaleString()}</td>
+              <td>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
               <td>${invoice.clientId}</td>
               <td>${invoice.route}</td>
               <td>${invoice.total.toFixed(2)}</td>
+              <td>${invoice.anulada ? "ANULADA" : "ACTIVA"}</td>
               <td>
                 <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
-                <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
+                <button onclick="anularInvoice('${doc.id}')">ANULAR</button>
               </td>
             `;
             tbody.appendChild(row);
@@ -666,14 +746,14 @@
                 <table class="details-table">
                   <tr>
                     <td><strong>Fecha y Hora:</strong><br>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
-                    <td><strong>Cliente:</strong><br>${client.nombreCliente}</td>
+                    <td><strong>Cliente:</strong><br>${client ? client.nombreCliente : "N/A"}</td>
                   </tr>
                   <tr>
-                    <td><strong>Tienda:</strong><br>${client.nombreTienda}</td>
-                    <td><strong>Dirección:</strong><br>${client.direccion}</td>
+                    <td><strong>Tienda:</strong><br>${client ? client.nombreTienda : "N/A"}</td>
+                    <td><strong>Dirección:</strong><br>${client ? client.direccion : "N/A"}</td>
                   </tr>
                   <tr>
-                    <td><strong>Teléfono:</strong><br>${client.telefono}</td>
+                    <td><strong>Teléfono:</strong><br>${client ? client.telefono : "N/A"}</td>
                     <td><strong>Pago:</strong><br>${invoice.paymentMethod || 'N/A'}</td>
                   </tr>
                 </table>
@@ -716,20 +796,6 @@
 
     function closeInvoiceModal() {
       document.getElementById('invoiceModal').style.display = 'none';
-    }
-
-    // Eliminar factura
-    function deleteInvoice(invoiceId) {
-      if (confirm("¿Está seguro de eliminar la factura?")) {
-        db.collection("facturas").doc(invoiceId).delete()
-        .then(() => {
-          alert("Factura eliminada con éxito.");
-          loadInvoices();
-        })
-        .catch((error) => {
-          console.error("Error al eliminar factura:", error);
-        });
-      }
     }
 
     // Inicializar la página

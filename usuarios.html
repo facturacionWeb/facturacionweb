@@ -56,8 +56,8 @@
         window.onload = function() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
             if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
+                //alert("Debe autenticarse primero");
+                //window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
             } else {
                 // Load users if authenticated
                 loadUsers();

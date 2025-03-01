@@ -85,6 +85,9 @@
     .details-table td, .items-table th, .items-table td {
       border: 1px solid #ddd;
       padding: 10px;
+      /* Permite que el texto se parta en varias líneas si es muy largo */
+      white-space: normal;
+      word-wrap: break-word;
     }
     .items-table th {
       background: #333;
@@ -292,7 +295,8 @@
       });
     }
 
-    // Función para poblar un select con los artículos (guardando marca, modelo, IMEI aparte)
+    // Función para poblar un select con los artículos
+    // Se guarda precioVenta, marca, modelo, imei en un JSON
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -306,12 +310,12 @@
               if (!imeiSnapshot.empty) {
                 imeiSnapshot.forEach((imeiDoc) => {
                   const imeiData = imeiDoc.data();
-                  // Construimos un JSON con la info
                   const payload = {
                     articleId: articleDoc.id,
                     marca: articleData.marca,
                     modelo: articleData.modelo,
-                    imei: imeiData.imei
+                    imei: imeiData.imei,
+                    precioVenta: articleData.precioVenta || 0
                   };
                   const optionText = `${articleData.marca} ${articleData.modelo} - IMEI: ${imeiData.imei}`;
                   const optionValue = JSON.stringify(payload);
@@ -323,7 +327,8 @@
                   articleId: articleDoc.id,
                   marca: articleData.marca,
                   modelo: articleData.modelo,
-                  imei: ""
+                  imei: "",
+                  precioVenta: articleData.precioVenta || 0
                 };
                 const optionText = `${articleData.marca} ${articleData.modelo}`;
                 const optionValue = JSON.stringify(payload);
@@ -361,12 +366,12 @@
       row.appendChild(articleCell);
       populateArticleSelect($(articleSelect));
 
-      // Columna: Cantidad
+      // Columna: Cantidad (por defecto 0)
       const quantityCell = document.createElement('td');
       const quantityInput = document.createElement('input');
       quantityInput.type = 'number';
-      quantityInput.value = 1;
-      quantityInput.min = 1;
+      quantityInput.value = 0;  // Por defecto 0
+      quantityInput.min = 0;
       quantityCell.appendChild(quantityInput);
       row.appendChild(quantityCell);
 
@@ -403,19 +408,32 @@
       actionsCell.appendChild(deleteBtn);
       row.appendChild(actionsCell);
 
-      // Actualizar el total de la fila al modificar cantidad, precio o descuento
+      // Evento: cuando se cambie el artículo, se precarga el Precio Venta
+      $(articleSelect).on('change', function() {
+        if ($(this).val()) {
+          const parsedValue = JSON.parse($(this).val());
+          // Asignar precioVenta por defecto
+          priceInput.value = parsedValue.precioVenta || 0;
+          recalcRow();
+        }
+      });
+
+      // Función para recalcular la fila
+      function recalcRow() {
+        const qty = parseFloat(quantityInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        const discount = parseFloat(discountInput.value) || 0;
+        let total = qty * price;
+        if (discount > 0) {
+          total -= (total * discount / 100);
+        }
+        totalCell.textContent = total.toFixed(2);
+        recalculateInvoice();
+      }
+
+      // Escuchar cambios en cantidad, precio o descuento
       [quantityInput, priceInput, discountInput].forEach(input => {
-        input.addEventListener('input', function() {
-          const qty = parseFloat(quantityInput.value) || 0;
-          const price = parseFloat(priceInput.value) || 0;
-          const discount = parseFloat(discountInput.value) || 0;
-          let total = qty * price;
-          if (discount > 0) {
-            total -= (total * discount / 100);
-          }
-          totalCell.textContent = total.toFixed(2);
-          recalculateInvoice();
-        });
+        input.addEventListener('input', recalcRow);
       });
 
       tbody.appendChild(row);
@@ -451,17 +469,25 @@
       }
 
       const items = [];
-
       // Recopilar items de la factura
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       rows.forEach(row => {
-        // Obtener el valor seleccionado del select de artículo (con marca, modelo, imei)
         const articleSelectElem = row.children[0].querySelector('select');
+        const quantity = parseFloat(row.children[1].querySelector('input').value) || 0;
+        const price = parseFloat(row.children[2].querySelector('input').value) || 0;
+        const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
+        const total = parseFloat(row.children[4].textContent) || 0;
+
+        // Si la cantidad es 0, no se agrega el ítem
+        if (quantity === 0) {
+          return;
+        }
+
+        // Parseamos la info del artículo
         let brand = "";
         let model = "";
         let imei = "";
         let articleId = "";
-
         if (articleSelectElem.value) {
           const parsedValue = JSON.parse(articleSelectElem.value);
           brand = parsedValue.marca;
@@ -469,11 +495,6 @@
           imei = parsedValue.imei;
           articleId = parsedValue.articleId;
         }
-
-        const quantity = parseFloat(row.children[1].querySelector('input').value) || 0;
-        const price = parseFloat(row.children[2].querySelector('input').value) || 0;
-        const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
-        const total = parseFloat(row.children[4].textContent) || 0;
 
         items.push({
           articleId: articleId,
@@ -514,11 +535,11 @@
     function displayInvoice(invoiceId, invoice) {
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
-
         // Lógica para mostrar la moneda elegida
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
         let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
 
+        // Presentación en dos líneas para Tienda, Dirección, Pago, etc.
         const invoiceHTML = `
           <div class="invoice-header">
             <h2>Factura - ${invoiceId}</h2>
@@ -528,16 +549,16 @@
           <div class="invoice-body">
             <table class="details-table">
               <tr>
-                <td><strong>Fecha y Hora:</strong> ${new Date(invoice.fecha).toLocaleString()}</td>
-                <td><strong>Cliente:</strong> ${client.nombreCliente}</td>
+                <td><strong>Fecha y Hora:</strong><br>${new Date(invoice.fecha).toLocaleString()}</td>
+                <td><strong>Cliente:</strong><br>${client.nombreCliente}</td>
               </tr>
               <tr>
-                <td><strong>Tienda:</strong> ${client.nombreTienda}</td>
-                <td><strong>Dirección:</strong> ${client.direccion}</td>
+                <td><strong>Tienda:</strong><br>${client.nombreTienda}</td>
+                <td><strong>Dirección:</strong><br>${client.direccion}</td>
               </tr>
               <tr>
-                <td><strong>Teléfono:</strong> ${client.telefono}</td>
-                <td><strong>Pago:</strong> ${invoice.paymentMethod || 'N/A'}</td>
+                <td><strong>Teléfono:</strong><br>${client.telefono}</td>
+                <td><strong>Pago:</strong><br>${invoice.paymentMethod || 'N/A'}</td>
               </tr>
             </table>
             <table class="items-table">
@@ -664,16 +685,16 @@
               <div class="invoice-body">
                 <table class="details-table">
                   <tr>
-                    <td><strong>Fecha y Hora:</strong> ${new Date(invoice.fecha).toLocaleString()}</td>
-                    <td><strong>Cliente:</strong> ${client.nombreCliente}</td>
+                    <td><strong>Fecha y Hora:</strong><br>${new Date(invoice.fecha).toLocaleString()}</td>
+                    <td><strong>Cliente:</strong><br>${client.nombreCliente}</td>
                   </tr>
                   <tr>
-                    <td><strong>Tienda:</strong> ${client.nombreTienda}</td>
-                    <td><strong>Dirección:</strong> ${client.direccion}</td>
+                    <td><strong>Tienda:</strong><br>${client.nombreTienda}</td>
+                    <td><strong>Dirección:</strong><br>${client.direccion}</td>
                   </tr>
                   <tr>
-                    <td><strong>Teléfono:</strong> ${client.telefono}</td>
-                    <td><strong>Pago:</strong> ${invoice.paymentMethod || 'N/A'}</td>
+                    <td><strong>Teléfono:</strong><br>${client.telefono}</td>
+                    <td><strong>Pago:</strong><br>${invoice.paymentMethod || 'N/A'}</td>
                   </tr>
                 </table>
                 <table class="items-table">

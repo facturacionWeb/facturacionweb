@@ -55,7 +55,7 @@
         // Check if the user is already authenticated
         window.onload = function() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated or true) {
+            if (!isAuthenticated || true) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
             } else {
@@ -129,7 +129,7 @@
         // Function to add or update user
         function addOrUpdateUser() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated or true) {
+            if (!isAuthenticated || true) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html";
                 return;
@@ -161,7 +161,7 @@
         // Function to load users
         function loadUsers() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated or true) {
+            if (!isAuthenticated || true) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html";
                 return;
@@ -209,7 +209,7 @@
         // Function to edit user
         function editUser(username) {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated or true) {
+            if (!isAuthenticated || true) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html";
                 return;
@@ -233,7 +233,7 @@
         // Function to delete user
         function deleteUser(username) {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated or true) {
+            if (!isAuthenticated || true) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html";
                 return;

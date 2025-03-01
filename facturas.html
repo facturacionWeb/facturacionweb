@@ -15,7 +15,7 @@
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <style>
-    /* Estilos básicos para la página */
+    /* Estilos básicos */
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
@@ -52,6 +52,7 @@
       background-color: #333;
       color: #fff;
     }
+    /* Sección de la factura */
     .invoice-container {
       width: 800px;
       background: #fff;
@@ -94,17 +95,6 @@
       margin-top: 30px;
       text-align: right;
     }
-    .print-btn {
-      display: block;
-      width: 200px;
-      margin: 20px auto;
-      padding: 10px;
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      font-size: 16px;
-    }
     /* Estilos para el modal de detalle de factura */
     .modal {
       display: none;
@@ -132,6 +122,21 @@
       font-weight: bold;
       cursor: pointer;
     }
+    /* Oculta todo excepto la factura al imprimir */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #invoiceContainer, #invoiceContainer * {
+        visibility: visible;
+      }
+      #invoiceContainer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -154,12 +159,20 @@
       <option value="5">5</option>
     </select>
 
+    <!-- Nuevo selector de Moneda -->
+    <label for="currencySelect">Moneda:</label>
+    <select id="currencySelect">
+      <option value="CORD">Córdobas (C$)</option>
+      <option value="USD">Dólares ($)</option>
+    </select>
+
     <!-- Nuevo selector de Método de Pago -->
     <label for="paymentType">Método de Pago:</label>
     <select id="paymentType">
       <option value="Efectivo">Efectivo</option>
       <option value="Transferencia">Transferencia</option>
     </select>
+
     <!-- Información adicional para Transferencia -->
     <div id="transferInfo" style="display: none;">
       <label for="bankSelect">Selecciona Banco:</label>
@@ -179,7 +192,6 @@
       <thead>
         <tr>
           <th>Artículo</th>
-          <th>IMEI (si aplica)</th>
           <th>Cantidad</th>
           <th>Precio Venta</th>
           <th>Descuento (%)</th>
@@ -192,7 +204,7 @@
       </tbody>
     </table>
     <button onclick="addInvoiceItem()">Agregar Item ➕</button>
-    <h3>Total a Pagar: $<span id="invoiceTotal">0.00</span></h3>
+    <h3>Total a Pagar: <span id="invoiceTotal">0.00</span></h3>
     <button onclick="createInvoice()">Crear Factura 💵</button>
 
     <!-- Sección para mostrar la factura creada -->
@@ -201,7 +213,7 @@
       <div class="invoice-container" id="invoiceContainer">
         <!-- Aquí se mostrará la factura con el detalle -->
       </div>
-      <button class="print-btn" onclick="window.print()">Imprimir Factura 🖨️</button>
+      <button onclick="printInvoice()">Imprimir Factura 🖨️</button>
     </div>
 
     <hr>
@@ -280,7 +292,7 @@
       });
     }
 
-    // Función para poblar un select con los artículos (combinando Articulos y Articulos_X_IMEI)
+    // Función para poblar un select con los artículos (guardando marca, modelo, IMEI aparte)
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -294,13 +306,28 @@
               if (!imeiSnapshot.empty) {
                 imeiSnapshot.forEach((imeiDoc) => {
                   const imeiData = imeiDoc.data();
+                  // Construimos un JSON con la info
+                  const payload = {
+                    articleId: articleDoc.id,
+                    marca: articleData.marca,
+                    modelo: articleData.modelo,
+                    imei: imeiData.imei
+                  };
                   const optionText = `${articleData.marca} ${articleData.modelo} - IMEI: ${imeiData.imei}`;
-                  const optionValue = `${articleDoc.id}_${imeiData.imei}`;
+                  const optionValue = JSON.stringify(payload);
                   $select.append(new Option(optionText, optionValue));
                 });
               } else {
+                // Sin IMEI
+                const payload = {
+                  articleId: articleDoc.id,
+                  marca: articleData.marca,
+                  modelo: articleData.modelo,
+                  imei: ""
+                };
                 const optionText = `${articleData.marca} ${articleData.modelo}`;
-                $select.append(new Option(optionText, articleDoc.id));
+                const optionValue = JSON.stringify(payload);
+                $select.append(new Option(optionText, optionValue));
               }
             })
             .catch((error) => {
@@ -321,7 +348,7 @@
       });
     }
 
-    // Función para agregar una nueva fila de item en la factura
+    // Agregar una nueva fila de item en la factura
     function addInvoiceItem() {
       const tbody = document.querySelector('#invoiceItemsTable tbody');
       const row = document.createElement('tr');
@@ -333,14 +360,6 @@
       articleCell.appendChild(articleSelect);
       row.appendChild(articleCell);
       populateArticleSelect($(articleSelect));
-
-      // Columna: IMEI (opcional; para ingresar IMEI manualmente si es necesario)
-      const imeiCell = document.createElement('td');
-      const imeiInput = document.createElement('input');
-      imeiInput.type = 'text';
-      imeiInput.placeholder = 'IMEI(s) separados por coma';
-      imeiCell.appendChild(imeiInput);
-      row.appendChild(imeiCell);
 
       // Columna: Cantidad
       const quantityCell = document.createElement('td');
@@ -392,7 +411,7 @@
           const discount = parseFloat(discountInput.value) || 0;
           let total = qty * price;
           if (discount > 0) {
-            total = total - (total * discount / 100);
+            total -= (total * discount / 100);
           }
           totalCell.textContent = total.toFixed(2);
           recalculateInvoice();
@@ -407,18 +426,19 @@
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       let total = 0;
       rows.forEach(row => {
-        const totalCell = row.children[5];
+        const totalCell = row.children[4]; // Columna "Total"
         total += parseFloat(totalCell.textContent) || 0;
       });
       invoiceTotal = total;
-      document.getElementById('invoiceTotal').textContent = total.toFixed(2);
+      document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
     // Crear factura y guardar en Firestore
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
-      
+      const currency = document.getElementById('currencySelect').value;
+
       // Procesar el método de pago según selección
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;
@@ -435,18 +455,31 @@
       // Recopilar items de la factura
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       rows.forEach(row => {
-        // Obtener el valor seleccionado del select de artículo
+        // Obtener el valor seleccionado del select de artículo (con marca, modelo, imei)
         const articleSelectElem = row.children[0].querySelector('select');
-        const article = articleSelectElem.value;
-        const imeis = row.children[1].querySelector('input').value;
-        const quantity = parseFloat(row.children[2].querySelector('input').value) || 0;
-        const price = parseFloat(row.children[3].querySelector('input').value) || 0;
-        const discount = parseFloat(row.children[4].querySelector('input').value) || 0;
-        const total = parseFloat(row.children[5].textContent) || 0;
+        let brand = "";
+        let model = "";
+        let imei = "";
+        let articleId = "";
+
+        if (articleSelectElem.value) {
+          const parsedValue = JSON.parse(articleSelectElem.value);
+          brand = parsedValue.marca;
+          model = parsedValue.modelo;
+          imei = parsedValue.imei;
+          articleId = parsedValue.articleId;
+        }
+
+        const quantity = parseFloat(row.children[1].querySelector('input').value) || 0;
+        const price = parseFloat(row.children[2].querySelector('input').value) || 0;
+        const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
+        const total = parseFloat(row.children[4].textContent) || 0;
 
         items.push({
-          article: article,
-          imeis: imeis ? imeis.split(',').map(i => i.trim()) : [],
+          articleId: articleId,
+          brand: brand,
+          model: model,
+          imei: imei,
           quantity: quantity,
           price: price,
           discount: discount,
@@ -458,6 +491,7 @@
       const invoice = {
         clientId: clientId,
         route: route,
+        currency: currency, // Moneda
         paymentMethod: paymentMethod,
         items: items,
         total: invoiceTotal,
@@ -465,7 +499,7 @@
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
-        alert("Factura creada con éxito, Gustavo! 🎉");
+        alert("¡Factura creada con éxito! 🎉");
         displayInvoice(docRef.id, invoice);
         loadInvoices(); // Actualiza el listado de facturas
         // Limpiar la tabla de items y reiniciar total
@@ -480,10 +514,15 @@
     function displayInvoice(invoiceId, invoice) {
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
+
+        // Lógica para mostrar la moneda elegida
+        let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
+        let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
+
         const invoiceHTML = `
           <div class="invoice-header">
             <h2>Factura - ${invoiceId}</h2>
-            <p class="currency"><strong>Moneda:</strong> USD ($)</p>
+            <p class="currency"><strong>Moneda:</strong> ${currencyText}</p>
             <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
           </div>
           <div class="invoice-body">
@@ -512,15 +551,15 @@
               ${invoice.items.map(item => `
                 <tr>
                   <td>${item.quantity}</td>
-                  <td>${item.article} ${item.imeis.length ? ' (IMEI: ' + item.imeis.join(', ') + ')' : ''}</td>
-                  <td>$${item.price.toFixed(2)}</td>
+                  <td>${item.brand} ${item.model} ${item.imei ? '(IMEI: ' + item.imei + ')' : ''}</td>
+                  <td>${currencySymbol}${item.price.toFixed(2)}</td>
                   <td>${item.discount}%</td>
-                  <td>$${item.total.toFixed(2)}</td>
+                  <td>${currencySymbol}${item.total.toFixed(2)}</td>
                 </tr>
               `).join('')}
               <tr>
                 <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
-                <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+                <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
               </tr>
             </table>
             <div class="signature">
@@ -536,7 +575,12 @@
       });
     }
 
-    // Función para listar las facturas
+    // Función para imprimir solo la sección de la factura
+    function printInvoice() {
+      window.print();
+    }
+
+    // Listar facturas
     function loadInvoices() {
       db.collection("facturas").orderBy("fecha", "desc").get().then((querySnapshot) => {
         const tbody = document.querySelector('#invoicesTable tbody');
@@ -549,7 +593,7 @@
             <td>${new Date(invoice.fecha).toLocaleString()}</td>
             <td>${invoice.clientId}</td>
             <td>${invoice.route}</td>
-            <td>$${invoice.total.toFixed(2)}</td>
+            <td>${invoice.total.toFixed(2)}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
             </td>
@@ -561,7 +605,7 @@
       });
     }
 
-    // Función para filtrar facturas por fecha y ruta
+    // Filtrar facturas por fecha y ruta
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
@@ -589,7 +633,7 @@
             <td>${new Date(invoice.fecha).toLocaleString()}</td>
             <td>${invoice.clientId}</td>
             <td>${invoice.route}</td>
-            <td>$${invoice.total.toFixed(2)}</td>
+            <td>${invoice.total.toFixed(2)}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
             </td>
@@ -601,17 +645,20 @@
       });
     }
 
-    // Función para ver el detalle de una factura en modal
+    // Ver detalle de una factura en modal
     function viewInvoiceDetail(invoiceId) {
       db.collection("facturas").doc(invoiceId).get().then((doc) => {
         if(doc.exists) {
           const invoice = doc.data();
           db.collection("clientes").doc(invoice.clientId).get().then((clientDoc) => {
             const client = clientDoc.data();
+            let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
+            let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
+
             const invoiceHTML = `
               <div class="invoice-header">
                 <h2>Factura - ${invoiceId}</h2>
-                <p class="currency"><strong>Moneda:</strong> USD ($)</p>
+                <p class="currency"><strong>Moneda:</strong> ${currencyText}</p>
                 <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
               </div>
               <div class="invoice-body">
@@ -640,15 +687,15 @@
                   ${invoice.items.map(item => `
                     <tr>
                       <td>${item.quantity}</td>
-                      <td>${item.article} ${item.imeis.length ? ' (IMEI: ' + item.imeis.join(', ') + ')' : ''}</td>
-                      <td>$${item.price.toFixed(2)}</td>
+                      <td>${item.brand} ${item.model} ${item.imei ? '(IMEI: ' + item.imei + ')' : ''}</td>
+                      <td>${currencySymbol}${item.price.toFixed(2)}</td>
                       <td>${item.discount}%</td>
-                      <td>$${item.total.toFixed(2)}</td>
+                      <td>${currencySymbol}${item.total.toFixed(2)}</td>
                     </tr>
                   `).join('')}
                   <tr>
                     <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
-                    <td><strong>$${invoice.total.toFixed(2)}</strong></td>
+                    <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
                   </tr>
                 </table>
                 <div class="signature">

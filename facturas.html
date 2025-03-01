@@ -85,7 +85,6 @@
     .details-table td, .items-table th, .items-table td {
       border: 1px solid #ddd;
       padding: 10px;
-      /* Permite que el texto se parta en varias líneas si es muy largo */
       white-space: normal;
       word-wrap: break-word;
     }
@@ -96,7 +95,7 @@
     }
     .signature {
       margin-top: 30px;
-      text-align: center; /* Centrado de la firma */
+      text-align: center;
     }
     /* Estilos para el modal de detalle de factura */
     .modal {
@@ -266,7 +265,6 @@
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
-    // Variable global para el total de la factura
     let invoiceTotal = 0;
 
     // Mostrar u ocultar información adicional para transferencia
@@ -295,8 +293,7 @@
       });
     }
 
-    // Función para poblar un select con los artículos
-    // Se guarda precioVenta, marca, modelo, imei en un JSON
+    // Poblar select con artículos
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -322,7 +319,6 @@
                   $select.append(new Option(optionText, optionValue));
                 });
               } else {
-                // Sin IMEI
                 const payload = {
                   articleId: articleDoc.id,
                   marca: articleData.marca,
@@ -353,12 +349,11 @@
       });
     }
 
-    // Agregar una nueva fila de item en la factura
+    // Agregar fila de item en la factura
     function addInvoiceItem() {
       const tbody = document.querySelector('#invoiceItemsTable tbody');
       const row = document.createElement('tr');
 
-      // Columna: Artículo (select con búsqueda)
       const articleCell = document.createElement('td');
       const articleSelect = document.createElement('select');
       $(articleSelect).css('width', '100%');
@@ -366,16 +361,14 @@
       row.appendChild(articleCell);
       populateArticleSelect($(articleSelect));
 
-      // Columna: Cantidad (por defecto 0)
       const quantityCell = document.createElement('td');
       const quantityInput = document.createElement('input');
       quantityInput.type = 'number';
-      quantityInput.value = 0;  // Por defecto 0
+      quantityInput.value = 0;
       quantityInput.min = 0;
       quantityCell.appendChild(quantityInput);
       row.appendChild(quantityCell);
 
-      // Columna: Precio Venta
       const priceCell = document.createElement('td');
       const priceInput = document.createElement('input');
       priceInput.type = 'number';
@@ -383,7 +376,6 @@
       priceCell.appendChild(priceInput);
       row.appendChild(priceCell);
 
-      // Columna: Descuento (%)
       const discountCell = document.createElement('td');
       const discountInput = document.createElement('input');
       discountInput.type = 'number';
@@ -392,12 +384,10 @@
       discountCell.appendChild(discountInput);
       row.appendChild(discountCell);
 
-      // Columna: Total (calculado)
       const totalCell = document.createElement('td');
       totalCell.textContent = "0.00";
       row.appendChild(totalCell);
 
-      // Columna: Acciones (botón para eliminar la fila)
       const actionsCell = document.createElement('td');
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = "Eliminar";
@@ -408,17 +398,14 @@
       actionsCell.appendChild(deleteBtn);
       row.appendChild(actionsCell);
 
-      // Evento: cuando se cambie el artículo, se precarga el Precio Venta
       $(articleSelect).on('change', function() {
         if ($(this).val()) {
           const parsedValue = JSON.parse($(this).val());
-          // Asignar precioVenta por defecto
           priceInput.value = parsedValue.precioVenta || 0;
           recalcRow();
         }
       });
 
-      // Función para recalcular la fila
       function recalcRow() {
         const qty = parseFloat(quantityInput.value) || 0;
         const price = parseFloat(priceInput.value) || 0;
@@ -431,7 +418,6 @@
         recalculateInvoice();
       }
 
-      // Escuchar cambios en cantidad, precio o descuento
       [quantityInput, priceInput, discountInput].forEach(input => {
         input.addEventListener('input', recalcRow);
       });
@@ -439,25 +425,24 @@
       tbody.appendChild(row);
     }
 
-    // Recalcular el total de la factura
+    // Recalcular total de factura
     function recalculateInvoice() {
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       let total = 0;
       rows.forEach(row => {
-        const totalCell = row.children[4]; // Columna "Total"
+        const totalCell = row.children[4];
         total += parseFloat(totalCell.textContent) || 0;
       });
       invoiceTotal = total;
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
-    // Crear factura y guardar en Firestore
+    // Crear factura y guardar en Firestore (modificado para agregar fechaStr)
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
       const currency = document.getElementById('currencySelect').value;
 
-      // Procesar el método de pago según selección
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;
       if(paymentType === "Transferencia") {
@@ -469,7 +454,6 @@
       }
 
       const items = [];
-      // Recopilar items de la factura
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       rows.forEach(row => {
         const articleSelectElem = row.children[0].querySelector('select');
@@ -477,17 +461,8 @@
         const price = parseFloat(row.children[2].querySelector('input').value) || 0;
         const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
         const total = parseFloat(row.children[4].textContent) || 0;
-
-        // Si la cantidad es 0, no se agrega el ítem
-        if (quantity === 0) {
-          return;
-        }
-
-        // Parseamos la info del artículo
-        let brand = "";
-        let model = "";
-        let imei = "";
-        let articleId = "";
+        if (quantity === 0) return;
+        let brand = "", model = "", imei = "", articleId = "";
         if (articleSelectElem.value) {
           const parsedValue = JSON.parse(articleSelectElem.value);
           brand = parsedValue.marca;
@@ -495,7 +470,6 @@
           imei = parsedValue.imei;
           articleId = parsedValue.articleId;
         }
-
         items.push({
           articleId: articleId,
           brand: brand,
@@ -508,22 +482,28 @@
         });
       });
 
-      // Crear objeto de factura
+      // Crear fecha y fechaStr (solo fecha en formato "YYYY-MM-DD")
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const fechaStr = `${yyyy}-${mm}-${dd}`;
+
       const invoice = {
         clientId: clientId,
         route: route,
-        currency: currency, // Moneda
+        currency: currency,
         paymentMethod: paymentMethod,
         items: items,
         total: invoiceTotal,
-        fecha: new Date() // Timestamp
+        fecha: now,       // Timestamp completo
+        fechaStr: fechaStr  // Solo la fecha (para filtrar)
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
         alert("¡Factura creada con éxito! 🎉");
         displayInvoice(docRef.id, invoice);
-        loadInvoices(); // Actualiza el listado de facturas
-        // Limpiar la tabla de items y reiniciar total
+        loadInvoices();
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
       }).catch((error) => {
@@ -531,15 +511,12 @@
       });
     }
 
-    // Mostrar la factura creada en la sección de detalle
+    // Mostrar factura generada
     function displayInvoice(invoiceId, invoice) {
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
-        // Lógica para mostrar la moneda elegida
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
         let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
-
-        // Presentación en varias líneas para Tienda, Dirección, Pago, etc.
         const invoiceHTML = `
           <div class="invoice-header">
             <h2>Factura - ${invoiceId}</h2>
@@ -596,7 +573,7 @@
       });
     }
 
-    // Función para imprimir solo la sección de la factura
+    // Imprimir factura
     function printInvoice() {
       window.print();
     }
@@ -627,55 +604,45 @@
       });
     }
 
-    // Filtrar facturas por fecha y ruta (AQUÍ ES DONDE SE MODIFICÓ)
+    // Filtrar facturas por fecha (usando fechaStr) y ruta
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
       let query = db.collection("facturas");
 
-      // Filtro por fecha (rango entre 00:00 y 23:59 del mismo día)
       if(filterDate) {
-        const start = new Date(filterDate);
-        start.setHours(0,0,0,0);
-        const end = new Date(filterDate);
-        end.setHours(23,59,59,999);
-        query = query.where("fecha", ">=", start).where("fecha", "<=", end);
+        query = query.where("fechaStr", "==", filterDate);
       }
-
-      // Filtro por ruta
       if(filterRoute) {
         query = query.where("route", "==", filterRoute);
       }
 
-      // Orden por fecha descendente
       query = query.orderBy("fecha", "desc");
 
       query.get()
-      .then((querySnapshot) => {
-        const tbody = document.querySelector('#invoicesTable tbody');
-        tbody.innerHTML = '';
-        querySnapshot.forEach((doc) => {
-          const invoice = doc.data();
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${doc.id}</td>
-            <td>${new Date(invoice.fecha).toLocaleString()}</td>
-            <td>${invoice.clientId}</td>
-            <td>${invoice.route}</td>
-            <td>${invoice.total.toFixed(2)}</td>
-            <td>
-              <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
-              <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
-            </td>
-          `;
-          tbody.appendChild(row);
+        .then((querySnapshot) => {
+          const tbody = document.querySelector('#invoicesTable tbody');
+          tbody.innerHTML = '';
+          querySnapshot.forEach((doc) => {
+            const invoice = doc.data();
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${doc.id}</td>
+              <td>${new Date(invoice.fecha).toLocaleString()}</td>
+              <td>${invoice.clientId}</td>
+              <td>${invoice.route}</td>
+              <td>${invoice.total.toFixed(2)}</td>
+              <td>
+                <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
+                <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
+              </td>
+            `;
+            tbody.appendChild(row);
+          });
+        })
+        .catch((error) => {
+          console.error("Error al filtrar facturas: ", error);
         });
-      })
-      .catch((error) => {
-        console.error("Error al filtrar facturas: ", error);
-        // Si es un error de índice, lo mostrará aquí
-        // Aparecerá un link en la consola para crear el índice compuesto
-      });
     }
 
     // Ver detalle de una factura en modal
@@ -687,7 +654,6 @@
             const client = clientDoc.data();
             let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
             let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
-
             const invoiceHTML = `
               <div class="invoice-header">
                 <h2>Factura - ${invoiceId}</h2>
@@ -750,7 +716,7 @@
       document.getElementById('invoiceModal').style.display = 'none';
     }
 
-    // Eliminar factura con confirmación
+    // Eliminar factura
     function deleteInvoice(invoiceId) {
       if (confirm("¿Está seguro de eliminar la factura?")) {
         db.collection("facturas").doc(invoiceId).delete()
@@ -764,7 +730,7 @@
       }
     }
 
-    // Inicializar la página: carga de clientes y facturas
+    // Inicializar la página
     window.onload = function() {
       loadClients();
       loadInvoices();

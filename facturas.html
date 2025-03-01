@@ -316,7 +316,7 @@
       });
     }
 
-    // Poblar select con artículos
+    // Poblar select con artículos (solo IMEIs que existan en Articulos_X_IMEI)
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -344,7 +344,8 @@
                   $select.append(new Option(optionText, optionValue));
                 });
               } else {
-                // Artículo sin IMEI
+                // Artículo sin IMEI (o ya no hay IMEIs disponibles)
+                // Si deseas que no aparezca en absoluto, omite estas líneas.
                 const payload = {
                   articleId: articleDoc.id,
                   marca: articleData.marca,
@@ -473,7 +474,7 @@
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
-    // Crear factura y guardar en Firestore (y aquí se eliminan los IMEIs)
+    // Crear factura y guardar en Firestore (eliminando IMEIs)
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
@@ -499,15 +500,24 @@
         const price = parseFloat(row.children[2].querySelector('input').value) || 0;
         const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
         const total = parseFloat(row.children[4].textContent) || 0;
-        if (!articleSelectElem.value) return; // Sin artículo seleccionado
-        // 2) Si el total es 0, también ignora esa fila
+
+        // Si no hay artículo o total es 0, ignora la fila
+        if (!articleSelectElem.value) return;
         if (total <= 0) return;
+
         const parsedValue = JSON.parse(articleSelectElem.value);
         const brand = parsedValue.marca;
         const model = parsedValue.modelo;
         const imei = parsedValue.imei;
         const articleId = parsedValue.articleId;
-        const imeiDocId = parsedValue.imeiDocId; // Para eliminar luego
+        const imeiDocId = parsedValue.imeiDocId;
+
+        // Guardamos imeiDocData para poder reinsertarlo si se anula la factura
+        // (agrega más campos si lo necesitas)
+        const imeiDocData = {
+          articleId: articleId,
+          imei: imei
+        };
 
         items.push({
           articleId,
@@ -515,6 +525,7 @@
           model,
           imei,
           imeiDocId,
+          imeiDocData,  // para reinsertar
           quantity,
           price,
           discount,
@@ -533,19 +544,19 @@
         clientId,
         route,
         currency,
-        paymentType,     // Efectivo/Transferencia/Crédito
-        paymentMethod,   // Detalle
+        paymentType,   // Efectivo/Transferencia/Crédito
+        paymentMethod, // Detalle
         items,
         total: invoiceTotal,
-        fecha: now,       // Timestamp completo
+        fecha: now,    // Timestamp completo
         fechaStr,
-        anulada: false    // Por defecto, la factura NO está anulada
+        anulada: false // Por defecto, la factura NO está anulada
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
         alert("¡Factura creada con éxito! 🎉");
 
-        // Ahora que la factura se creó correctamente, eliminamos los IMEIs seleccionados
+        // Eliminar los IMEIs seleccionados (si tienen imeiDocId)
         items.forEach(item => {
           if (item.imeiDocId) {
             db.collection("Articulos_X_IMEI").doc(item.imeiDocId).delete()
@@ -658,12 +669,36 @@
       });
     }
 
-    // Anular factura (en lugar de eliminar)
+    // Anular factura y restaurar IMEIs
     function anularInvoice(invoiceId) {
       if (confirm("¿Está seguro de ANULAR la factura?")) {
-        db.collection("facturas").doc(invoiceId).update({ anulada: true })
+        let invoiceData = null;
+        // 1) Leer la factura
+        db.collection("facturas").doc(invoiceId).get()
+          .then(docSnap => {
+            if (!docSnap.exists) {
+              throw new Error("La factura no existe.");
+            }
+            invoiceData = docSnap.data();
+            // 2) Marcar como anulada
+            return db.collection("facturas").doc(invoiceId).update({ anulada: true });
+          })
           .then(() => {
-            alert("Factura ANULADA con éxito.");
+            // 3) Restaurar IMEIs
+            const items = invoiceData.items || [];
+            const promises = [];
+            items.forEach(item => {
+              // Si el ítem tenía un IMEI doc y su "imeiDocData"
+              if (item.imeiDocId && item.imeiDocData) {
+                // Volvemos a crear el doc en Articulos_X_IMEI con el MISMO docId
+                const docRef = db.collection("Articulos_X_IMEI").doc(item.imeiDocId);
+                promises.push(docRef.set(item.imeiDocData));
+              }
+            });
+            return Promise.all(promises);
+          })
+          .then(() => {
+            alert("Factura ANULADA con éxito. IMEIs restaurados.");
             loadInvoices();
           })
           .catch((error) => {
@@ -672,7 +707,7 @@
       }
     }
 
-    // Filtrar facturas (fechaStr, route, anulada, paymentType)
+    // Filtros de facturas
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
@@ -691,7 +726,6 @@
       }
       // Filtro por anulada
       if (filterAnulada) {
-        // filterAnulada es "true" o "false"
         const boolVal = (filterAnulada === "true");
         query = query.where("anulada", "==", boolVal);
       }
@@ -718,7 +752,7 @@
               <td>${invoice.anulada ? "ANULADA" : "ACTIVA"}</td>
               <td>
                 <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
-                <button onclick="anularInvoice('${doc.id}')">ANULAR</button>
+                ${invoice.anulada ? "" : `<button onclick="anularInvoice('${doc.id}')">ANULAR</button>`}
               </td>
             `;
             tbody.appendChild(row);

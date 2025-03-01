@@ -28,6 +28,21 @@
             padding: 10px;
             box-sizing: border-box;
         }
+        .password-container {
+            position: relative;
+            width: calc(100% - 20px);
+        }
+        .password-container input {
+            width: 100%;
+            padding-right: 40px;
+        }
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -50,10 +65,10 @@
 
         <!-- Form to create or update a user -->
         <input type="text" id="username" placeholder="Username" />
-        <label>
-            <input type="checkbox" id="showPassword"> Mostrar Contraseña
-        </label>
-        <input type="password" id="password" placeholder="Password" />
+        <div class="password-container">
+            <input type="password" id="password" placeholder="Password" />
+            <span class="toggle-password" onclick="togglePassword()">👁️</span>
+        </div>
         <input type="text" id="fullName" placeholder="Nombre Completo" />
         <select id="location">
             <option value="TODOS">TODOS</option>
@@ -92,7 +107,11 @@
     <script>
         const db = firebase.firestore();
 
-        // Function to clear input fields
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+        }
+
         function clearFields() {
             document.getElementById('username').value = '';
             document.getElementById('password').value = '';
@@ -100,7 +119,6 @@
             document.getElementById('location').value = '';
         }
 
-        // Function to add or update user
         function addOrUpdateUser() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
@@ -124,7 +142,6 @@
             }
         }
 
-        // Function to load users
         function loadUsers() {
             db.collection("users").get().then((querySnapshot) => {
                 const userTable = document.getElementById('userTable');
@@ -147,7 +164,6 @@
             });
         }
 
-        // Function to edit user
         function editUser(username) {
             db.collection("users").doc(username).get().then((doc) => {
                 if (doc.exists) {
@@ -161,16 +177,6 @@
                 }
             }).catch((error) => {
                 console.error("Error editando usuario: ", error);
-            });
-        }
-
-        // Function to delete user
-        function deleteUser(username) {
-            db.collection("users").doc(username).delete().then(() => {
-                alert("Usuario eliminado con éxito");
-                loadUsers();
-            }).catch((error) => {
-                console.error("Error al eliminar el usuario: ", error);
             });
         }
 

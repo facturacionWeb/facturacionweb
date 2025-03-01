@@ -96,7 +96,7 @@
     }
     .signature {
       margin-top: 30px;
-      text-align: right;
+      text-align: center; /* Centrado de la firma */
     }
     /* Estilos para el modal de detalle de factura */
     .modal {
@@ -539,7 +539,7 @@
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
         let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
 
-        // Presentación en dos líneas para Tienda, Dirección, Pago, etc.
+        // Presentación en varias líneas para Tienda, Dirección, Pago, etc.
         const invoiceHTML = `
           <div class="invoice-header">
             <h2>Factura - ${invoiceId}</h2>
@@ -617,6 +617,7 @@
             <td>${invoice.total.toFixed(2)}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
+              <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
             </td>
           `;
           tbody.appendChild(row);
@@ -657,6 +658,7 @@
             <td>${invoice.total.toFixed(2)}</td>
             <td>
               <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
+              <button onclick="deleteInvoice('${doc.id}')">Eliminar</button>
             </td>
           `;
           tbody.appendChild(row);
@@ -736,6 +738,20 @@
 
     function closeInvoiceModal() {
       document.getElementById('invoiceModal').style.display = 'none';
+    }
+
+    // Eliminar factura con confirmación
+    function deleteInvoice(invoiceId) {
+      if (confirm("¿Está seguro de eliminar la factura?")) {
+        db.collection("facturas").doc(invoiceId).delete()
+        .then(() => {
+          alert("Factura eliminada con éxito.");
+          loadInvoices();
+        })
+        .catch((error) => {
+          console.error("Error al eliminar factura:", error);
+        });
+      }
     }
 
     // Inicializar la página: carga de clientes y facturas

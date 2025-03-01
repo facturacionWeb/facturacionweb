@@ -1,188 +1,225 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Usuarios</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Usuarios</title>
 
-    <!-- Import Firebase SDK (v8 with namespaced API) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    
-    <!-- Import Firebase configuration -->
-    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-    
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        input, button, label, select {
-            margin: 10px 0;
-            display: block;
-            width: calc(100% - 20px);
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        .password-container {
-            position: relative;
-            width: calc(100% - 20px);
-        }
-        .password-container input {
-            width: 100%;
-            padding-right: 40px;
-        }
-        .toggle-password {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        table, th, td {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: left;
-        }
-        th, td {
-            text-align: center;
-        }
-    </style>
+  <!-- Import Firebase SDK (v8 with namespaced API) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  
+  <!-- Import Firebase configuration -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    input, button, label, select {
+      margin: 10px 0;
+      display: block;
+      width: calc(100% - 20px);
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .password-container {
+      position: relative;
+      width: calc(100% - 20px);
+    }
+    .password-container input {
+      width: 100%;
+      padding-right: 40px;
+    }
+    .toggle-password {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table, th, td {
+      border: 1px solid black;
+      padding: 10px;
+      text-align: left;
+    }
+    th, td {
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
-    <a href="index.html">Volver a la Página Principal</a>
-    
-    <div class="container">
-        <h1>Gestión de Usuarios</h1>
+  <a href="index.html">Volver a la Página Principal</a>
+  
+  <div class="container">
+    <h1>Gestión de Usuarios</h1>
 
-        <!-- Form to create or update a user -->
-        <input type="text" id="username" placeholder="Username" />
-        <div class="password-container">
-            <input type="password" id="password" placeholder="Password" />
-            <span class="toggle-password" onclick="togglePassword()">👁️</span>
-        </div>
-        <input type="text" id="fullName" placeholder="Nombre Completo" />
-        <select id="location">
-            <option value="TODOS">TODOS</option>
-            <option value="SIN RUTA">SIN RUTA</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="7">7</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10">10</option>
-        </select>
-        <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
-        <button onclick="clearFields()">Limpiar Campos</button>
-
-        <!-- Table to display users -->
-        <h2>Usuarios Existentes</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Nombre Completo</th>
-                    <th>Ubicación</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="userTable">
-                <!-- User rows will be populated here -->
-            </tbody>
-        </table>
+    <!-- Formulario para crear o actualizar un usuario -->
+    <input type="text" id="username" placeholder="Username" />
+    <div class="password-container">
+      <input type="password" id="password" placeholder="Password" />
+      <span class="toggle-password" onclick="togglePassword()">👁️</span>
     </div>
+    <input type="text" id="fullName" placeholder="Nombre Completo" />
+    <select id="location">
+      <option value="TODOS">TODOS</option>
+      <option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+      <option value="10">10</option>
+    </select>
+    <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
+    <button onclick="clearFields()">Limpiar Campos</button>
 
-    <script>
-        const db = firebase.firestore();
+    <!-- Tabla para mostrar los usuarios existentes -->
+    <h2>Usuarios Existentes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Nombre Completo</th>
+          <th>Ubicación</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="userTable">
+        <!-- Las filas de usuarios se generarán aquí -->
+      </tbody>
+    </table>
+  </div>
 
-        function togglePassword() {
-            const passwordInput = document.getElementById('password');
-            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
-        }
+  <script>
+    // Asegúrate de que firebase-config.js incluya firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-        function clearFields() {
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('fullName').value = '';
-            document.getElementById('location').value = '';
-        }
+    function togglePassword() {
+      const passwordInput = document.getElementById('password');
+      passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+    }
 
-        function addOrUpdateUser() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            const fullName = document.getElementById('fullName').value.trim();
-            const location = document.getElementById('location').value;
+    function clearFields() {
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+      document.getElementById('fullName').value = '';
+      document.getElementById('location').value = 'TODOS';
+    }
 
-            if (username) {
-                db.collection("users").doc(username).set({
-                    username: username,
-                    password: password,
-                    fullName: fullName,
-                    location: location
-                }).then(() => {
-                    alert("Usuario agregado o actualizado con éxito");
-                    loadUsers();
-                }).catch((error) => {
-                    console.error("Error al agregar o actualizar el usuario: ", error);
-                });
-            } else {
-                alert("El nombre de usuario es requerido");
-            }
-        }
+    function addOrUpdateUser() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const fullName = document.getElementById('fullName').value.trim();
+      const location = document.getElementById('location').value;
 
-        function loadUsers() {
-            db.collection("users").get().then((querySnapshot) => {
-                const userTable = document.getElementById('userTable');
-                userTable.innerHTML = '';
-                querySnapshot.forEach((doc) => {
-                    const user = doc.data();
-                    const row = `<tr>
-                                    <td>${user.username || 'N/A'}</td>
-                                    <td>${user.fullName || 'N/A'}</td>
-                                    <td>${user.location || 'N/A'}</td>
-                                    <td>
-                                        <button onclick="editUser('${user.username}')">Editar</button>
-                                        <button onclick="deleteUser('${user.username}')">Eliminar</button>
-                                    </td>
-                                 </tr>`;
-                    userTable.innerHTML += row;
-                });
-            }).catch((error) => {
-                console.error("Error al cargar los usuarios: ", error);
-            });
-        }
+      if (username) {
+        db.collection("users").doc(username).set({
+          username: username,
+          password: password,
+          fullName: fullName,
+          location: location
+        }).then(() => {
+          alert("Usuario agregado o actualizado con éxito 😊");
+          loadUsers();
+          clearFields();
+        }).catch((error) => {
+          console.error("Error al agregar o actualizar el usuario: ", error);
+        });
+      } else {
+        alert("El nombre de usuario es requerido ⚠️");
+      }
+    }
 
-        function editUser(username) {
-            db.collection("users").doc(username).get().then((doc) => {
-                if (doc.exists) {
-                    const user = doc.data();
-                    document.getElementById('username').value = user.username;
-                    document.getElementById('password').value = user.password;
-                    document.getElementById('fullName').value = user.fullName;
-                    document.getElementById('location').value = user.location || '';
-                } else {
-                    alert("El usuario no existe");
-                }
-            }).catch((error) => {
-                console.error("Error editando usuario: ", error);
-            });
-        }
+    // Función para cargar y mostrar todos los usuarios
+    function loadUsers() {
+      db.collection("users").get().then((querySnapshot) => {
+        const userTable = document.getElementById('userTable');
+        userTable.innerHTML = ""; // Limpia la tabla
 
-        window.onload = function() {
-            loadUsers();
-        };
-    </script>
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+
+          // Crear fila para cada usuario
+          const row = document.createElement('tr');
+
+          // Celda para username
+          const usernameCell = document.createElement('td');
+          usernameCell.textContent = data.username;
+          row.appendChild(usernameCell);
+
+          // Celda para nombre completo
+          const fullNameCell = document.createElement('td');
+          fullNameCell.textContent = data.fullName;
+          row.appendChild(fullNameCell);
+
+          // Celda para ubicación
+          const locationCell = document.createElement('td');
+          locationCell.textContent = data.location;
+          row.appendChild(locationCell);
+
+          // Celda de acciones
+          const actionsCell = document.createElement('td');
+
+          // Botón para eliminar usuario
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = "Eliminar";
+          deleteBtn.onclick = function() {
+            deleteUser(data.username);
+          };
+          actionsCell.appendChild(deleteBtn);
+
+          // Botón para editar usuario
+          const editBtn = document.createElement('button');
+          editBtn.textContent = "Editar";
+          editBtn.onclick = function() {
+            fillFormForEdit(data);
+          };
+          actionsCell.appendChild(editBtn);
+
+          row.appendChild(actionsCell);
+          userTable.appendChild(row);
+        });
+      }).catch((error) => {
+        console.error("Error al cargar los usuarios: ", error);
+      });
+    }
+
+    // Función para eliminar un usuario
+    function deleteUser(username) {
+      db.collection("users").doc(username).delete().then(() => {
+        alert("Usuario eliminado exitosamente 🚀");
+        loadUsers();
+      }).catch((error) => {
+        console.error("Error eliminando el usuario: ", error);
+      });
+    }
+
+    // Función para llenar el formulario con los datos del usuario (modo edición)
+    function fillFormForEdit(data) {
+      document.getElementById('username').value = data.username;
+      document.getElementById('password').value = data.password;
+      document.getElementById('fullName').value = data.fullName;
+      document.getElementById('location').value = data.location;
+    }
+
+    // Cargar usuarios al iniciar la página
+    window.onload = function() {
+      loadUsers();
+    };
+  </script>
 </body>
 </html>

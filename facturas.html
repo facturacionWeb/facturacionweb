@@ -154,8 +154,24 @@
       <option value="5">5</option>
     </select>
 
-    <label for="paymentMethod">Método de Pago:</label>
-    <input type="text" id="paymentMethod" placeholder="Ej: Efectivo, Transferencia...">
+    <!-- Nuevo selector de Método de Pago -->
+    <label for="paymentType">Método de Pago:</label>
+    <select id="paymentType">
+      <option value="Efectivo">Efectivo</option>
+      <option value="Transferencia">Transferencia</option>
+    </select>
+    <!-- Información adicional para Transferencia -->
+    <div id="transferInfo" style="display: none;">
+      <label for="bankSelect">Selecciona Banco:</label>
+      <select id="bankSelect">
+        <option value="BAC">BAC</option>
+        <option value="LA FISE">LA FISE</option>
+        <option value="BANPRO">BANPRO</option>
+        <option value="AVANZ">AVANZ</option>
+      </select>
+      <label for="bankReference">Número de Referencia Bancaria:</label>
+      <input type="text" id="bankReference" placeholder="Número de Referencia Bancaria">
+    </div>
 
     <!-- Tabla para los items de la factura -->
     <h3>Items de Factura</h3>
@@ -235,9 +251,17 @@
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
-
     // Variable global para el total de la factura
     let invoiceTotal = 0;
+
+    // Mostrar u ocultar información adicional para transferencia
+    document.getElementById('paymentType').addEventListener('change', function() {
+      if (this.value === "Transferencia") {
+        document.getElementById('transferInfo').style.display = 'block';
+      } else {
+        document.getElementById('transferInfo').style.display = 'none';
+      }
+    });
 
     // Cargar clientes en el select de facturación
     function loadClients() {
@@ -394,7 +418,18 @@
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
-      const paymentMethod = document.getElementById('paymentMethod').value;
+      
+      // Procesar el método de pago según selección
+      let paymentType = document.getElementById('paymentType').value;
+      let paymentMethod;
+      if(paymentType === "Transferencia") {
+        let bank = document.getElementById('bankSelect').value;
+        let bankReference = document.getElementById('bankReference').value;
+        paymentMethod = `Transferencia - Banco: ${bank} (#Ref: ${bankReference})`;
+      } else {
+        paymentMethod = "Efectivo";
+      }
+
       const items = [];
 
       // Recopilar items de la factura

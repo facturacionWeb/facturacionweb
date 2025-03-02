@@ -7,7 +7,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Firebase Config -->
+  <!-- Firebase Config (ajusta la URL si tu config está en otro lado) -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -303,6 +303,51 @@
         <!-- Aquí se listan las facturas -->
       </tbody>
     </table>
+
+    <!-- ******************************************************************
+         SECCIÓN: Registrar Abonos (Subcolección)
+    ****************************************************************** -->
+    <hr>
+    <h2>Registrar Abonos a Facturas de Crédito 💸</h2>
+    <label for="abonoClientSelect">Selecciona Cliente:</label>
+    <select id="abonoClientSelect" onchange="loadCreditInvoicesForAbonos()">
+      <!-- Se llena dinámicamente con clientes -->
+    </select>
+
+    <label for="abonoInvoiceSelect">Selecciona Factura (Crédito Pendiente):</label>
+    <select id="abonoInvoiceSelect">
+      <!-- Se llena dinámicamente con facturas crédito no pagadas -->
+    </select>
+
+    <label for="abonoAmount">Monto a Abonar (C$):</label>
+    <input type="number" id="abonoAmount" step="0.01" min="0.01" />
+
+    <label for="abonoRoute">Ruta del Abono:</label>
+    <select id="abonoRoute">
+      <option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+      <option value="10">10</option>
+    </select>
+
+    <button onclick="registerAbono()">REGISTRAR ABONO</button>
+    <button onclick="cancelAbono()">CANCELAR</button>
+
+    <!-- Contenedor para mostrar el recibo del abono -->
+    <div id="abonoReceiptContainer" style="display:none; margin-top:20px;">
+      <div id="abonoReceipt" style="border:1px solid #333; padding:10px;">
+        <!-- Aquí se generará dinámicamente el recibo de abono -->
+      </div>
+      <button onclick="printAbonoReceipt()">Imprimir Recibo 🖨️</button>
+    </div>
+    <!-- ****************************************************************** -->
   </div>
 
   <script>
@@ -649,6 +694,8 @@
       const dd = String(now.getDate()).padStart(2, '0');
       const fechaStr = `${yyyy}-${mm}-${dd}`;
 
+      // 🚨 IMPORTANTE: Guardar "saldo" en la factura igual a "invoiceTotal"
+      // para manejar pagos parciales
       const invoice = {
         clientId,
         route,
@@ -659,7 +706,8 @@
         total: invoiceTotal,
         fecha: now,
         fechaStr,
-        anulada: false
+        anulada: false,
+        saldo: invoiceTotal // <-- Aquí almacenamos el saldo inicial
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
@@ -1003,10 +1051,216 @@
       document.getElementById('invoiceModal').style.display = 'none';
     }
 
+    // ******************************************************************
+    // SECCIÓN DE ABONOS COMO SUBCOLECCIÓN DE FACTURAS
+    // ******************************************************************
+
+    // Cargar lista de clientes para el select de abonos
+    function loadClientsForAbonos() {
+      const abonoClientSelect = document.getElementById('abonoClientSelect');
+      abonoClientSelect.innerHTML = ''; // limpiar
+      db.collection("clientes").get().then((querySnapshot) => {
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = data.nombreCliente + " - " + data.nombreTienda;
+          abonoClientSelect.appendChild(opt);
+        });
+      }).catch((err) => {
+        console.error("Error al cargar clientes para abonos:", err);
+      });
+    }
+
+    // Cargar facturas de crédito pendientes (saldo > 0) para el cliente seleccionado
+    async function loadCreditInvoicesForAbonos() {
+      const clientId = document.getElementById('abonoClientSelect').value;
+      const abonoInvoiceSelect = document.getElementById('abonoInvoiceSelect');
+      abonoInvoiceSelect.innerHTML = '';
+
+      try {
+        // Filtrar facturas de este cliente con paymentType="Credito" y no anuladas
+        const querySnap = await db.collection("facturas")
+          .where("clientId", "==", clientId)
+          .where("paymentType", "==", "Credito")
+          .where("anulada", "==", false)
+          .orderBy("fecha", "asc")
+          .get();
+
+        querySnap.forEach((docFact) => {
+          const factData = docFact.data();
+          // Verificamos si el saldo > 0
+          const saldo = factData.saldo !== undefined ? factData.saldo : factData.total;
+          if (saldo > 0) {
+            const opt = document.createElement('option');
+            opt.value = docFact.id;
+            opt.textContent = `Factura: ${docFact.id} - Saldo: C$${saldo.toFixed(2)}`;
+            abonoInvoiceSelect.appendChild(opt);
+          }
+        });
+      } catch (error) {
+        console.error("Error al cargar facturas de crédito:", error);
+      }
+    }
+
+    // Registrar Abono usando una transacción
+    async function registerAbono() {
+      const clientId = document.getElementById('abonoClientSelect').value;
+      const invoiceId = document.getElementById('abonoInvoiceSelect').value;
+      const abonoAmountInput = document.getElementById('abonoAmount');
+      const route = document.getElementById('abonoRoute').value;
+
+      if (!clientId || !invoiceId) {
+        alert("Debes seleccionar cliente y factura primero. 😬");
+        return;
+      }
+
+      let abonoAmount = parseFloat(abonoAmountInput.value);
+      if (isNaN(abonoAmount) || abonoAmount <= 0) {
+        alert("Monto de abono inválido. 😬");
+        return;
+      }
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          const invoiceRef = db.collection("facturas").doc(invoiceId);
+          const invoiceDoc = await transaction.get(invoiceRef);
+
+          if (!invoiceDoc.exists) {
+            throw new Error("La factura no existe.");
+          }
+          const factData = invoiceDoc.data();
+          const currentSaldo = factData.saldo !== undefined ? factData.saldo : factData.total;
+
+          if (currentSaldo <= 0) {
+            throw new Error("La factura ya está pagada o saldo en cero.");
+          }
+          if (abonoAmount > currentSaldo) {
+            throw new Error(`El abono excede el saldo pendiente (C$${currentSaldo.toFixed(2)}).`);
+          }
+
+          // Nuevo saldo
+          const newSaldo = currentSaldo - abonoAmount;
+          transaction.update(invoiceRef, { saldo: newSaldo });
+
+          // Generar referencia única
+          const reference = generateReference();
+          const dateTime = new Date();
+
+          // Crear doc de abono en la subcolección
+          const abonoRef = invoiceRef.collection("abonos").doc();
+          transaction.set(abonoRef, {
+            clientId: clientId,
+            amount: abonoAmount,
+            pendingBalance: newSaldo,
+            reference: reference,
+            dateTime: dateTime,
+            route: route
+          });
+        });
+
+        alert("Abono registrado con éxito. 🎉");
+        // Mostrar el recibo de abono
+        // Obtenemos la factura para mostrar datos en el recibo
+        const factDocSnap = await db.collection("facturas").doc(invoiceId).get();
+        if (!factDocSnap.exists) {
+          console.error("No se encontró la factura tras registrar el abono.");
+          return;
+        }
+        const facturaData = factDocSnap.data();
+        const newSaldo = facturaData.saldo || 0;
+        const abono = abonoAmount;
+        showAbonoReceipt({
+          invoiceId,
+          abono,
+          saldoPendiente: newSaldo,
+          fecha: new Date(),
+          route
+        }, facturaData);
+
+        // Recargar facturas pendientes
+        loadCreditInvoicesForAbonos();
+      } catch (error) {
+        console.error("Error al registrar abono:", error);
+        alert("Ocurrió un error al registrar el abono: " + error.message);
+      }
+    }
+
+    // Mostrar Recibo de Abono en pantalla
+    function showAbonoReceipt({invoiceId, abono, saldoPendiente, fecha, route}, facturaData) {
+      const container = document.getElementById('abonoReceiptContainer');
+      const receiptDiv = document.getElementById('abonoReceipt');
+
+      const originalTotal = parseFloat(facturaData.total).toFixed(2);
+      const abonoStr = parseFloat(abono).toFixed(2);
+      const balanceStr = parseFloat(saldoPendiente).toFixed(2);
+      const fechaStr = fecha.toLocaleString();
+
+      const html = `
+        <h3 style="text-align:center;">Recibo de Abono</h3>
+        <p><strong>Fecha y Hora:</strong> ${fechaStr}</p>
+        <p><strong>Ruta:</strong> ${route}</p>
+        <p><strong>Moneda:</strong> Córdobas (C$)</p>
+        <hr>
+        <p><strong>Factura #:</strong> ${invoiceId}</p>
+        <p><strong>Monto Original de la Factura:</strong> C$${originalTotal}</p>
+        <p><strong>Monto Abonado:</strong> C$${abonoStr}</p>
+        <p><strong>Balance Pendiente:</strong> C$${balanceStr}</p>
+      `;
+
+      receiptDiv.innerHTML = html;
+      container.style.display = 'block';
+    }
+
+    // Imprimir SOLO el recibo de abono
+    function printAbonoReceipt() {
+      const printContents = document.getElementById('abonoReceipt').innerHTML;
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Imprimir Recibo de Abono</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; padding: 20px; }
+              h3 { text-align: center; }
+              hr { margin: 10px 0; }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }
+
+    // Cancelar abono (limpia campos)
+    function cancelAbono() {
+      document.getElementById('abonoAmount').value = '';
+      document.getElementById('abonoInvoiceSelect').innerHTML = '';
+      document.getElementById('abonoReceiptContainer').style.display = 'none';
+    }
+
+    // Generar la referencia (yyyyMMddHHmmss)
+    function generateReference() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return `${yyyy}${mm}${dd}${hh}${min}${ss}`;
+    }
+
     // Inicializar la página
     window.onload = function() {
-      loadClients();
-      loadInvoices();
+      loadClients();          // Para facturación
+      loadInvoices();         // Para listado de facturas
+      loadClientsForAbonos(); // Para sección de abonos
     };
   </script>
   
@@ -1021,7 +1275,3 @@
   </div>
 </body>
 </html>
-
-
-
-

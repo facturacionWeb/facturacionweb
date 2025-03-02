@@ -220,7 +220,7 @@
     <!-- FIN DE NUEVA SECCIÓN -->
     <!-- ****************************************************************** -->
 
-    <!-- Tabla para los items de la factura (se completan al guardar los items escaneados o agregados manualmente) -->
+    <!-- Tabla para los items de la factura -->
     <h3>Items de Factura</h3>
     <table id="invoiceItemsTable">
       <thead>
@@ -237,8 +237,6 @@
         <!-- Aquí se agregan las filas dinámicamente -->
       </tbody>
     </table>
-    <!-- Si querés seguir agregando items manualmente, podrías mantener el botón de abajo -->
-    <!-- <button onclick="addInvoiceItem()">Agregar Item ➕</button> -->
     <h3>Total a Pagar: <span id="invoiceTotal">0.00</span></h3>
     <button onclick="createInvoice()">Crear Factura 💵</button>
 
@@ -270,7 +268,7 @@
       <option value="5">5</option>
     </select>
 
-    <!-- Nuevo filtro: Facturas Anuladas -->
+    <!-- Filtro: Estado -->
     <label for="filterAnulada">Estado:</label>
     <select id="filterAnulada">
       <option value="">-- Todas --</option>
@@ -278,7 +276,7 @@
       <option value="true">Anuladas</option>
     </select>
 
-    <!-- Nuevo filtro: Método de Pago -->
+    <!-- Filtro: Método de Pago -->
     <label for="filterPaymentMethod">Método de Pago:</label>
     <select id="filterPaymentMethod">
       <option value="">-- Todos --</option>
@@ -389,6 +387,7 @@
           // Agregar al arreglo y actualizar tabla de previsualización
           invoicePreviewItems.push(newItem);
           updateInvoicePreviewTable();
+          // Limpiar y reenfocar el input para el siguiente escaneo
           document.getElementById('invoiceImei').value = '';
           document.getElementById('invoiceImei').focus();
         }).catch((error) => {
@@ -398,6 +397,13 @@
         console.error("Error al buscar IMEI: ", error);
       });
     }
+
+    // Escucha el evento "Enter" para procesar el escaneo automáticamente
+    document.getElementById('invoiceImei').addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        addInvoiceItemByScan();
+      }
+    });
 
     // Actualiza la tabla de previsualización con los items escaneados
     function updateInvoicePreviewTable() {
@@ -466,7 +472,7 @@
 
     // Recalcula la fila de previsualización y actualiza el total
     function recalcPreviewRow(item, row) {
-      const totalCell = row.children[3]; // 4ta columna
+      const totalCell = row.children[3];
       totalCell.textContent = calculateItemTotal(item).toFixed(2);
       recalcPreviewTotal();
     }
@@ -496,14 +502,14 @@
       invoicePreviewItems.forEach(item => {
         const row = document.createElement('tr');
 
-        // Columna Artículo: Creamos un select oculto con un solo option para cumplir con createInvoice()
+        // Columna Artículo: Creamos un select oculto con un solo option
         const articleCell = document.createElement('td');
         const articleSelect = document.createElement('select');
         const option = document.createElement('option');
         option.value = JSON.stringify(item);
         option.textContent = `${item.marca} ${item.modelo} - IMEI: ${item.imei}`;
         articleSelect.appendChild(option);
-        articleSelect.disabled = true; // Para que no se edite
+        articleSelect.disabled = true;
         articleCell.appendChild(articleSelect);
         row.appendChild(articleCell);
 
@@ -545,7 +551,6 @@
           recalculateInvoice();
         };
         recalcRow();
-        // Actualizar al cambiar precio o descuento
         [priceInput, discountInput].forEach(input => {
           input.addEventListener('input', recalcRow);
         });
@@ -574,7 +579,7 @@
     // FIN de funciones de escaneo/previsualización
     // ******************************************************************
 
-    // Poblar select con artículos (para el agregado manual, si se desea)
+    // Poblar select con artículos (para agregado manual)
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -645,7 +650,7 @@
         let bankReference = document.getElementById('bankReference').value;
         paymentMethod = `Transferencia - Banco: ${bank} (#Ref: ${bankReference})`;
       } else if (paymentType === "Credito") {
-        paymentMethod = "Crédito a 30 días"; // Ejemplo
+        paymentMethod = "Crédito a 30 días";
       } else {
         paymentMethod = "Efectivo";
       }
@@ -669,7 +674,6 @@
         const articleId = parsedValue.articleId;
         const imeiDocId = parsedValue.imeiDocId;
 
-        // Guardamos imeiDocData para poder reinsertarlo si se anula la factura
         const imeiDocData = {
           articleId: articleId,
           imei: imei
@@ -722,7 +726,6 @@
 
         displayInvoice(docRef.id, invoice);
         loadInvoices();
-        // Limpieza de la tabla de items de factura
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
       }).catch((error) => {
@@ -998,4 +1001,5 @@
   </div>
 </body>
 </html>
+
 

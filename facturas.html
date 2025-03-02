@@ -1082,9 +1082,9 @@
         // Filtrar facturas de este cliente con paymentType="Credito" y no anuladas
         const querySnap = await db.collection("facturas")
           .where("clientId", "==", clientId)
-          .where("paymentType", "==", "Credito")
-          .where("anulada", "==", false)
-          .orderBy("fecha", "asc")
+        //  .where("paymentType", "==", "Credito")
+        //  .where("anulada", "==", false)
+        //  .orderBy("fecha", "asc")
           .get();
 
         querySnap.forEach((docFact) => {

@@ -102,11 +102,17 @@
         })
         .then((querySnapshot) => {
           let tableContent = '';
+          let grandTotal = 0;
           querySnapshot.forEach((doc) => {
             const article = doc.data();
             // Si no hay IMEI para el artículo, el contador es 0
             const count = imeiCounts[article.id] || 0;
-            // La columna de cantidad es clickeable para abrir el modal
+            // Convertir a número en caso de que sea string
+            let precioCompra = parseFloat(article.precioCompra) || 0;
+            // Calcular total por artículo (precio de compra x existencias)
+            let total = precioCompra * count;
+            grandTotal += total;
+  
             tableContent += `<tr>
               <td>${article.id}</td>
               <td>${article.marca}</td>
@@ -114,8 +120,14 @@
               <td>${article.precioCompra}</td>
               <td>${article.precioVenta}</td>
               <td style="cursor:pointer; color: blue;" onclick="showIMEIModal('${article.id}')">${count}</td>
+              <td>${total.toFixed(2)}</td>
             </tr>`;
           });
+          // Agregar fila con el Total General
+          tableContent += `<tr>
+            <td colspan="6" style="text-align: right; font-weight: bold;">Total General:</td>
+            <td style="font-weight: bold;">${grandTotal.toFixed(2)}</td>
+          </tr>`;
           document.getElementById('reportTable').innerHTML = tableContent;
         })
         .catch((error) => {
@@ -177,6 +189,7 @@
         <th>Precio Compra</th>
         <th>Precio Venta</th>
         <th>Cantidad de IMEI</th>
+        <th>Total</th>
       </tr>
     </thead>
     <tbody id="reportTable">
@@ -196,3 +209,4 @@
   </div>
 </body>
 </html>
+

@@ -1067,6 +1067,12 @@
           opt.textContent = data.nombreCliente + " - " + data.nombreTienda;
           abonoClientSelect.appendChild(opt);
         });
+
+      // Si solo hay un cliente, dispara la carga de facturas automáticamente
+      if (abonoClientSelect.options.length === 1) {
+        loadCreditInvoicesForAbonos();
+      }
+        
       }).catch((err) => {
         console.error("Error al cargar clientes para abonos:", err);
       });

@@ -37,6 +37,9 @@
     th {
       background-color: #f2f2f2;
     }
+    th span {
+      font-size: 12px;
+    }
     /* Estilos para el modal */
     .modal {
       display: none; /* Se oculta por defecto */
@@ -72,20 +75,21 @@
     }
   </style>
   
-  <!-- Defino las funciones en el head para asegurar que estén disponibles globalmente -->
   <script>
+    // Variables globales para almacenar datos y el estado de ordenamiento
+    let articlesData = [];
+    let currentSortColumn = null;
+    let currentSortDirection = 'asc';
+
     // Inicializar Firestore
     const db = firebase.firestore();
 
-    // Función para cargar el reporte cruzando las colecciones Articulos y Articulos_X_IMEI
+    // Función para cargar el reporte y almacenar la data en un arreglo
     function loadReport() {
-      // Limpiar contenido previo del reporte
       document.getElementById('reportTable').innerHTML = '';
-      
-      // Objeto para contar los IMEI por artículo
       const imeiCounts = {};
-  
-      // Primero, obtenemos todos los documentos de Articulos_X_IMEI y contamos los IMEI
+
+      // Primero, obtenemos los IMEI para contarlos
       db.collection("Articulos_X_IMEI").get()
         .then((querySnapshot) => {
           querySnapshot.forEach((doc) => {
@@ -101,48 +105,106 @@
           return db.collection("Articulos").get();
         })
         .then((querySnapshot) => {
-          let tableContent = '';
-          let grandTotal = 0;
+          articlesData = []; // reiniciamos el arreglo
           querySnapshot.forEach((doc) => {
             const article = doc.data();
-            // Si no hay IMEI para el artículo, el contador es 0
-            const count = imeiCounts[article.id] || 0;
-            // Convertir a número en caso de que sea string
+            // Convertir precios a número (por si vienen como string)
             let precioCompra = parseFloat(article.precioCompra) || 0;
-            // Calcular total por artículo (precio de compra x existencias)
-            let total = precioCompra * count;
-            grandTotal += total;
-  
-            tableContent += `<tr>
-              <td>${article.id}</td>
-              <td>${article.marca}</td>
-              <td>${article.modelo}</td>
-              <td>${article.precioCompra}</td>
-              <td>${article.precioVenta}</td>
-              <td style="cursor:pointer; color: blue;" onclick="showIMEIModal('${article.id}')">${count}</td>
-              <td>${total.toFixed(2)}</td>
-            </tr>`;
+            let precioVenta = parseFloat(article.precioVenta) || 0;
+            const count = imeiCounts[article.id] || 0;
+            const total = precioCompra * count;
+            articlesData.push({
+              id: article.id,
+              marca: article.marca,
+              modelo: article.modelo,
+              precioCompra: precioCompra,
+              precioVenta: precioVenta,
+              count: count,
+              total: total
+            });
           });
-          // Agregar fila con el Total General
-          tableContent += `<tr>
-            <td colspan="6" style="text-align: right; font-weight: bold;">Total General:</td>
-            <td style="font-weight: bold;">${grandTotal.toFixed(2)}</td>
-          </tr>`;
-          document.getElementById('reportTable').innerHTML = tableContent;
+          // Reiniciamos el ordenamiento por defecto
+          currentSortColumn = null;
+          currentSortDirection = 'asc';
+          updateSortIndicators();
+          renderTable();
         })
         .catch((error) => {
           console.error("Error al cargar el reporte: ", error);
         });
     }
 
+    // Función que renderiza la tabla, aplicando ordenamiento si corresponde
+    function renderTable() {
+      let tableContent = '';
+      let grandTotal = 0;
+      // Si se ha seleccionado una columna para ordenar, ordenamos el arreglo
+      if (currentSortColumn) {
+        articlesData.sort((a, b) => {
+          let valueA = a[currentSortColumn], valueB = b[currentSortColumn];
+          if (typeof valueA === 'string') {
+            return currentSortDirection === 'asc'
+              ? valueA.localeCompare(valueB)
+              : valueB.localeCompare(valueA);
+          } else {
+            return currentSortDirection === 'asc'
+              ? valueA - valueB
+              : valueB - valueA;
+          }
+        });
+      }
+      // Construir las filas de la tabla
+      articlesData.forEach((article) => {
+        grandTotal += article.total;
+        tableContent += `<tr>
+          <td>${article.id}</td>
+          <td>${article.marca}</td>
+          <td>${article.modelo}</td>
+          <td>${article.precioCompra}</td>
+          <td>${article.precioVenta}</td>
+          <td style="cursor:pointer; color: blue;" onclick="showIMEIModal('${article.id}')">${article.count}</td>
+          <td>${article.total.toFixed(2)}</td>
+        </tr>`;
+      });
+      // Fila de Total General
+      tableContent += `<tr>
+        <td colspan="6" style="text-align: right; font-weight: bold;">Total General:</td>
+        <td style="font-weight: bold;">${grandTotal.toFixed(2)}</td>
+      </tr>`;
+      document.getElementById('reportTable').innerHTML = tableContent;
+    }
+
+    // Función para ordenar por la columna indicada
+    function sortTable(column) {
+      if (currentSortColumn === column) {
+        // Si ya está ordenada por esa columna, invertimos la dirección
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+      }
+      updateSortIndicators();
+      renderTable();
+    }
+
+    // Actualiza los indicadores de orden (flechas) en los encabezados
+    function updateSortIndicators() {
+      const columns = ['marca', 'modelo', 'precioCompra', 'precioVenta', 'count'];
+      columns.forEach((col) => {
+        const span = document.getElementById('sort' + col.charAt(0).toUpperCase() + col.slice(1));
+        if (currentSortColumn === col) {
+          span.innerText = currentSortDirection === 'asc' ? ' ▲' : ' ▼';
+        } else {
+          span.innerText = '';
+        }
+      });
+    }
+
     // Función para mostrar el modal con el listado de IMEI de un artículo
     function showIMEIModal(articleId) {
-      // Mostrar el ID del artículo en el modal
       document.getElementById('modalArticleId').innerText = articleId;
-      // Limpiar la lista previa de IMEI
       document.getElementById('imeiList').innerHTML = '';
       
-      // Consultar los IMEI asociados a este artículo
       db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
         .then((querySnapshot) => {
           if (querySnapshot.empty) {
@@ -155,7 +217,6 @@
               document.getElementById('imeiList').appendChild(li);
             });
           }
-          // Mostrar el modal
           document.getElementById('imeiModal').style.display = 'block';
         })
         .catch((error) => {
@@ -184,11 +245,11 @@
     <thead>
       <tr>
         <th>ID del Artículo</th>
-        <th>Marca</th>
-        <th>Modelo</th>
-        <th>Precio Compra</th>
-        <th>Precio Venta</th>
-        <th>Cantidad de IMEI</th>
+        <th onclick="sortTable('marca')" style="cursor: pointer;">Marca<span id="sortMarca"></span></th>
+        <th onclick="sortTable('modelo')" style="cursor: pointer;">Modelo<span id="sortModelo"></span></th>
+        <th onclick="sortTable('precioCompra')" style="cursor: pointer;">Precio Compra<span id="sortPrecioCompra"></span></th>
+        <th onclick="sortTable('precioVenta')" style="cursor: pointer;">Precio Venta<span id="sortPrecioVenta"></span></th>
+        <th onclick="sortTable('count')" style="cursor: pointer;">Cantidad de IMEI<span id="sortCount"></span></th>
         <th>Total</th>
       </tr>
     </thead>

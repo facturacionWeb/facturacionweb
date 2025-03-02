@@ -1095,14 +1095,25 @@
 
         querySnap.forEach((docFact) => {
           const factData = docFact.data();
-          // Verificamos si el saldo > 0
+          
+          /*// Verificamos si el saldo > 0
+          const saldo = factData.saldo !== undefined ? factData.saldo : factData.total;
+          if (saldo > 0) {
+            const opt = document.createElement('option');
+            opt.value = docFact.id;
+            opt.textContent = `Factura: ${docFact.id} - Saldo: C$${saldo.toFixed(2)}`;*/
+
+          // Verificamos el saldo: si el campo 'saldo' existe, se usa; si no, se usa 'total'
           const saldo = factData.saldo !== undefined ? factData.saldo : factData.total;
           if (saldo > 0) {
             const opt = document.createElement('option');
             opt.value = docFact.id;
             opt.textContent = `Factura: ${docFact.id} - Saldo: C$${saldo.toFixed(2)}`;
+            // Guardamos el saldo pendiente en un atributo data-saldo
+            opt.dataset.saldo = saldo;
             abonoInvoiceSelect.appendChild(opt);
           }
+          
         });
 
         // Si solo hay una factura, se dispara automáticamente la función para actualizar el monto

@@ -124,7 +124,7 @@
       font-weight: bold;
       cursor: pointer;
     }
-    /* Oculta todo excepto la factura al imprimir */
+    /* Oculta todo excepto la factura al imprimir (para la ventana principal) */
     @media print {
       body * {
         visibility: hidden;
@@ -240,7 +240,7 @@
     <h3>Total a Pagar: <span id="invoiceTotal">0.00</span></h3>
     <button onclick="createInvoice()">Crear Factura 💵</button>
 
-    <!-- Sección para mostrar la factura creada -->
+    <!-- Sección para mostrar la factura creada (en la página principal) -->
     <div id="invoiceDisplay" style="display:none;">
       <h2>Factura Generada</h2>
       <div class="invoice-container" id="invoiceContainer">
@@ -575,56 +575,6 @@
       recalculateInvoice();
     }
 
-    // ******************************************************************
-    // FIN de funciones de escaneo/previsualización
-    // ******************************************************************
-
-    // Poblar select con artículos (para agregado manual)
-    function populateArticleSelect($select) {
-      $select.empty();
-      db.collection("Articulos").get().then((articlesSnapshot) => {
-        let promises = [];
-        articlesSnapshot.forEach((articleDoc) => {
-          const articleData = articleDoc.data();
-          const p = db.collection("Articulos_X_IMEI")
-            .where("articleId", "==", articleDoc.id)
-            .get()
-            .then((imeiSnapshot) => {
-              if (!imeiSnapshot.empty) {
-                imeiSnapshot.forEach((imeiDoc) => {
-                  const imeiData = imeiDoc.data();
-                  const payload = {
-                    articleId: articleDoc.id,
-                    marca: articleData.marca,
-                    modelo: articleData.modelo,
-                    imei: imeiData.imei,
-                    precioVenta: articleData.precioVenta || 0,
-                    imeiDocId: imeiDoc.id
-                  };
-                  const optionText = `${articleData.marca} ${articleData.modelo} - IMEI: ${imeiData.imei}`;
-                  const optionValue = JSON.stringify(payload);
-                  $select.append(new Option(optionText, optionValue));
-                });
-              }
-            })
-            .catch((error) => {
-              console.error("Error al cargar IMEI para el artículo: ", error);
-            });
-          promises.push(p);
-        });
-        Promise.all(promises).then(() => {
-          $select.select2({
-            placeholder: "Busca por marca, modelo o IMEI",
-            allowClear: true,
-            width: '100%'
-          });
-        });
-      })
-      .catch((error) => {
-        console.error("Error al cargar artículos: ", error);
-      });
-    }
-
     // Recalcular total de factura (suma de los items en la tabla de factura)
     function recalculateInvoice() {
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
@@ -733,7 +683,7 @@
       });
     }
 
-    // Mostrar factura generada
+    // Mostrar factura generada (en la parte principal)
     function displayInvoice(invoiceId, invoice) {
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
@@ -795,7 +745,7 @@
       });
     }
 
-    // Imprimir factura
+    // Imprimir factura desde la parte principal
     function printInvoice() {
       window.print();
     }
@@ -912,7 +862,11 @@
         });
     }
 
-    // Ver detalle de una factura en modal
+    // ******************************************************************
+    // VER DETALLE EN EL MODAL + BOTÓN DE IMPRIMIR SOLO LA FACTURA
+    // ******************************************************************
+
+    // Función para ver detalle de una factura en un modal
     function viewInvoiceDetail(invoiceId) {
       db.collection("facturas").doc(invoiceId).get().then((doc) => {
         if(doc.exists) {
@@ -921,9 +875,15 @@
             const client = clientDoc.data();
             let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
             let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
+
+            // Mostrar "ANULADA" si es true
+            let invoiceStatus = invoice.anulada 
+              ? `<span style="color: red; font-weight: bold;">ANULADA</span>` 
+              : '';
+
             const invoiceHTML = `
               <div class="invoice-header">
-                <h2>Factura - ${invoiceId}</h2>
+                <h2>Factura - ${invoiceId} ${invoiceStatus}</h2>
                 <p class="currency"><strong>Moneda:</strong> ${currencyText}</p>
                 <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
               </div>
@@ -969,6 +929,10 @@
                   <p>Firma del Cliente</p>
                 </div>
               </div>
+              <!-- Botón para imprimir SOLO esta factura -->
+              <div style="text-align:center; margin-top:20px;">
+                <button onclick="printModalInvoice()">Imprimir Factura 🖨️</button>
+              </div>
             `;
             document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
             document.getElementById('invoiceModal').style.display = 'block';
@@ -977,6 +941,62 @@
       }).catch((error) => {
         console.error("Error al ver factura: ", error);
       });
+    }
+
+    // Función para imprimir solo la factura del modal
+    function printModalInvoice() {
+      const modalContent = document.getElementById('modalInvoiceContent').innerHTML;
+      // Abrir ventana emergente con el contenido de la factura
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Imprimir Factura</title>
+          <style>
+            /* Estilos básicos para la impresión del modal */
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+              padding: 20px;
+            }
+            .invoice-header h2 {
+              margin: 0;
+            }
+            .items-table, .details-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            .items-table th, .items-table td, .details-table td {
+              border: 1px solid #ccc;
+              padding: 8px;
+              text-align: left;
+            }
+            .items-table th {
+              background-color: #333;
+              color: #fff;
+            }
+            .signature {
+              margin-top: 30px;
+              text-align: center;
+            }
+            .invoice-header {
+              text-align: center;
+              border-bottom: 2px solid #000;
+              margin-bottom: 20px;
+            }
+          </style>
+        </head>
+        <body>
+          ${modalContent}
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
     }
 
     function closeInvoiceModal() {
@@ -995,11 +1015,13 @@
     <div class="modal-content">
       <span class="close" onclick="closeInvoiceModal()">&times;</span>
       <div id="modalInvoiceContent">
-        <!-- Detalle de factura -->
+        <!-- Detalle de factura en modal -->
       </div>
     </div>
   </div>
 </body>
 </html>
+
+
 
 

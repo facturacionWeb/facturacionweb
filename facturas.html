@@ -1104,10 +1104,29 @@
             abonoInvoiceSelect.appendChild(opt);
           }
         });
+
+        // Si solo hay una factura, se dispara automáticamente la función para actualizar el monto
+        if (abonoInvoiceSelect.options.length === 1) {
+          updateAbonoAmount();
+        }
+        
+        
       } catch (error) {
         console.error("Error al cargar facturas de crédito:", error);
       }
     }
+
+    function updateAbonoAmount() {
+      const abonoInvoiceSelect = document.getElementById('abonoInvoiceSelect');
+      const selectedOption = abonoInvoiceSelect.options[abonoInvoiceSelect.selectedIndex];
+      if (selectedOption && selectedOption.dataset.saldo) {
+        // Establece el input con el saldo pendiente
+        document.getElementById('abonoAmount').value = parseFloat(selectedOption.dataset.saldo).toFixed(2);
+      } else {
+        document.getElementById('abonoAmount').value = "";
+      }
+    }
+
 
     // Registrar Abono usando una transacción
     async function registerAbono() {

@@ -174,5 +174,156 @@
         articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
 
         querySnapshot.forEach((doc) => {
-   
+          const article = doc.data();
+          // Agregar fila a la tabla de artículos con botones para Editar y Eliminar
+          const row = `<tr>
+                        <td>${article.id}</td>
+                        <td>${article.marca}</td>
+                        <td>${article.modelo}</td>
+                        <td>${article.precioCompra}</td>
+                        <td>${article.precioVenta}</td>
+                        <td>
+                          <button onclick="editArticle('${doc.id}')">Editar</button>
+                          <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
+                        </td>
+                      </tr>`;
+          articleTable.innerHTML += row;
+          // Agregar opción al selector de artículos
+          const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
+          articleSelector.innerHTML += option;
+        });
+      }).catch((error) => {
+        console.error("Error al cargar los artículos: ", error);
+      });
+    }
 
+    function editArticle(id) {
+      db.collection("Articulos").doc(id).get().then((doc) => {
+        if (doc.exists) {
+          const article = doc.data();
+          document.getElementById('articleId').value = article.id;
+          document.getElementById('marca').value = article.marca;
+          document.getElementById('modelo').value = article.modelo;
+          document.getElementById('precioCompra').value = article.precioCompra;
+          document.getElementById('precioVenta').value = article.precioVenta;
+        }
+      }).catch((error) => {
+        console.error("Error al obtener el artículo: ", error);
+      });
+    }
+
+    // Función para eliminar un artículo solo si no tiene IMEIs asociados
+    function deleteArticle(id) {
+      // Verificar si hay IMEIs asociados al artículo
+      db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
+      .then((querySnapshot) => {
+        if (!querySnapshot.empty) {
+          alert("No se puede eliminar el artículo porque tiene IMEI asociados 😬");
+          return;
+        } else {
+          if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
+            db.collection("Articulos").doc(id).delete()
+            .then(() => {
+              alert("Artículo eliminado 😊");
+              loadArticles();
+            })
+            .catch((error) => {
+              console.error("Error al eliminar el artículo: ", error);
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error al verificar IMEIs asociados: ", error);
+      });
+    }
+
+    /* =============================
+       Funciones para IMEI
+       ============================= */
+    function addIMEI() {
+      const articleId = document.getElementById('articleSelector').value;
+      const imei = document.getElementById('imei').value.trim();
+      if (!articleId) {
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
+      }
+      if (!imei) {
+        alert("Debes ingresar un IMEI válido 😬");
+        return;
+      }
+      // Verificar si el IMEI ya existe en la colección
+      db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
+      .then((querySnapshot) => {
+        if (!querySnapshot.empty) {
+          alert("El IMEI ya existe y no se puede registrar duplicado 😬");
+          return;
+        } else {
+          // Guardar el IMEI en la colección "Articulos_X_IMEI"
+          db.collection("Articulos_X_IMEI").add({
+            articleId: articleId,
+            imei: imei
+          })
+          .then(() => {
+            alert("IMEI agregado con éxito 👍");
+            loadIMEIs(articleId);
+            document.getElementById('imei').value = '';
+          })
+          .catch((error) => {
+            console.error("Error al agregar el IMEI: ", error);
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Error al verificar IMEI duplicado: ", error);
+      });
+    }
+
+    function loadIMEIs(articleId) {
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+      .then((querySnapshot) => {
+        const imeiTable = document.getElementById('imeiTable');
+        imeiTable.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const imeiData = doc.data();
+          const row = `<tr>
+                        <td>${doc.id}</td>
+                        <td>${imeiData.imei}</td>
+                        <td><button onclick="deleteIMEI('${doc.id}', '${articleId}')">Eliminar</button></td>
+                      </tr>`;
+          imeiTable.innerHTML += row;
+        });
+      })
+      .catch((error) => {
+        console.error("Error al cargar los IMEIs: ", error);
+      });
+    }
+
+    function deleteIMEI(docId, articleId) {
+      if (confirm("¿Está seguro de que desea eliminar este IMEI?")) {
+        db.collection("Articulos_X_IMEI").doc(docId).delete().then(() => {
+          alert("IMEI eliminado 😊");
+          loadIMEIs(articleId);
+        }).catch((error) => {
+          console.error("Error al eliminar el IMEI: ", error);
+        });
+      }
+    }
+
+    // Evento para cargar los IMEIs al seleccionar un artículo en el dropdown
+    document.getElementById('articleSelector').addEventListener('change', function() {
+      const articleId = this.value;
+      if (articleId) {
+        loadIMEIs(articleId);
+      } else {
+        document.getElementById('imeiTable').innerHTML = '';
+      }
+    });
+
+    // Cargar los artículos al iniciar la página
+    window.onload = function() {
+      loadArticles();
+    };
+  </script>
+</body>
+</html>

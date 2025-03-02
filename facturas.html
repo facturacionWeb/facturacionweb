@@ -343,7 +343,7 @@
                   const optionValue = JSON.stringify(payload);
                   $select.append(new Option(optionText, optionValue));
                 });
-              } else {
+              } /*else {
                 // Artículo sin IMEI (o ya no hay IMEIs disponibles)
                 // Si deseas que no aparezca en absoluto, omite estas líneas.
                 const payload = {
@@ -357,7 +357,7 @@
                 const optionText = `${articleData.marca} ${articleData.modelo}`;
                 const optionValue = JSON.stringify(payload);
                 $select.append(new Option(optionText, optionValue));
-              }
+              }*/
             })
             .catch((error) => {
               console.error("Error al cargar IMEI para el artículo: ", error);

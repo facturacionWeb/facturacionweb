@@ -43,7 +43,7 @@
       padding: 8px;
       text-align: left;
     }
-    h1, h2 {
+    h1, h2, h3 {
       text-align: center;
     }
   </style>
@@ -102,7 +102,23 @@
     <input type="text" id="imei" placeholder="IMEI" />
     <button onclick="addIMEI()">Agregar IMEI</button>
 
-    <!-- Tabla de IMEIs -->
+    <!-- Previsualización de IMEIs pendientes -->
+    <h3>Previsualización de IMEIs pendientes 📋</h3>
+    <table id="previewTable">
+      <thead>
+        <tr>
+          <th>IMEI</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Se llenará dinámicamente -->
+      </tbody>
+    </table>
+    <button onclick="savePendingIMEIs()">Guardar todos los IMEIs</button>
+
+    <!-- Tabla de IMEIs guardados -->
+    <h3>IMEIs Guardados en Firestore 💾</h3>
     <table>
       <thead>
         <tr>
@@ -120,6 +136,9 @@
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
+
+    // Arreglo para acumular los IMEIs pendientes
+    let pendingIMEIs = [];
 
     /* =============================
        Funciones para Artículos
@@ -241,6 +260,7 @@
     /* =============================
        Funciones para IMEI
        ============================= */
+    // Función para agregar IMEI a la lista pendiente (preview)
     function addIMEI() {
       const articleId = document.getElementById('articleSelector').value;
       const imei = document.getElementById('imei').value.trim();
@@ -252,33 +272,79 @@
         alert("Debes ingresar un IMEI válido 😬");
         return;
       }
-      // Verificar si el IMEI ya existe en la colección
-      db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
-      .then((querySnapshot) => {
-        if (!querySnapshot.empty) {
-          alert("El IMEI ya existe y no se puede registrar duplicado 😬");
-          return;
-        } else {
-          // Guardar el IMEI en la colección "Articulos_X_IMEI"
-          db.collection("Articulos_X_IMEI").add({
-            articleId: articleId,
-            imei: imei
-          })
-          .then(() => {
-            alert("IMEI agregado con éxito 👍");
-            loadIMEIs(articleId);
-            document.getElementById('imei').value = '';
-          })
-          .catch((error) => {
-            console.error("Error al agregar el IMEI: ", error);
-          });
-        }
-      })
-      .catch((error) => {
-        console.error("Error al verificar IMEI duplicado: ", error);
+      // Verificar si el IMEI ya está en la lista pendiente
+      if (pendingIMEIs.includes(imei)) {
+        alert("Este IMEI ya se encuentra en la lista pendiente 😬");
+        return;
+      }
+      // Agregar el IMEI al arreglo pendiente
+      pendingIMEIs.push(imei);
+      updatePreviewTable();
+      document.getElementById('imei').value = '';
+      document.getElementById('imei').focus();
+    }
+
+    // Actualiza la tabla de previsualización con los IMEIs pendientes
+    function updatePreviewTable() {
+      const previewTableBody = document.getElementById('previewTable').getElementsByTagName('tbody')[0];
+      previewTableBody.innerHTML = '';
+      pendingIMEIs.forEach((imei, index) => {
+        const row = `<tr>
+                       <td>${imei}</td>
+                       <td><button onclick="removePendingIMEI(${index})">Eliminar</button></td>
+                     </tr>`;
+        previewTableBody.innerHTML += row;
       });
     }
 
+    // Elimina un IMEI de la lista pendiente
+    function removePendingIMEI(index) {
+      pendingIMEIs.splice(index, 1);
+      updatePreviewTable();
+    }
+
+    // Guarda todos los IMEIs pendientes en Firestore
+    function savePendingIMEIs() {
+      const articleId = document.getElementById('articleSelector').value;
+      if (!articleId) {
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
+      }
+      if (pendingIMEIs.length === 0) {
+        alert("No hay IMEIs pendientes para guardar 😬");
+        return;
+      }
+      let promises = [];
+      // Iterar sobre cada IMEI pendiente
+      pendingIMEIs.forEach((imei) => {
+        // Verificar en Firestore si el IMEI ya existe
+        let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
+        .then((querySnapshot) => {
+          if (!querySnapshot.empty) {
+            console.log("El IMEI ya existe:", imei);
+            return Promise.resolve(null);
+          } else {
+            return db.collection("Articulos_X_IMEI").add({
+              articleId: articleId,
+              imei: imei
+            });
+          }
+        });
+        promises.push(promise);
+      });
+      Promise.all(promises)
+      .then(() => {
+        alert("Todos los IMEIs pendientes han sido guardados 👍");
+        pendingIMEIs = [];
+        updatePreviewTable();
+        loadIMEIs(articleId);
+      })
+      .catch((error) => {
+        console.error("Error al guardar los IMEIs: ", error);
+      });
+    }
+
+    // Función para cargar los IMEIs guardados en Firestore para un artículo dado
     function loadIMEIs(articleId) {
       db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
       .then((querySnapshot) => {
@@ -310,13 +376,23 @@
       }
     }
 
-    // Evento para cargar los IMEIs al seleccionar un artículo en el dropdown
+    // Evento para cargar los IMEIs guardados al seleccionar un artículo
     document.getElementById('articleSelector').addEventListener('change', function() {
       const articleId = this.value;
+      // Limpiar la previsualización cuando se cambia de artículo
+      pendingIMEIs = [];
+      updatePreviewTable();
       if (articleId) {
         loadIMEIs(articleId);
       } else {
         document.getElementById('imeiTable').innerHTML = '';
+      }
+    });
+
+    // Evento para permitir agregar IMEI con la tecla Enter
+    document.getElementById('imei').addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        addIMEI();
       }
     });
 
@@ -327,3 +403,4 @@
   </script>
 </body>
 </html>
+

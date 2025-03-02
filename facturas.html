@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Facturación de Artículos</title>
+  <title>Facturación de Artículos con Escaneo de IMEI 😎📲</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -189,7 +189,38 @@
       <input type="text" id="bankReference" placeholder="Número de Referencia Bancaria">
     </div>
 
-    <!-- Tabla para los items de la factura -->
+    <!-- ****************************************************************** -->
+    <!-- NUEVA SECCIÓN: Escaneo de IMEI para Facturación -->
+    <!-- ****************************************************************** -->
+    <h3>Escaneo de IMEI para Facturación 📲</h3>
+    <label for="invoiceImei">Escanear IMEI:</label>
+    <input type="text" id="invoiceImei" placeholder="Escanea el IMEI del artículo" />
+    <button onclick="addInvoiceItemByScan()">Agregar IMEI</button>
+
+    <!-- Tabla de previsualización de items escaneados -->
+    <h3>Previsualización de Items Escaneados 📋</h3>
+    <table id="invoicePreviewTable">
+      <thead>
+        <tr>
+          <th>Artículo</th>
+          <th>Precio Venta</th>
+          <th>Descuento (%)</th>
+          <th>Total</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Se llenará dinámicamente -->
+      </tbody>
+    </table>
+    <button onclick="saveInvoicePreviewItems()">Guardar Items Escaneados ➕</button>
+    <h3>Total Previsualización: <span id="previewTotal">0.00</span></h3>
+
+    <!-- ****************************************************************** -->
+    <!-- FIN DE NUEVA SECCIÓN -->
+    <!-- ****************************************************************** -->
+
+    <!-- Tabla para los items de la factura (se completan al guardar los items escaneados o agregados manualmente) -->
     <h3>Items de Factura</h3>
     <table id="invoiceItemsTable">
       <thead>
@@ -206,7 +237,8 @@
         <!-- Aquí se agregan las filas dinámicamente -->
       </tbody>
     </table>
-    <button onclick="addInvoiceItem()">Agregar Item ➕</button>
+    <!-- Si querés seguir agregando items manualmente, podrías mantener el botón de abajo -->
+    <!-- <button onclick="addInvoiceItem()">Agregar Item ➕</button> -->
     <h3>Total a Pagar: <span id="invoiceTotal">0.00</span></h3>
     <button onclick="createInvoice()">Crear Factura 💵</button>
 
@@ -275,20 +307,12 @@
     </table>
   </div>
 
-  <!-- Modal para ver el detalle de una factura -->
-  <div id="invoiceModal" class="modal">
-    <div class="modal-content">
-      <span class="close" onclick="closeInvoiceModal()">&times;</span>
-      <div id="modalInvoiceContent">
-        <!-- Detalle de factura -->
-      </div>
-    </div>
-  </div>
-
   <script>
     // Inicializar Firestore
     const db = firebase.firestore();
     let invoiceTotal = 0;
+    // Arreglo para acumular los items escaneados en la previsualización
+    let invoicePreviewItems = [];
 
     // Mostrar u ocultar información adicional para transferencia
     document.getElementById('paymentType').addEventListener('change', function() {
@@ -316,7 +340,241 @@
       });
     }
 
-    // Poblar select con artículos (solo IMEIs que existan en Articulos_X_IMEI)
+    // ******************************************************************
+    // Funciones para el escaneo y previsualización de IMEIs en facturación
+    // ******************************************************************
+
+    // Agregar item a previsualización vía escaneo
+    function addInvoiceItemByScan() {
+      const scannedImei = document.getElementById('invoiceImei').value.trim();
+      if (!scannedImei) {
+        alert("Debés ingresar/escaniar un IMEI 😬");
+        return;
+      }
+      // Verificar si ya fue escaneado en la previsualización
+      if (invoicePreviewItems.some(item => item.imei === scannedImei)) {
+        alert("Este IMEI ya está en la previsualización 😅");
+        document.getElementById('invoiceImei').value = '';
+        return;
+      }
+      // Consultar en Articulos_X_IMEI para ver si el IMEI existe
+      db.collection("Articulos_X_IMEI").where("imei", "==", scannedImei).get()
+      .then((querySnapshot) => {
+        if (querySnapshot.empty) {
+          alert("El IMEI no se encontró en inventario 😬");
+          return;
+        }
+        // Tomamos el primer documento encontrado
+        const doc = querySnapshot.docs[0];
+        const imeiData = doc.data();
+        const articleId = imeiData.articleId;
+        // Consultar la información del artículo en la colección Articulos
+        db.collection("Articulos").doc(articleId).get().then((docSnap) => {
+          if (!docSnap.exists) {
+            alert("No se encontró información del artículo asociado 😬");
+            return;
+          }
+          const articleData = docSnap.data();
+          // Crear objeto item para previsualización
+          const newItem = {
+            articleId: articleId,
+            marca: articleData.marca,
+            modelo: articleData.modelo,
+            imei: scannedImei,
+            precioVenta: articleData.precioVenta || 0,
+            imeiDocId: doc.id,
+            discount: 0,
+            total: parseFloat(articleData.precioVenta || 0)
+          };
+          // Agregar al arreglo y actualizar tabla de previsualización
+          invoicePreviewItems.push(newItem);
+          updateInvoicePreviewTable();
+          document.getElementById('invoiceImei').value = '';
+          document.getElementById('invoiceImei').focus();
+        }).catch((error) => {
+          console.error("Error al obtener artículo: ", error);
+        });
+      }).catch((error) => {
+        console.error("Error al buscar IMEI: ", error);
+      });
+    }
+
+    // Actualiza la tabla de previsualización con los items escaneados
+    function updateInvoicePreviewTable() {
+      const tbody = document.querySelector('#invoicePreviewTable tbody');
+      tbody.innerHTML = '';
+      invoicePreviewItems.forEach((item, index) => {
+        const row = document.createElement('tr');
+
+        // Columna Artículo (marca, modelo e IMEI)
+        const articleCell = document.createElement('td');
+        articleCell.textContent = `${item.marca} ${item.modelo} - IMEI: ${item.imei}`;
+        row.appendChild(articleCell);
+
+        // Columna Precio Venta (editable)
+        const priceCell = document.createElement('td');
+        const priceInput = document.createElement('input');
+        priceInput.type = 'number';
+        priceInput.value = item.precioVenta;
+        priceInput.addEventListener('input', function() {
+          item.precioVenta = parseFloat(priceInput.value) || 0;
+          recalcPreviewRow(item, row);
+        });
+        priceCell.appendChild(priceInput);
+        row.appendChild(priceCell);
+
+        // Columna Descuento (editable)
+        const discountCell = document.createElement('td');
+        const discountInput = document.createElement('input');
+        discountInput.type = 'number';
+        discountInput.value = item.discount;
+        discountInput.addEventListener('input', function() {
+          item.discount = parseFloat(discountInput.value) || 0;
+          recalcPreviewRow(item, row);
+        });
+        discountCell.appendChild(discountInput);
+        row.appendChild(discountCell);
+
+        // Columna Total (calculado)
+        const totalCell = document.createElement('td');
+        totalCell.textContent = calculateItemTotal(item).toFixed(2);
+        row.appendChild(totalCell);
+
+        // Columna Acciones (Eliminar)
+        const actionsCell = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.textContent = "Eliminar";
+        delBtn.onclick = function() {
+          removeInvoicePreviewItem(index);
+        };
+        actionsCell.appendChild(delBtn);
+        row.appendChild(actionsCell);
+
+        tbody.appendChild(row);
+      });
+      recalcPreviewTotal();
+    }
+
+    // Calcula el total de un item en previsualización
+    function calculateItemTotal(item) {
+      let total = item.precioVenta;
+      if(item.discount > 0) {
+        total -= (total * item.discount / 100);
+      }
+      return total;
+    }
+
+    // Recalcula la fila de previsualización y actualiza el total
+    function recalcPreviewRow(item, row) {
+      const totalCell = row.children[3]; // 4ta columna
+      totalCell.textContent = calculateItemTotal(item).toFixed(2);
+      recalcPreviewTotal();
+    }
+
+    // Recalcula el total de todos los items en previsualización y lo muestra
+    function recalcPreviewTotal() {
+      let sum = 0;
+      invoicePreviewItems.forEach(item => {
+        sum += calculateItemTotal(item);
+      });
+      document.getElementById('previewTotal').textContent = sum.toFixed(2);
+    }
+
+    // Elimina un item de la previsualización
+    function removeInvoicePreviewItem(index) {
+      invoicePreviewItems.splice(index, 1);
+      updateInvoicePreviewTable();
+    }
+
+    // Transfiere los items de previsualización a la tabla de items de factura
+    function saveInvoicePreviewItems() {
+      if (invoicePreviewItems.length === 0) {
+        alert("No hay items en la previsualización 😬");
+        return;
+      }
+      const tbody = document.querySelector('#invoiceItemsTable tbody');
+      invoicePreviewItems.forEach(item => {
+        const row = document.createElement('tr');
+
+        // Columna Artículo: Creamos un select oculto con un solo option para cumplir con createInvoice()
+        const articleCell = document.createElement('td');
+        const articleSelect = document.createElement('select');
+        const option = document.createElement('option');
+        option.value = JSON.stringify(item);
+        option.textContent = `${item.marca} ${item.modelo} - IMEI: ${item.imei}`;
+        articleSelect.appendChild(option);
+        articleSelect.disabled = true; // Para que no se edite
+        articleCell.appendChild(articleSelect);
+        row.appendChild(articleCell);
+
+        // Columna Cantidad (fija en 1)
+        const qtyCell = document.createElement('td');
+        const qtyInput = document.createElement('input');
+        qtyInput.type = 'number';
+        qtyInput.value = 1;
+        qtyInput.disabled = true;
+        qtyCell.appendChild(qtyInput);
+        row.appendChild(qtyCell);
+
+        // Columna Precio Venta (editable)
+        const priceCell = document.createElement('td');
+        const priceInput = document.createElement('input');
+        priceInput.type = 'number';
+        priceInput.value = item.precioVenta;
+        priceCell.appendChild(priceInput);
+        row.appendChild(priceCell);
+
+        // Columna Descuento (editable)
+        const discountCell = document.createElement('td');
+        const discountInput = document.createElement('input');
+        discountInput.type = 'number';
+        discountInput.value = item.discount;
+        discountCell.appendChild(discountInput);
+        row.appendChild(discountCell);
+
+        // Columna Total (calculado)
+        const totalCell = document.createElement('td');
+        const recalcRow = function() {
+          const price = parseFloat(priceInput.value) || 0;
+          const discount = parseFloat(discountInput.value) || 0;
+          let total = price;
+          if(discount > 0) {
+            total -= (total * discount / 100);
+          }
+          totalCell.textContent = total.toFixed(2);
+          recalculateInvoice();
+        };
+        recalcRow();
+        // Actualizar al cambiar precio o descuento
+        [priceInput, discountInput].forEach(input => {
+          input.addEventListener('input', recalcRow);
+        });
+        row.appendChild(totalCell);
+
+        // Columna Acciones (Eliminar fila)
+        const actionsCell = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.textContent = "Eliminar";
+        delBtn.onclick = function() {
+          tbody.removeChild(row);
+          recalculateInvoice();
+        };
+        actionsCell.appendChild(delBtn);
+        row.appendChild(actionsCell);
+
+        tbody.appendChild(row);
+      });
+      // Limpiar previsualización y actualizar total de factura
+      invoicePreviewItems = [];
+      updateInvoicePreviewTable();
+      recalculateInvoice();
+    }
+
+    // ******************************************************************
+    // FIN de funciones de escaneo/previsualización
+    // ******************************************************************
+
+    // Poblar select con artículos (para el agregado manual, si se desea)
     function populateArticleSelect($select) {
       $select.empty();
       db.collection("Articulos").get().then((articlesSnapshot) => {
@@ -330,7 +588,6 @@
               if (!imeiSnapshot.empty) {
                 imeiSnapshot.forEach((imeiDoc) => {
                   const imeiData = imeiDoc.data();
-                  // Guardamos también el doc ID de 'Articulos_X_IMEI'
                   const payload = {
                     articleId: articleDoc.id,
                     marca: articleData.marca,
@@ -343,21 +600,7 @@
                   const optionValue = JSON.stringify(payload);
                   $select.append(new Option(optionText, optionValue));
                 });
-              } /*else {
-                // Artículo sin IMEI (o ya no hay IMEIs disponibles)
-                // Si deseas que no aparezca en absoluto, omite estas líneas.
-                const payload = {
-                  articleId: articleDoc.id,
-                  marca: articleData.marca,
-                  modelo: articleData.modelo,
-                  imei: "",
-                  precioVenta: articleData.precioVenta || 0,
-                  imeiDocId: null
-                };
-                const optionText = `${articleData.marca} ${articleData.modelo}`;
-                const optionValue = JSON.stringify(payload);
-                $select.append(new Option(optionText, optionValue));
-              }*/
+              }
             })
             .catch((error) => {
               console.error("Error al cargar IMEI para el artículo: ", error);
@@ -377,92 +620,7 @@
       });
     }
 
-    // Agregar fila de item en la factura
-    function addInvoiceItem() {
-      const tbody = document.querySelector('#invoiceItemsTable tbody');
-      const row = document.createElement('tr');
-
-      // Columna Artículo
-      const articleCell = document.createElement('td');
-      const articleSelect = document.createElement('select');
-      $(articleSelect).css('width', '100%');
-      articleCell.appendChild(articleSelect);
-      row.appendChild(articleCell);
-      populateArticleSelect($(articleSelect));
-
-      // Columna Cantidad (fija en 1 y no editable)
-      const quantityCell = document.createElement('td');
-      const quantityInput = document.createElement('input');
-      quantityInput.type = 'number';
-      quantityInput.value = 1;
-      quantityInput.min = 1;
-      quantityInput.disabled = true; // Deshabilitado
-      quantityCell.appendChild(quantityInput);
-      row.appendChild(quantityCell);
-
-      // Columna Precio Venta
-      const priceCell = document.createElement('td');
-      const priceInput = document.createElement('input');
-      priceInput.type = 'number';
-      priceInput.placeholder = 'Precio Venta';
-      priceCell.appendChild(priceInput);
-      row.appendChild(priceCell);
-
-      // Columna Descuento
-      const discountCell = document.createElement('td');
-      const discountInput = document.createElement('input');
-      discountInput.type = 'number';
-      discountInput.value = 0;
-      discountInput.min = 0;
-      discountCell.appendChild(discountInput);
-      row.appendChild(discountCell);
-
-      // Columna Total
-      const totalCell = document.createElement('td');
-      totalCell.textContent = "0.00";
-      row.appendChild(totalCell);
-
-      // Columna Acciones
-      const actionsCell = document.createElement('td');
-      const deleteBtn = document.createElement('button');
-      deleteBtn.textContent = "Eliminar";
-      deleteBtn.onclick = function() {
-        tbody.removeChild(row);
-        recalculateInvoice();
-      };
-      actionsCell.appendChild(deleteBtn);
-      row.appendChild(actionsCell);
-
-      // Cuando cambie el artículo, actualizamos precio y total
-      $(articleSelect).on('change', function() {
-        if ($(this).val()) {
-          const parsedValue = JSON.parse($(this).val());
-          priceInput.value = parsedValue.precioVenta || 0;
-          recalcRow();
-        }
-      });
-
-      // Función para recalcular la fila
-      function recalcRow() {
-        const qty = parseFloat(quantityInput.value) || 1;
-        const price = parseFloat(priceInput.value) || 0;
-        const discount = parseFloat(discountInput.value) || 0;
-        let total = qty * price;
-        if (discount > 0) {
-          total -= (total * discount / 100);
-        }
-        totalCell.textContent = total.toFixed(2);
-        recalculateInvoice();
-      }
-
-      [priceInput, discountInput].forEach(input => {
-        input.addEventListener('input', recalcRow);
-      });
-
-      tbody.appendChild(row);
-    }
-
-    // Recalcular total de factura
+    // Recalcular total de factura (suma de los items en la tabla de factura)
     function recalculateInvoice() {
       const rows = document.querySelectorAll('#invoiceItemsTable tbody tr');
       let total = 0;
@@ -474,7 +632,7 @@
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
-    // Crear factura y guardar en Firestore (eliminando IMEIs)
+    // Crear factura y guardar en Firestore (eliminando IMEIs usados)
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
@@ -501,7 +659,6 @@
         const discount = parseFloat(row.children[3].querySelector('input').value) || 0;
         const total = parseFloat(row.children[4].textContent) || 0;
 
-        // Si no hay artículo o total es 0, ignora la fila
         if (!articleSelectElem.value) return;
         if (total <= 0) return;
 
@@ -513,7 +670,6 @@
         const imeiDocId = parsedValue.imeiDocId;
 
         // Guardamos imeiDocData para poder reinsertarlo si se anula la factura
-        // (agrega más campos si lo necesitas)
         const imeiDocData = {
           articleId: articleId,
           imei: imei
@@ -525,7 +681,7 @@
           model,
           imei,
           imeiDocId,
-          imeiDocData,  // para reinsertar
+          imeiDocData,
           quantity,
           price,
           discount,
@@ -533,7 +689,6 @@
         });
       });
 
-      // Crear fecha y fechaStr
       const now = new Date();
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -544,13 +699,13 @@
         clientId,
         route,
         currency,
-        paymentType,   // Efectivo/Transferencia/Crédito
-        paymentMethod, // Detalle
+        paymentType,
+        paymentMethod,
         items,
         total: invoiceTotal,
-        fecha: now,    // Timestamp completo
+        fecha: now,
         fechaStr,
-        anulada: false // Por defecto, la factura NO está anulada
+        anulada: false
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
@@ -567,7 +722,7 @@
 
         displayInvoice(docRef.id, invoice);
         loadInvoices();
-        // Limpieza
+        // Limpieza de la tabla de items de factura
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
       }).catch((error) => {
@@ -673,24 +828,19 @@
     function anularInvoice(invoiceId) {
       if (confirm("¿Está seguro de ANULAR la factura?")) {
         let invoiceData = null;
-        // 1) Leer la factura
         db.collection("facturas").doc(invoiceId).get()
           .then(docSnap => {
             if (!docSnap.exists) {
               throw new Error("La factura no existe.");
             }
             invoiceData = docSnap.data();
-            // 2) Marcar como anulada
             return db.collection("facturas").doc(invoiceId).update({ anulada: true });
           })
           .then(() => {
-            // 3) Restaurar IMEIs
             const items = invoiceData.items || [];
             const promises = [];
             items.forEach(item => {
-              // Si el ítem tenía un IMEI doc y su "imeiDocData"
               if (item.imeiDocId && item.imeiDocData) {
-                // Volvemos a crear el doc en Articulos_X_IMEI con el MISMO docId
                 const docRef = db.collection("Articulos_X_IMEI").doc(item.imeiDocId);
                 promises.push(docRef.set(item.imeiDocData));
               }
@@ -716,20 +866,16 @@
 
       let query = db.collection("facturas");
 
-      // Filtro por fecha
       if (filterDate) {
         query = query.where("fechaStr", "==", filterDate);
       }
-      // Filtro por ruta
       if (filterRoute) {
         query = query.where("route", "==", filterRoute);
       }
-      // Filtro por anulada
       if (filterAnulada) {
         const boolVal = (filterAnulada === "true");
         query = query.where("anulada", "==", boolVal);
       }
-      // Filtro por método de pago
       if (filterPaymentMethod) {
         query = query.where("paymentType", "==", filterPaymentMethod);
       }
@@ -840,5 +986,16 @@
       loadInvoices();
     };
   </script>
+  
+  <!-- Modal para ver el detalle de una factura -->
+  <div id="invoiceModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeInvoiceModal()">&times;</span>
+      <div id="modalInvoiceContent">
+        <!-- Detalle de factura -->
+      </div>
+    </div>
+  </div>
 </body>
 </html>
+

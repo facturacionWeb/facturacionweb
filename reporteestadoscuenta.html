@@ -131,87 +131,92 @@
       });
     }
 
-    // Función para cargar el reporte de estado de cuentas
-    async function loadReporteEstadoCuentas() {
-      const clienteId = document.getElementById('reporteClienteSelect').value;
-      const fechaFiltro = document.getElementById('reporteFecha').value; // formato yyyy-mm-dd
-      const estadoFiltro = document.getElementById('reporteEstado').value;
-      const reporteTableBody = document.querySelector("#reporteTable tbody");
-      reporteTableBody.innerHTML = ''; // Limpiar la tabla
+async function loadReporteEstadoCuentas() {
+  const clienteId = document.getElementById('reporteClienteSelect').value;
+  const fechaFiltro = document.getElementById('reporteFecha').value; // formato yyyy-mm-dd
+  const estadoFiltro = document.getElementById('reporteEstado').value;
+  const reporteTableBody = document.querySelector("#reporteTable tbody");
+  reporteTableBody.innerHTML = ''; // Limpiar la tabla
 
-      if (!clienteId) {
-        alert("Por favor, selecciona un cliente 😬");
-        return;
+  if (!clienteId) {
+    alert("Por favor, selecciona un cliente 😬");
+    return;
+  }
+
+  // Inicia la consulta básica
+  let query = db.collection("facturas")
+                .where("clientId", "==", clienteId)
+                .where("anulada", "==", false)
+                .where("paymentType", "==", "Credito");
+
+  // Filtrar por fecha, si se especifica (usamos "fechaStr")
+  if (fechaFiltro) {
+    query = query.where("fechaStr", "==", fechaFiltro);
+  }
+
+  // Aplicar filtro por estado
+  if (estadoFiltro === "pendientes") {
+    // Para desigualdad en "saldo", ordenamos primero por "saldo"
+    query = query.where("saldo", ">", 0)
+                 .orderBy("saldo", "asc")
+                 .orderBy("fecha", "asc");
+  } else if (estadoFiltro === "pagadas") {
+    query = query.where("saldo", "==", 0)
+                 .orderBy("fecha", "asc");
+  } else {
+    // "todas": sin filtro adicional de saldo
+    query = query.orderBy("fecha", "asc");
+  }
+
+  try {
+    const querySnap = await query.get();
+    let totalOriginal = 0;
+    let totalPagado = 0;
+    let totalSaldo = 0;
+    querySnap.forEach((doc) => {
+      const data = doc.data();
+      const montoOriginal = parseFloat(data.total) || 0;
+      const saldo = data.saldo !== undefined ? parseFloat(data.saldo) : montoOriginal;
+      const montoPagado = montoOriginal - saldo;
+      totalOriginal += montoOriginal;
+      totalPagado += montoPagado;
+      totalSaldo += saldo;
+      
+      // Formatear la fecha y hora
+      let fechaHora = "";
+      if (data.fecha && data.fecha.toDate) {
+        fechaHora = data.fecha.toDate().toLocaleString();
+      } else if (data.fecha) {
+        fechaHora = new Date(data.fecha).toLocaleString();
       }
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${doc.id}</td>
+        <td>${fechaHora}</td>
+        <td>${montoOriginal.toFixed(2)}</td>
+        <td>${montoPagado.toFixed(2)}</td>
+        <td>${saldo.toFixed(2)}</td>
+      `;
+      reporteTableBody.appendChild(row);
+    });
 
-      // Construir la consulta
-      let query = db.collection("facturas")
-                    .where("clientId", "==", clienteId)
-                    .where("anulada", "==", false)
-                    .where("paymentType", "==", "Credito");
+    // Actualizar totales en el pie de tabla
+    document.getElementById('totalOriginal').textContent = totalOriginal.toFixed(2);
+    document.getElementById('totalPagado').textContent = totalPagado.toFixed(2);
+    document.getElementById('totalSaldo').textContent = totalSaldo.toFixed(2);
 
-      // Filtrar por fecha, si se especifica (usamos "fechaStr")
-      if (fechaFiltro) {
-        query = query.where("fechaStr", "==", fechaFiltro);
-      }
-
-      // Filtrar por estado: pagadas (saldo == 0) o pendientes (saldo > 0)
-      if (estadoFiltro === "pagadas") {
-        query = query.where("saldo", "==", 0);
-      } else if (estadoFiltro === "pendientes") {
-        query = query.where("saldo", ">", 0);
-      }
-
-      query = query.orderBy("fecha", "asc");
-
-      try {
-        const querySnap = await query.get();
-        let totalOriginal = 0;
-        let totalPagado = 0;
-        let totalSaldo = 0;
-        querySnap.forEach((doc) => {
-          const data = doc.data();
-          const montoOriginal = parseFloat(data.total) || 0;
-          const saldo = data.saldo !== undefined ? parseFloat(data.saldo) : montoOriginal;
-          const montoPagado = montoOriginal - saldo;
-          totalOriginal += montoOriginal;
-          totalPagado += montoPagado;
-          totalSaldo += saldo;
-          
-          // Formatear la fecha y hora
-          let fechaHora = "";
-          if (data.fecha && data.fecha.toDate) {
-            fechaHora = data.fecha.toDate().toLocaleString();
-          } else if (data.fecha) {
-            fechaHora = new Date(data.fecha).toLocaleString();
-          }
-          
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${doc.id}</td>
-            <td>${fechaHora}</td>
-            <td>${montoOriginal.toFixed(2)}</td>
-            <td>${montoPagado.toFixed(2)}</td>
-            <td>${saldo.toFixed(2)}</td>
-          `;
-          reporteTableBody.appendChild(row);
-        });
-
-        // Actualizar totales en el pie de tabla
-        document.getElementById('totalOriginal').textContent = totalOriginal.toFixed(2);
-        document.getElementById('totalPagado').textContent = totalPagado.toFixed(2);
-        document.getElementById('totalSaldo').textContent = totalSaldo.toFixed(2);
-
-        // Si no se encontraron facturas, mostrar un mensaje en la tabla
-        if (querySnap.empty) {
-          const row = document.createElement('tr');
-          row.innerHTML = `<td colspan="5">No se encontraron facturas para el filtro seleccionado 😢</td>`;
-          reporteTableBody.appendChild(row);
-        }
-      } catch (error) {
-        console.error("Error al cargar reporte:", error);
-      }
+    // Si no se encontraron facturas, mostrar un mensaje en la tabla
+    if (querySnap.empty) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td colspan="5">No se encontraron facturas para el filtro seleccionado 😢</td>`;
+      reporteTableBody.appendChild(row);
     }
+  } catch (error) {
+    console.error("Error al cargar reporte:", error);
+  }
+}
+
 
     // Inicializar la página cargando los clientes para el reporte
     window.onload = function() {

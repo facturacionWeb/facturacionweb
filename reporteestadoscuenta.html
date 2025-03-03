@@ -72,6 +72,13 @@
     <label for="reporteFecha">Selecciona Fecha:</label>
     <input type="date" id="reporteFecha" onchange="loadReporteEstadoCuentas()" />
 
+    <label for="reporteEstado">Estado de la Factura:</label>
+    <select id="reporteEstado" onchange="loadReporteEstadoCuentas()">
+      <option value="todas">Todas</option>
+      <option value="pagadas">Pagadas</option>
+      <option value="pendientes">Pendientes</option>
+    </select>
+
     <button onclick="loadReporteEstadoCuentas()">Cargar Reporte 🚀</button>
 
     <!-- Tabla de Reporte -->
@@ -128,6 +135,7 @@
     async function loadReporteEstadoCuentas() {
       const clienteId = document.getElementById('reporteClienteSelect').value;
       const fechaFiltro = document.getElementById('reporteFecha').value; // formato yyyy-mm-dd
+      const estadoFiltro = document.getElementById('reporteEstado').value;
       const reporteTableBody = document.querySelector("#reporteTable tbody");
       reporteTableBody.innerHTML = ''; // Limpiar la tabla
 
@@ -142,10 +150,18 @@
                     .where("anulada", "==", false)
                     .where("paymentType", "==", "Credito");
 
-      // Si se selecciona una fecha, filtramos por el campo "fechaStr"
+      // Filtrar por fecha, si se especifica (usamos "fechaStr")
       if (fechaFiltro) {
         query = query.where("fechaStr", "==", fechaFiltro);
       }
+
+      // Filtrar por estado: pagadas (saldo == 0) o pendientes (saldo > 0)
+      if (estadoFiltro === "pagadas") {
+        query = query.where("saldo", "==", 0);
+      } else if (estadoFiltro === "pendientes") {
+        query = query.where("saldo", ">", 0);
+      }
+
       query = query.orderBy("fecha", "asc");
 
       try {
@@ -156,7 +172,6 @@
         querySnap.forEach((doc) => {
           const data = doc.data();
           const montoOriginal = parseFloat(data.total) || 0;
-          // Usamos el campo 'saldo' si existe, de lo contrario asumimos que el saldo es el total
           const saldo = data.saldo !== undefined ? parseFloat(data.saldo) : montoOriginal;
           const montoPagado = montoOriginal - saldo;
           totalOriginal += montoOriginal;
@@ -205,3 +220,4 @@
   </script>
 </body>
 </html>
+

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporte de Estado de Cuentas 💼📊</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config (ajusta la URL de tu config si es necesario) -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    /* Estilos básicos para la página */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 20px;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    label, select, input, button {
+      display: block;
+      margin: 10px auto;
+      padding: 10px;
+      width: 90%;
+      box-sizing: border-box;
+    }
+    button {
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+      color: #fff;
+    }
+    tfoot {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Reporte de Estado de Cuentas 📊💰</h1>
+
+    <!-- Filtros -->
+    <label for="reporteClienteSelect">Selecciona Cliente:</label>
+    <select id="reporteClienteSelect" onchange="loadReporteEstadoCuentas()">
+      <!-- Se llena dinámicamente con clientes -->
+    </select>
+
+    <label for="reporteFecha">Selecciona Fecha:</label>
+    <input type="date" id="reporteFecha" onchange="loadReporteEstadoCuentas()" />
+
+    <button onclick="loadReporteEstadoCuentas()">Cargar Reporte 🚀</button>
+
+    <!-- Tabla de Reporte -->
+    <table id="reporteTable">
+      <thead>
+        <tr>
+          <th>N° Factura</th>
+          <th>Fecha y Hora</th>
+          <th>Monto Original (C$)</th>
+          <th>Monto Pagado (C$)</th>
+          <th>Saldo Pendiente (C$)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Se llenará dinámicamente -->
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2">Totales</td>
+          <td id="totalOriginal">0.00</td>
+          <td id="totalPagado">0.00</td>
+          <td id="totalSaldo">0.00</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <script>
+    // Inicializar Firestore
+    const db = firebase.firestore();
+
+    // Cargar clientes en el select para el reporte
+    function loadClientesParaReporte() {
+      const reporteClienteSelect = document.getElementById('reporteClienteSelect');
+      reporteClienteSelect.innerHTML = '';
+      db.collection("clientes").get().then((querySnapshot) => {
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = data.nombreCliente + " - " + data.nombreTienda;
+          reporteClienteSelect.appendChild(opt);
+        });
+        // Si solo hay un cliente, dispara automáticamente la carga del reporte
+        if (reporteClienteSelect.options.length === 1) {
+          loadReporteEstadoCuentas();
+        }
+      }).catch((err) => {
+        console.error("Error al cargar clientes para reporte:", err);
+      });
+    }
+
+    // Función para cargar el reporte de estado de cuentas
+    async function loadReporteEstadoCuentas() {
+      const clienteId = document.getElementById('reporteClienteSelect').value;
+      const fechaFiltro = document.getElementById('reporteFecha').value; // formato yyyy-mm-dd
+      const reporteTableBody = document.querySelector("#reporteTable tbody");
+      reporteTableBody.innerHTML = ''; // Limpiar la tabla
+
+      if (!clienteId) {
+        alert("Por favor, selecciona un cliente 😬");
+        return;
+      }
+
+      // Construir la consulta
+      let query = db.collection("facturas")
+                    .where("clientId", "==", clienteId)
+                    .where("anulada", "==", false)
+                    .where("paymentType", "==", "Credito");
+
+      // Si se selecciona una fecha, filtramos por el campo "fechaStr"
+      if (fechaFiltro) {
+        query = query.where("fechaStr", "==", fechaFiltro);
+      }
+      query = query.orderBy("fecha", "asc");
+
+      try {
+        const querySnap = await query.get();
+        let totalOriginal = 0;
+        let totalPagado = 0;
+        let totalSaldo = 0;
+        querySnap.forEach((doc) => {
+          const data = doc.data();
+          const montoOriginal = parseFloat(data.total) || 0;
+          // Usamos el campo 'saldo' si existe, de lo contrario asumimos que el saldo es el total
+          const saldo = data.saldo !== undefined ? parseFloat(data.saldo) : montoOriginal;
+          const montoPagado = montoOriginal - saldo;
+          totalOriginal += montoOriginal;
+          totalPagado += montoPagado;
+          totalSaldo += saldo;
+          
+          // Formatear la fecha y hora
+          let fechaHora = "";
+          if (data.fecha && data.fecha.toDate) {
+            fechaHora = data.fecha.toDate().toLocaleString();
+          } else if (data.fecha) {
+            fechaHora = new Date(data.fecha).toLocaleString();
+          }
+          
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${doc.id}</td>
+            <td>${fechaHora}</td>
+            <td>${montoOriginal.toFixed(2)}</td>
+            <td>${montoPagado.toFixed(2)}</td>
+            <td>${saldo.toFixed(2)}</td>
+          `;
+          reporteTableBody.appendChild(row);
+        });
+
+        // Actualizar totales en el pie de tabla
+        document.getElementById('totalOriginal').textContent = totalOriginal.toFixed(2);
+        document.getElementById('totalPagado').textContent = totalPagado.toFixed(2);
+        document.getElementById('totalSaldo').textContent = totalSaldo.toFixed(2);
+
+        // Si no se encontraron facturas, mostrar un mensaje en la tabla
+        if (querySnap.empty) {
+          const row = document.createElement('tr');
+          row.innerHTML = `<td colspan="5">No se encontraron facturas para el filtro seleccionado 😢</td>`;
+          reporteTableBody.appendChild(row);
+        }
+      } catch (error) {
+        console.error("Error al cargar reporte:", error);
+      }
+    }
+
+    // Inicializar la página cargando los clientes para el reporte
+    window.onload = function() {
+      loadClientesParaReporte();
+    }
+  </script>
+</body>
+</html>

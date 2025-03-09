@@ -899,6 +899,16 @@
           tbody.innerHTML = '';
           querySnapshot.forEach((doc) => {
             const invoice = doc.data();
+
+            let status = "";
+            if (invoice.anulada) {
+              status = "ANULADA";
+            } else if (invoice.paymentType === "Credito" && parseFloat(invoice.saldo) === 0) {
+              status = "PAGADA";
+            } else {
+              status = "ACTIVA";
+            }
+            
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${doc.id}</td>
@@ -906,7 +916,7 @@
               <td>${invoice.clientId}</td>
               <td>${invoice.route}</td>
               <td>${invoice.total.toFixed(2)}</td>
-              <td>${invoice.anulada ? "ANULADA" : "ACTIVA"}</td>
+              <td>${status}</td>
               <td>
                 <button onclick="viewInvoiceDetail('${doc.id}')">Ver</button>
                 ${invoice.anulada ? "" : `<button onclick="anularInvoice('${doc.id}')">ANULAR</button>`}

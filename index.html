@@ -99,6 +99,7 @@
         <hr/>
         <button onclick="goToItemsReport()">📊 Reporte de Artículos</button>
         <button onclick="goToItemsXRutaReport()">🚛 Reporte por Ruta</button>
+        <button onclick="goToEstadoCuentaReport()">👤🧾 Reporte por Cliente</button>
         <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
         
         <div class="footer">
@@ -173,6 +174,10 @@
 
         function goToCargaMasivaIMEI_X_Ruta(){
             window.location.href = "cargamasivaimei.html";
+        }
+
+        function goToEstadoCuentaReport(){
+            window.location.href = "reporteestadoscuenta.html";
         }
 
         // Function to log out

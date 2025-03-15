@@ -72,6 +72,14 @@
             color: #666;
         }
     </style>
+    <script>
+    // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
+    (function loadVersionScript() {
+        const versionScript = document.createElement('script');
+        versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+        //document.head.appendChild(versionScript);
+    })();
+    </script>
 </head>
 <body>
     <div id="loginContainer" class="container" style="display:none;">

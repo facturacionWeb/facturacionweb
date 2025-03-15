@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Carga Masiva de IMEIs a Rutas 🚀</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Configuración de Firebase -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
+  <style>
+    /* Estilos básicos para la página */
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    select, input[type="text"] {
+      padding: 5px;
+      margin-bottom: 20px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    button {
+      padding: 8px 12px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    /* Estilos para el modal de confirmación */
+    #confirmationModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    #confirmationModal .modal-content {
+      background: white;
+      padding: 20px;
+      max-width: 400px;
+      margin: 100px auto;
+      border-radius: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Carga Masiva de IMEIs a Rutas 🚀</h1>
+  
+  <!-- Selector de Ruta -->
+  <div>
+    <label for="routeSelector">Selecciona la Ruta:</label>
+    <select id="routeSelector">
+      <option value="">Seleccione una ruta</option>
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+      <option value="6">6</option>
+      <option value="7">7</option>
+      <option value="8">8</option>
+      <option value="9">9</option>
+      <option value="10">10</option>
+    </select>
+  </div>
+  
+  <!-- Input para escanear/ingresar IMEI -->
+  <div>
+    <input type="text" id="imeiInput" placeholder="Escanea el IMEI aquí... 🔍" autofocus>
+  </div>
+  
+  <!-- Tabla de previsualización de IMEIs -->
+  <h3>Previsualización de IMEIs a asociar 📋</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>IMEI</th>
+        <th>Acción</th>
+      </tr>
+    </thead>
+    <tbody id="imeiPreviewTable">
+      <!-- Aquí se irán agregando los IMEIs escaneados -->
+    </tbody>
+  </table>
+  
+  <!-- Botón para guardar todos los IMEIs -->
+  <button id="saveAllBtn">Guardar todos los IMEIs 💾</button>
+  
+  <!-- Modal para confirmar el movimiento de IMEI a una nueva ruta -->
+  <div id="confirmationModal">
+    <div class="modal-content">
+      <p id="modalMessage"></p>
+      <button id="modalConfirmBtn">Sí, mover 👍</button>
+      <button id="modalCancelBtn">Cancelar ❌</button>
+    </div>
+  </div>
+  
+  <script>
+    // ¡Hola Gustavo! Inicializamos Firestore 😎
+    const db = firebase.firestore();
+    let pendingIMEIs = []; // Lista de IMEIs pendientes para asociar
+    
+    // Función para actualizar la tabla de previsualización
+    function updatePreviewTable() {
+      const tableBody = document.getElementById("imeiPreviewTable");
+      tableBody.innerHTML = "";
+      pendingIMEIs.forEach((imei, index) => {
+        const row = document.createElement("tr");
+        const cellImei = document.createElement("td");
+        cellImei.textContent = imei;
+        row.appendChild(cellImei);
+  
+        const cellAction = document.createElement("td");
+        const btnRemove = document.createElement("button");
+        btnRemove.textContent = "Eliminar ❌";
+        btnRemove.onclick = () => {
+          pendingIMEIs.splice(index, 1);
+          updatePreviewTable();
+        };
+        cellAction.appendChild(btnRemove);
+        row.appendChild(cellAction);
+  
+        tableBody.appendChild(row);
+      });
+    }
+  
+    // Capturamos el evento "Enter" en el input de IMEI para agregarlo a la lista
+    document.getElementById("imeiInput").addEventListener("keyup", function(event) {
+      if (event.key === "Enter") {
+        const imei = this.value.trim();
+        if (imei !== "") {
+          if (pendingIMEIs.includes(imei)) {
+            alert("Este IMEI ya está en la lista, Gustavo 😅");
+          } else {
+            pendingIMEIs.push(imei);
+            updatePreviewTable();
+          }
+          this.value = "";
+        }
+      }
+    });
+  
+    // Función para mostrar el modal de confirmación
+    function showConfirmationModal(confirmationData, callback) {
+      const modal = document.getElementById("confirmationModal");
+      const message = document.getElementById("modalMessage");
+      message.textContent = "El IMEI " + confirmationData.imei + " ya está asociado a la ruta " + confirmationData.oldRoute + ". ¿Desea moverlo a la ruta " + confirmationData.newRoute + "?";
+      modal.style.display = "block";
+      
+      // Configuramos los botones del modal
+      const confirmBtn = document.getElementById("modalConfirmBtn");
+      const cancelBtn = document.getElementById("modalCancelBtn");
+  
+      // Eliminamos cualquier listener previo para evitar duplicados
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+  
+      confirmBtn.onclick = function() {
+        modal.style.display = "none";
+        callback(true);
+      };
+      cancelBtn.onclick = function() {
+        modal.style.display = "none";
+        callback(false);
+      };
+    }
+  
+    // Función para guardar todos los IMEIs pendientes
+    function saveAllIMEIs() {
+      const selectedRoute = document.getElementById("routeSelector").value;
+      if (!selectedRoute) {
+        alert("Debes seleccionar una ruta primero, Gustavo 😅");
+        return;
+      }
+      if (pendingIMEIs.length === 0) {
+        alert("No hay IMEIs pendientes para guardar 😬");
+        return;
+      }
+      // Procesamos cada IMEI de forma secuencial para manejar las confirmaciones
+      processIMEI(0, selectedRoute);
+    }
+  
+    // Función recursiva para procesar cada IMEI uno a uno
+    function processIMEI(index, selectedRoute) {
+      if (index >= pendingIMEIs.length) {
+        alert("¡Todos los IMEIs han sido procesados con éxito! 🚀");
+        pendingIMEIs = [];
+        updatePreviewTable();
+        return;
+      }
+      const imei = pendingIMEIs[index];
+      // Verificamos que el IMEI exista en la colección Articulos_X_IMEI
+      db.collection("Articulos_X_IMEI").where("imei", "==", imei).get().then((snapshot) => {
+        if (snapshot.empty) {
+          console.log("El IMEI " + imei + " no existe en Articulos_X_IMEI, se omite 😬");
+          processIMEI(index + 1, selectedRoute);
+        } else {
+          // Ahora revisamos si ya existe una asociación en Articulos_X_IMEI_X_Ruta
+          db.collection("Articulos_X_IMEI_X_Ruta").where("IMEI", "==", imei).get().then((rutaSnapshot) => {
+            if (!rutaSnapshot.empty) {
+              // El IMEI ya tiene una asociación, obtenemos la ruta actual
+              let doc = rutaSnapshot.docs[0];
+              let data = doc.data();
+              const currentRoute = data.Ruta;
+              if (currentRoute === selectedRoute) {
+                // Ya está en la misma ruta, así que no hacemos nada y pasamos al siguiente
+                processIMEI(index + 1, selectedRoute);
+              } else {
+                // Mostrar modal para confirmar el cambio de ruta
+                showConfirmationModal({imei: imei, oldRoute: currentRoute, newRoute: selectedRoute}, function(confirm) {
+                  if (confirm) {
+                    // Actualizamos la asociación a la nueva ruta
+                    db.collection("Articulos_X_IMEI_X_Ruta").doc(doc.id).set({
+                      ID: doc.id,
+                      IMEI: imei,
+                      Ruta: selectedRoute
+                    }).then(() => {
+                      console.log("IMEI " + imei + " actualizado a ruta " + selectedRoute);
+                      processIMEI(index + 1, selectedRoute);
+                    });
+                  } else {
+                    // Si se cancela, simplemente pasamos al siguiente IMEI
+                    processIMEI(index + 1, selectedRoute);
+                  }
+                });
+              }
+            } else {
+              // Si no existe asociación previa, creamos una nueva
+              db.collection("Articulos_X_IMEI_X_Ruta").add({
+                IMEI: imei,
+                Ruta: selectedRoute
+              }).then(() => {
+                console.log("IMEI " + imei + " asociado a ruta " + selectedRoute);
+                processIMEI(index + 1, selectedRoute);
+              });
+            }
+          });
+        }
+      }).catch((error) => {
+        console.error("Error al procesar el IMEI " + imei + ": ", error);
+        processIMEI(index + 1, selectedRoute);
+      });
+    }
+  
+    // Asignamos la función al botón de "Guardar todos los IMEIs"
+    document.getElementById("saveAllBtn").addEventListener("click", saveAllIMEIs);
+  </script>
+</body>
+</html>

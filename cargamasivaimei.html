@@ -212,7 +212,6 @@
       const imei = pendingIMEIs[index];
       // Verificamos que el IMEI exista en la colección Articulos_X_IMEI
       db.collection("Articulos_X_IMEI").where("imei", "==", imei).get().then((snapshot) => {
-        debugger;
         if (snapshot.empty) {
           alert("El IMEI " + imei + " no ha sido registrado en la tabla de artículos 😬");
           // Pasamos al siguiente IMEI

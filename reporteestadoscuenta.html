@@ -1,18 +1,21 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reporte de Estados de Cuenta 😎📊</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Firebase Config (ajusta la URL si tu config está en otro lado) -->
+  <!-- Firebase Config -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <!-- Select2 CSS y JS para un selector más chido -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link
+    href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
+    rel="stylesheet"
+  />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <style>
     /* Estilos básicos */
@@ -47,6 +50,7 @@
       border: 1px solid #ccc;
       padding: 10px;
       text-align: center;
+      vertical-align: top;
     }
     th {
       background-color: #333;
@@ -72,19 +76,19 @@
 <body>
   <div class="container">
     <h1>Reporte de Estados de Cuenta 😎📊</h1>
-    
+
     <!-- Selector de Cliente -->
     <label for="clientSelect">Selecciona Cliente:</label>
     <select id="clientSelect"></select>
     <button id="generateReportBtn">Generar Reporte 💥</button>
-    
+
     <!-- Sección del Reporte -->
     <div id="reportSection" style="margin-top:20px; display:none;">
       <div id="reportHeader" style="text-align:center;">
         <h2>Estado de Cuenta del Cliente</h2>
         <p id="reportDate"></p>
       </div>
-      
+
       <!-- Información del Cliente -->
       <div id="clientInfo" style="margin-bottom:20px;">
         <h3>Información del Cliente</h3>
@@ -92,10 +96,9 @@
         <p><strong>Nombre de la Tienda:</strong> <span id="storeName"></span></p>
         <p><strong>Dirección:</strong> <span id="clientAddress"></span></p>
         <p><strong>Teléfono:</strong> <span id="clientPhone"></span></p>
-        <!-- Aquí se muestra la deuda total -->
         <p><strong>Deuda Total:</strong> C$<span id="totalDebt">0.00</span></p>
       </div>
-      
+
       <!-- Detalle del Estado de Cuenta -->
       <div id="reportTableContainer">
         <h3>Detalle del Estado de Cuenta</h3>
@@ -112,16 +115,16 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Aquí se llenará dinámicamente -->
+            <!-- Aquí se llena dinámicamente cada Factura -->
           </tbody>
         </table>
       </div>
-      
+
       <!-- Botón para Imprimir el Reporte -->
       <button onclick="printReport()">Imprimir Reporte 🖨️</button>
     </div>
   </div>
-  
+
   <script>
     // Inicializar Firestore
     var db = firebase.firestore();
@@ -156,65 +159,135 @@
     });
 
     // Función para generar el reporte de estados de cuenta
-    function generateReport(clientId) {
-      // Primero, obtenemos la información del cliente
-      db.collection("clientes").doc(clientId).get().then((doc) => {
-        if(doc.exists) {
-          var clientData = doc.data();
+    async function generateReport(clientId) {
+      try {
+        // 1) Obtener info del cliente
+        const clientDoc = await db.collection("clientes").doc(clientId).get();
+        if (clientDoc.exists) {
+          const clientData = clientDoc.data();
           document.getElementById("clientName").textContent = clientData.nombreCliente || "N/A";
           document.getElementById("storeName").textContent = clientData.nombreTienda || "N/A";
           document.getElementById("clientAddress").textContent = clientData.direccion || "N/A";
           document.getElementById("clientPhone").textContent = clientData.telefono || "N/A";
         }
-      }).catch((error) => {
-        console.error("Error al obtener datos del cliente: ", error);
-      });
 
-      // Variable para acumular la deuda total
-      var totalDebt = 0;
+        // 2) Buscar facturas de crédito no anuladas
+        const invoicesSnap = await db.collection("facturas")
+          .where("clientId", "==", clientId)
+          .where("paymentType", "==", "Credito")
+          .where("anulada", "==", false)
+          .get();
 
-      // Luego, obtenemos las facturas de crédito que no estén anuladas y que tengan saldo > 0
-      db.collection("facturas")
-        .where("clientId", "==", clientId)
-        .where("paymentType", "==", "Credito")
-        .where("anulada", "==", false)
-        .get()
-        .then((querySnapshot) => {
-          var tbody = document.querySelector("#reportTable tbody");
-          tbody.innerHTML = "";
-          querySnapshot.forEach((doc) => {
-            var invoice = doc.data();
-            // Sólo mostramos las facturas con saldo distinto de 0 (no pagadas)
-            if (parseFloat(invoice.saldo) !== 0) {
-              // Calculamos el monto pagado: total - saldo (lo que equivale a sumar los abonos)
-              var montoPagado = parseFloat(invoice.total) - parseFloat(invoice.saldo);
-              // Acumulamos el saldo de esta factura para la deuda total
-              totalDebt += parseFloat(invoice.saldo);
-              // Para "Vendedor" usamos un valor por defecto ya que no tenemos ese dato en el documento
-              var vendedor = invoice.vendedor ? invoice.vendedor : "N/A";
-              // Creamos la fila con los datos
-              var row = document.createElement("tr");
-              row.innerHTML = "<td>" + doc.id + "</td>" +
-                              "<td>" + invoice.currency + "</td>" +
-                              "<td>" + vendedor + "</td>" +
-                              "<td>" + (invoice.fechaStr || "N/A") + "</td>" +
-                              "<td>" + parseFloat(invoice.total).toFixed(2) + "</td>" +
-                              "<td>" + montoPagado.toFixed(2) + "</td>" +
-                              "<td>" + parseFloat(invoice.saldo).toFixed(2) + "</td>";
-              tbody.appendChild(row);
-            }
-          });
-          // Actualizamos el campo de Deuda Total en el encabezado
-          document.getElementById("totalDebt").textContent = totalDebt.toFixed(2);
-          // Mostramos la fecha y hora actual en el encabezado del reporte
-          var now = new Date();
-          document.getElementById("reportDate").textContent = "Generado el: " + now.toLocaleString();
-          // Mostramos el reporte
-          document.getElementById("reportSection").style.display = "block";
-        })
-        .catch((error) => {
-          console.error("Error al generar reporte: ", error);
-        });
+        // 3) Limpiar tabla y resetear deuda total
+        const tbody = document.querySelector("#reportTable tbody");
+        tbody.innerHTML = "";
+        let totalDebt = 0;
+
+        // 4) Recorrer facturas
+        for (let doc of invoicesSnap.docs) {
+          const invoiceData = doc.data();
+          const invoiceId = doc.id;
+
+          // Si la factura tiene saldo 0, la consideramos pagada, no la mostramos
+          if (parseFloat(invoiceData.saldo) === 0) {
+            continue;
+          }
+
+          // Calcular "montoPagado" como la suma de los abonos (en vez de total - saldo)
+          // si quieres ver el total EXACTO de cada abono, hay que consultar la subcolección
+          let abonosArray = [];
+          let montoPagado = 0;
+
+          // Caso 1: la info de abonos está dentro de invoiceData.subcolecciones.abonos
+          if (invoiceData.subcolecciones && invoiceData.subcolecciones.abonos) {
+            abonosArray = invoiceData.subcolecciones.abonos;
+            montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount), 0);
+          }
+          // Caso 2: si NO está embebida y se almacena en subcolecciones reales de Firestore:
+          //   let abonosSnap = await doc.ref.collection("abonos").get();
+          //   abonosArray = abonosSnap.docs.map(d => d.data());
+          //   montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount), 0);
+
+          // Sumamos el saldo de esta factura a la deuda total
+          totalDebt += parseFloat(invoiceData.saldo);
+
+          // Vendedor (por si lo tienes en la factura)
+          const vendedor = invoiceData.vendedor ? invoiceData.vendedor : "N/A";
+
+          // Crear fila principal de la Factura
+          const invoiceRow = document.createElement("tr");
+          invoiceRow.innerHTML = `
+            <td>${invoiceId}</td>
+            <td>${invoiceData.currency}</td>
+            <td>${vendedor}</td>
+            <td>${invoiceData.fechaStr || "N/A"}</td>
+            <td>${parseFloat(invoiceData.total).toFixed(2)}</td>
+            <td>${montoPagado.toFixed(2)}</td>
+            <td>${parseFloat(invoiceData.saldo).toFixed(2)}</td>
+          `;
+          tbody.appendChild(invoiceRow);
+
+          // Ahora mostramos la info de abonos en una sub-fila (tabla interna)
+          if (abonosArray.length > 0) {
+            const abonosRow = document.createElement("tr");
+            // Colspan = 7 para que abarque todas las columnas
+            abonosRow.innerHTML = `
+              <td colspan="7" style="text-align: left;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <thead>
+                    <tr style="background-color: #555; color: #fff;">
+                      <th>ID Abono</th>
+                      <th>Fecha</th>
+                      <th>Monto</th>
+                      <th>Balance Pendiente</th>
+                      <th>Referencia</th>
+                    </tr>
+                  </thead>
+                  <tbody id="abonosTbody-${invoiceId}">
+                  </tbody>
+                </table>
+              </td>
+            `;
+            tbody.appendChild(abonosRow);
+
+            // Llenar la subtabla de abonos
+            const abonosTbody = document.getElementById(`abonosTbody-${invoiceId}`);
+
+            abonosArray.forEach(ab => {
+              const abonoRow = document.createElement("tr");
+
+              // Fecha abono (conviértela a Date si viene con seconds/nanoseconds)
+              let fechaAbonoStr = "";
+              if (ab.dateTime && ab.dateTime.seconds) {
+                const abonoDate = new Date(ab.dateTime.seconds * 1000);
+                fechaAbonoStr = abonoDate.toLocaleString();
+              }
+
+              abonoRow.innerHTML = `
+                <td>${ab.id || ""}</td>
+                <td>${fechaAbonoStr}</td>
+                <td>${parseFloat(ab.amount).toFixed(2)}</td>
+                <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
+                <td>${ab.reference || ""}</td>
+              `;
+              abonosTbody.appendChild(abonoRow);
+            });
+          }
+        }
+
+        // 5) Actualizar deuda total en el encabezado
+        document.getElementById("totalDebt").textContent = totalDebt.toFixed(2);
+
+        // 6) Mostrar fecha/hora de generación y mostrar la sección del reporte
+        var now = new Date();
+        document.getElementById("reportDate").textContent =
+          "Generado el: " + now.toLocaleString();
+        document.getElementById("reportSection").style.display = "block";
+
+      } catch (error) {
+        console.error("Error al generar reporte:", error);
+        alert("Ocurrió un error generando el reporte. Revisa la consola.");
+      }
     }
 
     // Función para imprimir solo la sección del reporte
@@ -222,11 +295,13 @@
       window.print();
     }
 
-    // Inicializamos la carga de clientes cuando carga la página
+    // Inicializamos la carga de clientes al cargar la página
     window.onload = function() {
       loadClients();
-    }
+    };
   </script>
 </body>
 </html>
+
+
 

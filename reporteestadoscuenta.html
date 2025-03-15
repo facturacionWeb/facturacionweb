@@ -75,7 +75,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Reporte de Estados de Cuenta 😎📊</h1>
+    <h1>😎 Reporte de Estados de Cuenta 😎📊</h1>
 
     <!-- Selector de Cliente -->
     <label for="clientSelect">Selecciona Cliente:</label>
@@ -152,7 +152,7 @@
     document.getElementById("generateReportBtn").addEventListener("click", function(){
       var clientId = document.getElementById("clientSelect").value;
       if (!clientId) {
-        alert("¡Selecciona un cliente, Gustavo! 😅");
+        alert("¡Selecciona un cliente! 😅");
         return;
       }
       generateReport(clientId);
@@ -184,33 +184,34 @@
         let totalDebt = 0;
 
         // 4) Recorrer facturas
-        for (let doc of invoicesSnap.docs) {
-          const invoiceData = doc.data();
-          const invoiceId = doc.id;
+        for (let docFact of invoicesSnap.docs) {
+          const invoiceData = docFact.data();
+          const invoiceId = docFact.id;
 
           // Omitir facturas pagadas (saldo 0)
           if (parseFloat(invoiceData.saldo) === 0) {
             continue;
           }
 
-          // 4a) Obtener y ordenar los abonos (sin alterar los datos en Firebase)
-          let abonosArray = [];
-          let montoPagado = 0;
-          if (invoiceData.subcolecciones && invoiceData.subcolecciones.abonos) {
-            abonosArray = invoiceData.subcolecciones.abonos;
-            // Ordenamos los abonos por fecha (ascendente)
-            abonosArray.sort((a, b) => {
-              const dateA = (a.dateTime && a.dateTime.seconds) ? a.dateTime.seconds : 0;
-              const dateB = (b.dateTime && b.dateTime.seconds) ? b.dateTime.seconds : 0;
-              return dateA - dateB;
-            });
-            montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount), 0);
-          }
+          // 4a) Consultar la subcolección "abonos" (real) para esta factura
+          //     *independientemente* de si hay algo en doc.data().subcolecciones
+          const abonosSnap = await docFact.ref.collection("abonos").get();
+          let abonosArray = abonosSnap.docs.map((d) => d.data());
+
+          // 4b) Ordenar abonos por fecha (ascendente) para mostrarlos en orden cronológico
+          abonosArray.sort((a, b) => {
+            const dateA = (a.dateTime && a.dateTime.seconds) ? a.dateTime.seconds : 0;
+            const dateB = (b.dateTime && b.dateTime.seconds) ? b.dateTime.seconds : 0;
+            return dateA - dateB;
+          });
+
+          // 4c) Calcular "montoPagado" como la suma de los abonos
+          let montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount || 0), 0);
 
           // Acumular el saldo para la deuda total
           totalDebt += parseFloat(invoiceData.saldo);
 
-          // Vendedor (si se tiene ese dato)
+          // Vendedor (si se tuviera)
           const vendedor = invoiceData.vendedor ? invoiceData.vendedor : "N/A";
 
           // Crear fila principal de la Factura

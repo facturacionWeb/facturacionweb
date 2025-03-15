@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reporte de Estados de Cuenta 😎📊</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config (ajusta la URL si tu config está en otro lado) -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- Select2 CSS y JS para un selector más chido -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <style>
+    /* Estilos básicos */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 20px;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    label, select, button {
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+      color: #fff;
+    }
+    /* Estilos para impresión: solo se imprime el reporte */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #reportSection, #reportSection * {
+        visibility: visible;
+      }
+      #reportSection {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Reporte de Estados de Cuenta 😎📊</h1>
+    
+    <!-- Selector de Cliente -->
+    <label for="clientSelect">Selecciona Cliente:</label>
+    <select id="clientSelect"></select>
+    <button id="generateReportBtn">Generar Reporte 💥</button>
+    
+    <!-- Sección del Reporte -->
+    <div id="reportSection" style="margin-top:20px; display:none;">
+      <div id="reportHeader" style="text-align:center;">
+        <h2>Estado de Cuenta del Cliente</h2>
+        <p id="reportDate"></p>
+      </div>
+      
+      <!-- Información del Cliente -->
+      <div id="clientInfo" style="margin-bottom:20px;">
+        <h3>Información del Cliente</h3>
+        <p><strong>Nombre de Cliente:</strong> <span id="clientName"></span></p>
+        <p><strong>Nombre de la Tienda:</strong> <span id="storeName"></span></p>
+        <p><strong>Dirección:</strong> <span id="clientAddress"></span></p>
+        <p><strong>Teléfono:</strong> <span id="clientPhone"></span></p>
+      </div>
+      
+      <!-- Detalle del Estado de Cuenta -->
+      <div id="reportTableContainer">
+        <h3>Detalle del Estado de Cuenta</h3>
+        <table id="reportTable">
+          <thead>
+            <tr>
+              <th>No Factura</th>
+              <th>Moneda</th>
+              <th>Vendedor</th>
+              <th>Fecha Emisión</th>
+              <th>Monto Original</th>
+              <th>Monto Pagado</th>
+              <th>Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Aquí se llenará dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Botón para Imprimir el Reporte -->
+      <button onclick="printReport()">Imprimir Reporte 🖨️</button>
+    </div>
+  </div>
+  
+  <script>
+    // Inicializar Firestore
+    var db = firebase.firestore();
+
+    // Cargar los clientes en el selector
+    function loadClients() {
+      db.collection("clientes").get().then((querySnapshot) => {
+        var clientSelect = document.getElementById("clientSelect");
+        clientSelect.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+          var data = doc.data();
+          var option = document.createElement("option");
+          option.value = doc.id;
+          option.textContent = data.nombreCliente + " - " + data.nombreTienda;
+          clientSelect.appendChild(option);
+        });
+        // Inicializamos Select2 para un look más cool 😎
+        $("#clientSelect").select2();
+      }).catch((error) => {
+        console.error("Error al cargar clientes: ", error);
+      });
+    }
+
+    // Escuchar el botón para generar reporte
+    document.getElementById("generateReportBtn").addEventListener("click", function(){
+      var clientId = document.getElementById("clientSelect").value;
+      if (!clientId) {
+        alert("¡Selecciona un cliente, Gustavo! 😅");
+        return;
+      }
+      generateReport(clientId);
+    });
+
+    // Función para generar el reporte de estados de cuenta
+    function generateReport(clientId) {
+      // Primero, obtenemos la información del cliente
+      db.collection("clientes").doc(clientId).get().then((doc) => {
+        if(doc.exists) {
+          var clientData = doc.data();
+          document.getElementById("clientName").textContent = clientData.nombreCliente || "N/A";
+          document.getElementById("storeName").textContent = clientData.nombreTienda || "N/A";
+          document.getElementById("clientAddress").textContent = clientData.direccion || "N/A";
+          document.getElementById("clientPhone").textContent = clientData.telefono || "N/A";
+        }
+      }).catch((error) => {
+        console.error("Error al obtener datos del cliente: ", error);
+      });
+
+      // Luego, obtenemos las facturas de crédito que no estén anuladas y que tengan saldo > 0
+      db.collection("facturas")
+        .where("clientId", "==", clientId)
+        .where("paymentType", "==", "Credito")
+        .where("anulada", "==", false)
+        .get()
+        .then((querySnapshot) => {
+          var tbody = document.querySelector("#reportTable tbody");
+          tbody.innerHTML = "";
+          querySnapshot.forEach((doc) => {
+            var invoice = doc.data();
+            // Sólo mostramos las facturas con saldo distinto de 0 (no pagadas)
+            if (parseFloat(invoice.saldo) !== 0) {
+              // Calculamos el monto pagado: total - saldo (esto equivale a sumar los abonos)
+              var montoPagado = parseFloat(invoice.total) - parseFloat(invoice.saldo);
+              // Para "Vendedor" usamos un valor por defecto ya que no tenemos ese dato en el documento
+              var vendedor = invoice.vendedor ? invoice.vendedor : "N/A";
+              // Creamos la fila con los datos
+              var row = document.createElement("tr");
+              row.innerHTML = "<td>" + doc.id + "</td>" +
+                              "<td>" + invoice.currency + "</td>" +
+                              "<td>" + vendedor + "</td>" +
+                              "<td>" + (invoice.fechaStr || "N/A") + "</td>" +
+                              "<td>" + parseFloat(invoice.total).toFixed(2) + "</td>" +
+                              "<td>" + montoPagado.toFixed(2) + "</td>" +
+                              "<td>" + parseFloat(invoice.saldo).toFixed(2) + "</td>";
+              tbody.appendChild(row);
+            }
+          });
+          // Mostrar la fecha y hora actual en el encabezado del reporte
+          var now = new Date();
+          document.getElementById("reportDate").textContent = "Generado el: " + now.toLocaleString();
+          // Mostramos el reporte
+          document.getElementById("reportSection").style.display = "block";
+        })
+        .catch((error) => {
+          console.error("Error al generar reporte: ", error);
+        });
+    }
+
+    // Función para imprimir solo la sección del reporte
+    function printReport() {
+      window.print();
+    }
+
+    // Inicializamos la carga de clientes cuando carga la página
+    window.onload = function() {
+      loadClients();
+    }
+  </script>
+</body>
+</html>

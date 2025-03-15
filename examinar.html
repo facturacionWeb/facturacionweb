@@ -16,7 +16,7 @@
 </head>
 <body>
 
-    <h1>🔥 Obtener Estructura de la Colección "facturas" en Firebase</h1>
+    <h1>🔥 Obtener Estructura de la Colección "facturas" en Firebase 🔥</h1>
     <button onclick="getFacturasStructure()">📂 Obtener Estructura</button>
     <button onclick="downloadJSON()">📥 Descargar JSON</button>
 
@@ -44,20 +44,20 @@
                         subcolecciones: {}
                     };
 
-                    // 🔍 Buscar subcolecciones dentro de cada factura
-                    const subcollections = await facturaDoc.ref.listCollections();
-                    for (const subcollection of subcollections) {
-                        const subcollectionSnapshot = await subcollection.get();
-                        let subcollectionData = [];
+                    // 🔍 Buscar manualmente la subcolección "abonos"
+                    const abonosSnapshot = await db.collection("facturas").doc(facturaDoc.id).collection("abonos").get();
+                    let abonosData = [];
 
-                        for (const subDoc of subcollectionSnapshot.docs) {
-                            subcollectionData.push({
-                                id: subDoc.id,
-                                ...subDoc.data()
-                            });
-                        }
+                    for (const abonoDoc of abonosSnapshot.docs) {
+                        abonosData.push({
+                            id: abonoDoc.id,
+                            ...abonoDoc.data()
+                        });
+                    }
 
-                        facturaData.subcolecciones[subcollection.id] = subcollectionData;
+                    // Si hay abonos, agregarlos a la estructura
+                    if (abonosData.length > 0) {
+                        facturaData.subcolecciones["abonos"] = abonosData;
                     }
 
                     facturasData.push(facturaData);

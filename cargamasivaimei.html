@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Carga Masiva de IMEIs a Rutas 🚀</title>
+  <title>Carga Masiva de IMEIs a Rutas 🚀📱</title>
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -117,7 +117,7 @@
   </div>
   
   <script>
-    // ¡Hola Gustavo! Inicializamos Firestore 😎
+    // ¡Hola, Gustavo! Inicializamos Firestore 😎
     const db = firebase.firestore();
     let pendingIMEIs = []; // Lista de IMEIs pendientes para asociar
     
@@ -213,10 +213,11 @@
       // Verificamos que el IMEI exista en la colección Articulos_X_IMEI
       db.collection("Articulos_X_IMEI").where("imei", "==", imei).get().then((snapshot) => {
         if (snapshot.empty) {
-          console.log("El IMEI " + imei + " no existe en Articulos_X_IMEI, se omite 😬");
+          alert("El IMEI " + imei + " no ha sido registrado en la tabla de artículos 😬");
+          // Pasamos al siguiente IMEI
           processIMEI(index + 1, selectedRoute);
         } else {
-          // Ahora revisamos si ya existe una asociación en Articulos_X_IMEI_X_Ruta
+          // Revisamos si ya existe una asociación en Articulos_X_IMEI_X_Ruta
           db.collection("Articulos_X_IMEI_X_Ruta").where("IMEI", "==", imei).get().then((rutaSnapshot) => {
             if (!rutaSnapshot.empty) {
               // El IMEI ya tiene una asociación, obtenemos la ruta actual
@@ -224,7 +225,7 @@
               let data = doc.data();
               const currentRoute = data.Ruta;
               if (currentRoute === selectedRoute) {
-                // Ya está en la misma ruta, así que no hacemos nada y pasamos al siguiente
+                // Ya está en la misma ruta, pasamos al siguiente
                 processIMEI(index + 1, selectedRoute);
               } else {
                 // Mostrar modal para confirmar el cambio de ruta
@@ -240,7 +241,7 @@
                       processIMEI(index + 1, selectedRoute);
                     });
                   } else {
-                    // Si se cancela, simplemente pasamos al siguiente IMEI
+                    // Si se cancela, pasamos al siguiente IMEI
                     processIMEI(index + 1, selectedRoute);
                   }
                 });

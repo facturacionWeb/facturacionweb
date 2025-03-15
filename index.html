@@ -47,7 +47,7 @@
             margin: 8px 0;
             border: none;
             border-radius: 5px;
-            background-color: #007bff;
+            background-color: #5a9bd5;
             color: white;
             font-size: 16px;
             cursor: pointer;
@@ -58,7 +58,7 @@
             gap: 8px;
         }
         button:hover {
-            background-color: #0056b3;
+            background-color: #4a89c7;
         }
         .logout-btn {
             background-color: #dc3545;
@@ -66,14 +66,12 @@
         .logout-btn:hover {
             background-color: #a71d2a;
         }
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
     </style>
-    <script>
-        (function loadVersionScript() {
-            const versionScript = document.createElement('script');
-            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-            document.head.appendChild(versionScript);
-        })();
-    </script>
 </head>
 <body>
     <div id="loginContainer" class="container" style="display:none;">
@@ -94,6 +92,17 @@
         <button onclick="goToItemsReport()">📊 Reporte de Artículos</button>
         <button onclick="goToItemsXRutaReport()">🚛 Reporte por Ruta</button>
         <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
+        
+        <div class="footer">
+            <script>
+                (function loadVersionScript() {
+                    const versionScript = document.createElement('script');
+                    versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+                    document.body.appendChild(versionScript);
+                })();
+            </script>
+            <p>&copy; 2025 Galaxia Cell. Todos los derechos reservados.</p>
+        </div>
     </div>
 
     <script>
@@ -102,42 +111,6 @@
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
             document.getElementById(isAuthenticated ? 'adminPanel' : 'loginContainer').style.display = 'block';
         };
-
-        function verifyPassword() {
-            const password = document.getElementById('adminPassword').value.trim();
-            db.collection("users").doc("Administrador").get().then((doc) => {
-                if (doc.exists && doc.data().password === password) {
-                    sessionStorage.setItem('isAuthenticated', true);
-                    document.getElementById('loginContainer').style.display = 'none';
-                    document.getElementById('adminPanel').style.display = 'block';
-                } else {
-                    alert("Contraseña incorrecta");
-                }
-            }).catch(console.error);
-        }
-
-        function goToUserManagement() { window.location.href = "usuarios.html"; }
-        function goToClientesManagement() { window.location.href = "clientes.html"; }
-        function goToProveedoresManagement() { window.location.href = "proveedores.html"; }
-        function goToFacturasManagement() { window.location.href = "facturas.html"; }
-        function goToItemsManagement() { window.location.href = "articulos.html"; }
-        function goToItemsReport() { window.location.href = "reportearticulos.html"; }
-        function goToItemsXRutaReport() { window.location.href = "reportearticulosxruta.html"; }
-        function goToCargaMasivaIMEI_X_Ruta() { window.location.href = "cargamasivaimei.html"; }
-
-        function logout() {
-            sessionStorage.removeItem('isAuthenticated');
-            document.getElementById('adminPanel').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'block';
-        }
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-

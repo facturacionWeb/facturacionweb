@@ -107,11 +107,80 @@
     </div>
 
     <script>
+
         const db = firebase.firestore();
+
+        // Check if the user is already authenticated
         window.onload = function() {
             const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            document.getElementById(isAuthenticated ? 'adminPanel' : 'loginContainer').style.display = 'block';
+            if (isAuthenticated) {
+                document.getElementById('loginContainer').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+            } else {
+                document.getElementById('loginContainer').style.display = 'block';
+            }
         };
-    </script>
+
+        // Function to verify admin password
+        function verifyPassword() {
+            const password = document.getElementById('adminPassword').value.trim();
+            db.collection("users").doc("Administrador").get().then((doc) => {
+                if (doc.exists) {
+                    const adminData = doc.data();
+                    if (adminData.password === password) {
+                        sessionStorage.setItem('isAuthenticated', true);
+                        document.getElementById('loginContainer').style.display = 'none';
+                        document.getElementById('adminPanel').style.display = 'block';
+                    } else {
+                        alert("Contraseña incorrecta");
+                    }
+                } else {
+                    alert("No se encontró el usuario Administrador");
+                }
+            }).catch((error) => {
+                console.error("Error al verificar la contraseña: ", error);
+            });
+        }
+
+        // Function to navigate to user management page
+        function goToUserManagement() {
+            window.location.href = "usuarios.html";
+        }
+
+        function goToClientesManagement() {
+            window.location.href = "clientes.html";
+        }
+
+        function goToProveedoresManagement() {
+            window.location.href = "proveedores.html";
+        }
+
+        function goToFacturasManagement(){
+            window.location.href = "facturas.html";
+        }
+
+        function goToItemsManagement(){
+            window.location.href = "articulos.html";
+        }
+
+        function goToItemsReport(){
+            window.location.href = "reportearticulos.html";
+        }
+
+        function goToItemsXRutaReport(){
+            window.location.href = "reportearticulosxruta.html";
+        }
+
+        function goToCargaMasivaIMEI_X_Ruta(){
+            window.location.href = "cargamasivaimei.html";
+        }
+
+        // Function to log out
+        function logout() {
+            sessionStorage.removeItem('isAuthenticated');
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('loginContainer').style.display = 'block';
+        }
+    </script>  
 </body>
 </html>

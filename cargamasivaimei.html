@@ -65,7 +65,7 @@
   </style>
 </head>
 <body>
-  <h1>Carga Masiva de IMEIs a Rutas 🚀</h1>
+  <h1>Carga Masiva de IMEIs a Rutas 🚀🚀</h1>
   
   <!-- Selector de Ruta -->
   <div>
@@ -217,10 +217,14 @@
           // Pasamos al siguiente IMEI
           processIMEI(index + 1, selectedRoute);
         } else {
-          // Revisamos si ya existe una asociación en Articulos_X_IMEI_X_Ruta
+          // Obtenemos el ID del doc en Articulos_X_IMEI
+          const imeiDoc = snapshot.docs[0];
+          const imeiDocId = imeiDoc.id; 
+          
+          // Revisamos si ya existe una asociación en Articulos_X_IMEI_X_Ruta (puede tener un doc con ID igual a imeiDocId o distinto)
           db.collection("Articulos_X_IMEI_X_Ruta").where("IMEI", "==", imei).get().then((rutaSnapshot) => {
             if (!rutaSnapshot.empty) {
-              // El IMEI ya tiene una asociación, obtenemos la ruta actual
+              // El IMEI ya tiene una asociación, obtenemos la ruta actual (la primera que encontremos)
               let doc = rutaSnapshot.docs[0];
               let data = doc.data();
               const currentRoute = data.Ruta;
@@ -231,13 +235,17 @@
                 // Mostrar modal para confirmar el cambio de ruta
                 showConfirmationModal({imei: imei, oldRoute: currentRoute, newRoute: selectedRoute}, function(confirm) {
                   if (confirm) {
-                    // Actualizamos la asociación a la nueva ruta
-                    db.collection("Articulos_X_IMEI_X_Ruta").doc(doc.id).set({
-                      ID: doc.id,
+                    // Ahora usamos el MISMO ID que el doc de Articulos_X_IMEI
+                    db.collection("Articulos_X_IMEI_X_Ruta").doc(imeiDocId).set({
+                      ID: imeiDocId,
                       IMEI: imei,
                       Ruta: selectedRoute
                     }).then(() => {
-                      console.log("IMEI " + imei + " actualizado a ruta " + selectedRoute);
+                      console.log("IMEI " + imei + " movido a ruta " + selectedRoute + " usando ID " + imeiDocId);
+                      // Opcional: si deseas, puedes eliminar el doc anterior con ID random
+                      if (doc.id !== imeiDocId) {
+                        db.collection("Articulos_X_IMEI_X_Ruta").doc(doc.id).delete();
+                      }
                       processIMEI(index + 1, selectedRoute);
                     });
                   } else {
@@ -247,12 +255,13 @@
                 });
               }
             } else {
-              // Si no existe asociación previa, creamos una nueva
-              db.collection("Articulos_X_IMEI_X_Ruta").add({
+              // Si no existe asociación previa, creamos una nueva con el ID de Articulos_X_IMEI
+              db.collection("Articulos_X_IMEI_X_Ruta").doc(imeiDocId).set({
+                ID: imeiDocId,
                 IMEI: imei,
                 Ruta: selectedRoute
               }).then(() => {
-                console.log("IMEI " + imei + " asociado a ruta " + selectedRoute);
+                console.log("IMEI " + imei + " asociado a ruta " + selectedRoute + " con ID " + imeiDocId);
                 processIMEI(index + 1, selectedRoute);
               });
             }

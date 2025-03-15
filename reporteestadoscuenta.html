@@ -11,7 +11,7 @@
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
   <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- Select2 CSS y JS para un selector más chido -->
+  <!-- Select2 CSS y JS -->
   <link
     href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
     rel="stylesheet"
@@ -115,7 +115,7 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Aquí se llena dinámicamente cada Factura -->
+            <!-- Aquí se llenan las facturas y sus abonos -->
           </tbody>
         </table>
       </div>
@@ -188,30 +188,29 @@
           const invoiceData = doc.data();
           const invoiceId = doc.id;
 
-          // Si la factura tiene saldo 0, la consideramos pagada, no la mostramos
+          // Omitir facturas pagadas (saldo 0)
           if (parseFloat(invoiceData.saldo) === 0) {
             continue;
           }
 
-          // Calcular "montoPagado" como la suma de los abonos (en vez de total - saldo)
-          // si quieres ver el total EXACTO de cada abono, hay que consultar la subcolección
+          // 4a) Obtener y ordenar los abonos (sin alterar los datos en Firebase)
           let abonosArray = [];
           let montoPagado = 0;
-
-          // Caso 1: la info de abonos está dentro de invoiceData.subcolecciones.abonos
           if (invoiceData.subcolecciones && invoiceData.subcolecciones.abonos) {
             abonosArray = invoiceData.subcolecciones.abonos;
+            // Ordenamos los abonos por fecha (ascendente)
+            abonosArray.sort((a, b) => {
+              const dateA = (a.dateTime && a.dateTime.seconds) ? a.dateTime.seconds : 0;
+              const dateB = (b.dateTime && b.dateTime.seconds) ? b.dateTime.seconds : 0;
+              return dateA - dateB;
+            });
             montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount), 0);
           }
-          // Caso 2: si NO está embebida y se almacena en subcolecciones reales de Firestore:
-          //   let abonosSnap = await doc.ref.collection("abonos").get();
-          //   abonosArray = abonosSnap.docs.map(d => d.data());
-          //   montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount), 0);
 
-          // Sumamos el saldo de esta factura a la deuda total
+          // Acumular el saldo para la deuda total
           totalDebt += parseFloat(invoiceData.saldo);
 
-          // Vendedor (por si lo tienes en la factura)
+          // Vendedor (si se tiene ese dato)
           const vendedor = invoiceData.vendedor ? invoiceData.vendedor : "N/A";
 
           // Crear fila principal de la Factura
@@ -227,10 +226,9 @@
           `;
           tbody.appendChild(invoiceRow);
 
-          // Ahora mostramos la info de abonos en una sub-fila (tabla interna)
+          // Crear subtabla para los abonos si existen
           if (abonosArray.length > 0) {
             const abonosRow = document.createElement("tr");
-            // Colspan = 7 para que abarque todas las columnas
             abonosRow.innerHTML = `
               <td colspan="7" style="text-align: left;">
                 <table style="width: 100%; border-collapse: collapse;">
@@ -252,17 +250,13 @@
 
             // Llenar la subtabla de abonos
             const abonosTbody = document.getElementById(`abonosTbody-${invoiceId}`);
-
-            abonosArray.forEach(ab => {
+            abonosArray.forEach((ab) => {
               const abonoRow = document.createElement("tr");
-
-              // Fecha abono (conviértela a Date si viene con seconds/nanoseconds)
               let fechaAbonoStr = "";
               if (ab.dateTime && ab.dateTime.seconds) {
                 const abonoDate = new Date(ab.dateTime.seconds * 1000);
                 fechaAbonoStr = abonoDate.toLocaleString();
               }
-
               abonoRow.innerHTML = `
                 <td>${ab.id || ""}</td>
                 <td>${fechaAbonoStr}</td>
@@ -275,10 +269,10 @@
           }
         }
 
-        // 5) Actualizar deuda total en el encabezado
+        // 5) Actualizar la deuda total en el encabezado
         document.getElementById("totalDebt").textContent = totalDebt.toFixed(2);
 
-        // 6) Mostrar fecha/hora de generación y mostrar la sección del reporte
+        // 6) Mostrar fecha/hora de generación y la sección del reporte
         var now = new Date();
         document.getElementById("reportDate").textContent =
           "Generado el: " + now.toLocaleString();
@@ -295,13 +289,10 @@
       window.print();
     }
 
-    // Inicializamos la carga de clientes al cargar la página
+    // Inicializar la carga de clientes al cargar la página
     window.onload = function() {
       loadClients();
     };
   </script>
 </body>
 </html>
-
-
-

@@ -51,7 +51,8 @@
         <button onclick="goToClientesManagement()">Administrar Clientes</button>
         <button onclick="goToProveedoresManagement()">Administrar Proveedores</button>
         <button onclick="goToItemsManagement()">Administrar Artículos</button>
-         <button onclick="goToFacturasManagement()">Facturar/Abonar</button>
+        <button onclick="goToFacturasManagement()">Facturar/Abonar</button>
+        <button onclick="goToCargaMasivaIMEI_X_Ruta()">Carga Masiva IMEI a Rutas</button>
         <hr/>
         <button onclick="goToItemsReport()">Reporte de Artículos</button>
         <button onclick="goToItemsXRutaReport()">Reporte de Artículos por Ruta</button>
@@ -121,6 +122,10 @@
 
         function goToItemsXRutaReport(){
             window.location.href = "reportearticulosxruta.html";
+        }
+
+        function goToCargaMasivaIMEI_X_Ruta(){
+            window.location.href = "cargamasivaimei.html";
         }
 
         // Function to log out

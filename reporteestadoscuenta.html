@@ -92,6 +92,8 @@
         <p><strong>Nombre de la Tienda:</strong> <span id="storeName"></span></p>
         <p><strong>Dirección:</strong> <span id="clientAddress"></span></p>
         <p><strong>Teléfono:</strong> <span id="clientPhone"></span></p>
+        <!-- Aquí se muestra la deuda total -->
+        <p><strong>Deuda Total:</strong> C$<span id="totalDebt">0.00</span></p>
       </div>
       
       <!-- Detalle del Estado de Cuenta -->
@@ -168,6 +170,9 @@
         console.error("Error al obtener datos del cliente: ", error);
       });
 
+      // Variable para acumular la deuda total
+      var totalDebt = 0;
+
       // Luego, obtenemos las facturas de crédito que no estén anuladas y que tengan saldo > 0
       db.collection("facturas")
         .where("clientId", "==", clientId)
@@ -181,8 +186,10 @@
             var invoice = doc.data();
             // Sólo mostramos las facturas con saldo distinto de 0 (no pagadas)
             if (parseFloat(invoice.saldo) !== 0) {
-              // Calculamos el monto pagado: total - saldo (esto equivale a sumar los abonos)
+              // Calculamos el monto pagado: total - saldo (lo que equivale a sumar los abonos)
               var montoPagado = parseFloat(invoice.total) - parseFloat(invoice.saldo);
+              // Acumulamos el saldo de esta factura para la deuda total
+              totalDebt += parseFloat(invoice.saldo);
               // Para "Vendedor" usamos un valor por defecto ya que no tenemos ese dato en el documento
               var vendedor = invoice.vendedor ? invoice.vendedor : "N/A";
               // Creamos la fila con los datos
@@ -197,7 +204,9 @@
               tbody.appendChild(row);
             }
           });
-          // Mostrar la fecha y hora actual en el encabezado del reporte
+          // Actualizamos el campo de Deuda Total en el encabezado
+          document.getElementById("totalDebt").textContent = totalDebt.toFixed(2);
+          // Mostramos la fecha y hora actual en el encabezado del reporte
           var now = new Date();
           document.getElementById("reportDate").textContent = "Generado el: " + now.toLocaleString();
           // Mostramos el reporte
@@ -220,3 +229,4 @@
   </script>
 </body>
 </html>
+

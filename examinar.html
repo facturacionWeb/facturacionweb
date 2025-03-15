@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔥 Obtener Estructura de Facturas - Firebase</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; padding: 20px; background-color: #f4f4f4; text-align: center; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #28a745; color: #fff; border: none; margin: 10px; }
+        button:hover { background-color: #218838; }
+        pre { background: #fff; padding: 10px; border: 1px solid #ccc; text-align: left; overflow-x: auto; max-height: 400px; }
+    </style>
+</head>
+<body>
+
+    <h1>🔥 Obtener Estructura de la Colección "facturas" en Firebase</h1>
+    <button onclick="getFacturasStructure()">📂 Obtener Estructura</button>
+    <button onclick="downloadJSON()">📥 Descargar JSON</button>
+
+    <h2>📜 Resultado:</h2>
+    <pre id="output">Presiona el botón para obtener la estructura...</pre>
+
+    <script>
+        // 🔥 Inicializar Firestore
+        const db = firebase.firestore();
+        let facturasData = [];
+
+        // 📌 Función para obtener la estructura de la colección "facturas"
+        async function getFacturasStructure() {
+            facturasData = []; // Resetear datos
+
+            try {
+                document.getElementById('output').textContent = "⏳ Cargando datos...";
+                
+                const facturasSnapshot = await db.collection("facturas").get();
+                
+                for (const facturaDoc of facturasSnapshot.docs) {
+                    let facturaData = {
+                        id: facturaDoc.id,
+                        ...facturaDoc.data(),
+                        subcolecciones: {}
+                    };
+
+                    // 🔍 Buscar subcolecciones dentro de cada factura
+                    const subcollections = await facturaDoc.ref.listCollections();
+                    for (const subcollection of subcollections) {
+                        const subcollectionSnapshot = await subcollection.get();
+                        let subcollectionData = [];
+
+                        for (const subDoc of subcollectionSnapshot.docs) {
+                            subcollectionData.push({
+                                id: subDoc.id,
+                                ...subDoc.data()
+                            });
+                        }
+
+                        facturaData.subcolecciones[subcollection.id] = subcollectionData;
+                    }
+
+                    facturasData.push(facturaData);
+                }
+
+                // 📜 Mostrar JSON formateado en la página
+                document.getElementById('output').textContent = JSON.stringify(facturasData, null, 2);
+                console.log("📂 Estructura obtenida:", facturasData);
+
+            } catch (error) {
+                console.error("❌ Error obteniendo la estructura de 'facturas':", error);
+                document.getElementById('output').textContent = "❌ Error obteniendo datos. Revisa la consola.";
+            }
+        }
+
+        // 📥 Función para descargar el JSON generado
+        function downloadJSON() {
+            if (facturasData.length === 0) {
+                alert("⚠️ Primero debes obtener la estructura.");
+                return;
+            }
+
+            const jsonString = JSON.stringify(facturasData, null, 2);
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "facturas_structure.json";
+            a.click();
+        }
+    </script>
+
+</body>
+</html>

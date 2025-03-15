@@ -75,7 +75,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>😎 Reporte de Estados de Cuenta 😎📊</h1>
+    <h1>Reporte de Estados de Cuenta 😎😎📊</h1>
 
     <!-- Selector de Cliente -->
     <label for="clientSelect">Selecciona Cliente:</label>
@@ -194,11 +194,15 @@
           }
 
           // 4a) Consultar la subcolección "abonos" (real) para esta factura
-          //     *independientemente* de si hay algo en doc.data().subcolecciones
           const abonosSnap = await docFact.ref.collection("abonos").get();
-          let abonosArray = abonosSnap.docs.map((d) => d.data());
+          // AQUI: inyectamos docAbono.id en cada abono
+          let abonosArray = abonosSnap.docs.map((docAbono) => {
+            let abData = docAbono.data();
+            abData._docId = docAbono.id; // Guardamos el ID real del doc
+            return abData;
+          });
 
-          // 4b) Ordenar abonos por fecha (ascendente) para mostrarlos en orden cronológico
+          // 4b) Ordenar abonos por fecha (ascendente)
           abonosArray.sort((a, b) => {
             const dateA = (a.dateTime && a.dateTime.seconds) ? a.dateTime.seconds : 0;
             const dateB = (b.dateTime && b.dateTime.seconds) ? b.dateTime.seconds : 0;
@@ -258,8 +262,9 @@
                 const abonoDate = new Date(ab.dateTime.seconds * 1000);
                 fechaAbonoStr = abonoDate.toLocaleString();
               }
+              // AQUI: mostramos _docId en la columna ID Abono
               abonoRow.innerHTML = `
-                <td>${ab.id || ""}</td>
+                <td>${ab._docId || ""}</td>
                 <td>${fechaAbonoStr}</td>
                 <td>${parseFloat(ab.amount).toFixed(2)}</td>
                 <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
@@ -297,3 +302,4 @@
   </script>
 </body>
 </html>
+

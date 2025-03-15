@@ -117,7 +117,7 @@
   </div>
   
   <script>
-    // ¡Hola, Gustavo! Inicializamos Firestore 😎
+    //Inicializamos Firestore 😎
     const db = firebase.firestore();
     let pendingIMEIs = []; // Lista de IMEIs pendientes para asociar
     
@@ -151,7 +151,7 @@
         const imei = this.value.trim();
         if (imei !== "") {
           if (pendingIMEIs.includes(imei)) {
-            alert("Este IMEI ya está en la lista, Gustavo 😅");
+            alert("Este IMEI ya está en la lista 😅");
           } else {
             pendingIMEIs.push(imei);
             updatePreviewTable();
@@ -190,7 +190,7 @@
     function saveAllIMEIs() {
       const selectedRoute = document.getElementById("routeSelector").value;
       if (!selectedRoute) {
-        alert("Debes seleccionar una ruta primero, Gustavo 😅");
+        alert("Debes seleccionar una ruta primero 😅");
         return;
       }
       if (pendingIMEIs.length === 0) {

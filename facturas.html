@@ -814,11 +814,16 @@
           } else {
             status = "ACTIVA";
           }
-          
+
+        let fecha = (typeof invoice.fecha.toDate === "function") 
+            ? invoice.fecha.toDate()
+            : new Date(invoice.fecha);
+
+          //invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${doc.id}</td>
-            <td>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
+            <td>${fecha}</td>
             <td>${invoice.clientId}</td>
             <td>${invoice.route}</td>
             <td>${invoice.total.toFixed(2)}</td>
@@ -908,11 +913,15 @@
             } else {
               status = "ACTIVA";
             }
-            
+
+            let fecha = (typeof invoice.fecha.toDate === "function") 
+            ? invoice.fecha.toDate()
+            : new Date(invoice.fecha);
+            //invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${doc.id}</td>
-              <td>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
+              <td>${fecha}</td>
               <td>${invoice.clientId}</td>
               <td>${invoice.route}</td>
               <td>${invoice.total.toFixed(2)}</td>
@@ -949,6 +958,10 @@
               ? `<span style="color: red; font-weight: bold;">ANULADA</span>` 
               : '';
 
+            let fecha = (typeof invoice.fecha.toDate === "function") 
+            ? invoice.fecha.toDate()
+            : new Date(invoice.fecha);
+            //invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""
             const invoiceHTML = `
               <div class="invoice-header">
                 <h2>Factura - ${invoiceId} ${invoiceStatus}</h2>
@@ -958,7 +971,7 @@
               <div class="invoice-body">
                 <table class="details-table">
                   <tr>
-                    <td><strong>Fecha y Hora:</strong><br>${invoice.fecha ? invoice.fecha.toDate().toLocaleString() : ""}</td>
+                    <td><strong>Fecha y Hora:</strong><br>${fecha}</td>
                     <td><strong>Cliente:</strong><br>${client ? client.nombreCliente : "N/A"}</td>
                   </tr>
                   <tr>

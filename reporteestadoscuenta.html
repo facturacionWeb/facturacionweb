@@ -273,6 +273,9 @@
                 <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
                 <td>${ab.reference || ""}</td>
               `;
+
+              abonoRow.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'}`;
+              
               abonosTbody.appendChild(abonoRow);
             });
           }

@@ -216,7 +216,7 @@
           const saldoCalculado = parseFloat(invoiceData.total) - montoPagado;
 
           // Acumular el saldo para la deuda total
-          totalDebt += parseFloat(invoiceData.saldo);
+          totalDebt += saldoCalculado;
 
           // Vendedor (si se tuviera)
           const vendedor = invoiceData.vendedor ? invoiceData.vendedor : "N/A";

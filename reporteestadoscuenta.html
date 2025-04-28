@@ -212,6 +212,9 @@
           // 4c) Calcular "montoPagado" como la suma de los abonos
           let montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount || 0), 0);
 
+          // Cálculo de saldo real
+          const saldoCalculado = parseFloat(invoiceData.total) - montoPagado;
+
           // Acumular el saldo para la deuda total
           totalDebt += parseFloat(invoiceData.saldo);
 
@@ -227,7 +230,7 @@
             <td>${invoiceData.fechaStr || "N/A"}</td>
             <td>${parseFloat(invoiceData.total).toFixed(2)}</td>
             <td>${montoPagado.toFixed(2)}</td>
-            <td>${parseFloat(invoiceData.saldo).toFixed(2)}</td>
+            <td>${saldoCalculado.toFixed(2)}</td>
           `;
           tbody.appendChild(invoiceRow);
 

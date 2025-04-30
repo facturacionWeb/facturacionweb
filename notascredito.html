@@ -9,11 +9,15 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <!-- jQuery y Select2 -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     .container { max-width: 800px; margin: 0 auto; }
-    input, button, label { margin: 10px 0; display: block; width: 100%; padding: 10px; }
+    input, select, button, label { margin: 10px 0; display: block; width: 100%; padding: 10px; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid black; padding: 10px; text-align: center; }
     .acciones button { margin: 0 4px; }
@@ -24,7 +28,8 @@
   <div class="container">
     <h1>Notas de Crédito</h1>
 
-    <input type="text" id="clienteId" placeholder="ID del Cliente">
+    <label for="clienteSelect">Selecciona Cliente:</label>
+    <select id="clienteSelect"></select>
     <input type="text" id="descripcion" placeholder="Descripción">
     <input type="number" id="monto" placeholder="Monto de la Nota">
 
@@ -50,16 +55,17 @@
   <script>
     const db = firebase.firestore();
     let idNotaActual = null;
+    let clientesMap = {};
 
     function limpiarCampos() {
-      document.getElementById('clienteId').value = '';
+      document.getElementById('clienteSelect').value = '';
       document.getElementById('descripcion').value = '';
       document.getElementById('monto').value = '';
       idNotaActual = null;
     }
 
     function addOrUpdateNotaCredito() {
-      const clienteId = document.getElementById('clienteId').value.trim();
+      const clienteId = document.getElementById('clienteSelect').value;
       const descripcion = document.getElementById('descripcion').value.trim();
       const monto = parseFloat(document.getElementById('monto').value.trim());
 
@@ -97,10 +103,11 @@
         tbody.innerHTML = '';
         snapshot.forEach(doc => {
           const nota = doc.data();
+          const clienteNombre = clientesMap[nota.clienteId] || nota.clienteId;
           const fila = `
             <tr>
               <td>${nota.codigo}</td>
-              <td>${nota.clienteId}</td>
+              <td>${clienteNombre}</td>
               <td>${nota.descripcion}</td>
               <td>C$ ${nota.monto.toFixed(2)}</td>
               <td>${nota.abonoId || '-'}</td>
@@ -119,7 +126,7 @@
       db.collection("notasCredito").doc(id).get().then(doc => {
         if (doc.exists) {
           const nota = doc.data();
-          document.getElementById('clienteId').value = nota.clienteId;
+          document.getElementById('clienteSelect').value = nota.clienteId;
           document.getElementById('descripcion').value = nota.descripcion;
           document.getElementById('monto').value = nota.monto;
           idNotaActual = id;
@@ -139,13 +146,33 @@
       });
     }
 
+    function cargarClientes() {
+      const select = document.getElementById('clienteSelect');
+      db.collection("clientes").get().then(snapshot => {
+        snapshot.forEach(doc => {
+          const cliente = doc.data();
+          const nombreCompleto = cliente.nombreCliente + ' - ' + cliente.nombreTienda;
+          clientesMap[doc.id] = nombreCompleto;
+
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = nombreCompleto;
+          select.appendChild(opt);
+        });
+
+        // Activar Select2 para mejor UX
+        $("#clienteSelect").select2({ placeholder: "Seleccione un cliente" });
+        cargarNotas();
+      });
+    }
+
     window.onload = () => {
       const auth = sessionStorage.getItem('isAuthenticated');
       if (!auth) {
         alert("Debe autenticarse primero");
         window.location.href = "index.html";
       } else {
-        cargarNotas();
+        cargarClientes();
       }
     };
   </script>

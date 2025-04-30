@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Notas de Crédito</title>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    input, button, label { margin: 10px 0; display: block; width: 100%; padding: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid black; padding: 10px; text-align: center; }
+    .acciones button { margin: 0 4px; }
+  </style>
+</head>
+<body>
+  <a href="index.html">Volver a la Página Principal</a>
+  <div class="container">
+    <h1>Notas de Crédito</h1>
+
+    <input type="text" id="clienteId" placeholder="ID del Cliente">
+    <input type="text" id="descripcion" placeholder="Descripción">
+    <input type="number" id="monto" placeholder="Monto de la Nota">
+
+    <button onclick="addOrUpdateNotaCredito()">Agregar / Actualizar Nota</button>
+    <button onclick="limpiarCampos()">Limpiar</button>
+
+    <h2>Notas Registradas</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Descripción</th>
+          <th>Monto</th>
+          <th>Abono Asociado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tablaNotas"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const db = firebase.firestore();
+    let idNotaActual = null;
+
+    function limpiarCampos() {
+      document.getElementById('clienteId').value = '';
+      document.getElementById('descripcion').value = '';
+      document.getElementById('monto').value = '';
+      idNotaActual = null;
+    }
+
+    function addOrUpdateNotaCredito() {
+      const clienteId = document.getElementById('clienteId').value.trim();
+      const descripcion = document.getElementById('descripcion').value.trim();
+      const monto = parseFloat(document.getElementById('monto').value.trim());
+
+      if (!clienteId || !descripcion || isNaN(monto)) {
+        alert("Por favor, complete todos los campos.");
+        return;
+      }
+
+      const data = {
+        clienteId,
+        descripcion,
+        monto,
+        abonoId: null
+      };
+
+      if (idNotaActual) {
+        db.collection("notasCredito").doc(idNotaActual).update(data).then(() => {
+          alert("Nota actualizada");
+          limpiarCampos();
+          cargarNotas();
+        });
+      } else {
+        const codigo = 'NC-' + Date.now();
+        db.collection("notasCredito").doc(codigo).set({ ...data, codigo }).then(() => {
+          alert("Nota registrada");
+          limpiarCampos();
+          cargarNotas();
+        });
+      }
+    }
+
+    function cargarNotas() {
+      db.collection("notasCredito").get().then(snapshot => {
+        const tbody = document.getElementById('tablaNotas');
+        tbody.innerHTML = '';
+        snapshot.forEach(doc => {
+          const nota = doc.data();
+          const fila = `
+            <tr>
+              <td>${nota.codigo}</td>
+              <td>${nota.clienteId}</td>
+              <td>${nota.descripcion}</td>
+              <td>C$ ${nota.monto.toFixed(2)}</td>
+              <td>${nota.abonoId || '-'}</td>
+              <td class="acciones">
+                <button onclick="editarNota('${doc.id}')">Editar</button>
+                <button onclick="eliminarNota('${doc.id}', '${nota.abonoId || ''}')">Eliminar</button>
+              </td>
+            </tr>
+          `;
+          tbody.innerHTML += fila;
+        });
+      });
+    }
+
+    function editarNota(id) {
+      db.collection("notasCredito").doc(id).get().then(doc => {
+        if (doc.exists) {
+          const nota = doc.data();
+          document.getElementById('clienteId').value = nota.clienteId;
+          document.getElementById('descripcion').value = nota.descripcion;
+          document.getElementById('monto').value = nota.monto;
+          idNotaActual = id;
+        }
+      });
+    }
+
+    function eliminarNota(id, abonoId) {
+      if (abonoId && abonoId !== 'null' && abonoId !== '') {
+        alert("No se puede eliminar esta nota porque ya está asociada a un abono.");
+        return;
+      }
+
+      db.collection("notasCredito").doc(id).delete().then(() => {
+        alert("Nota eliminada");
+        cargarNotas();
+      });
+    }
+
+    window.onload = () => {
+      const auth = sessionStorage.getItem('isAuthenticated');
+      if (!auth) {
+        alert("Debe autenticarse primero");
+        window.location.href = "index.html";
+      } else {
+        cargarNotas();
+      }
+    };
+  </script>
+</body>
+</html>

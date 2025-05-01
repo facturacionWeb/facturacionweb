@@ -358,9 +358,18 @@
     const facturaId = document.getElementById('facturaSelect').value;
     const monto = parseFloat(document.getElementById('montoAbono').value);
     const ruta = document.getElementById('rutaAbono').value;
-    const metodo = document.getElementById('metodoPago').value;
+    /*const metodo = document.getElementById('metodoPago').value;
     const banco = document.getElementById('bancoSelect').value;
-    const referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();
+    const referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();*/
+    const metodo = document.getElementById('metodoPago').value;
+    let banco = document.getElementById('bancoSelect').value;
+    let referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();
+    
+    if (metodo === 'Efectivo' || metodo === 'NotaCredito') {
+        banco = 'N/A';
+        referenciaBancaria = 'N/A';
+    }
+
     const notaCreditoId = document.getElementById('notaCreditoSelect').value;
 
     // Validaciones básicas

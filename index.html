@@ -94,7 +94,8 @@
         <button onclick="goToClientesManagement()">👥 Administrar Clientes</button>
         <button onclick="goToProveedoresManagement()">🏢 Administrar Proveedores</button>
         <button onclick="goToItemsManagement()">📦 Administrar Artículos</button>
-        <button onclick="goToFacturasManagement()">💰 Facturar/Abonar</button>
+        <button onclick="goToFacturasManagement()">🧾 Facturar </button>
+        <button onclick="goToAbonar()">💰 Abonar</button>
         <button onclick="goToCargaMasivaIMEI_X_Ruta()">📲 Carga Masiva IMEI</button>
         <hr/>
         <button onclick="goToItemsReport()">📊 Reporte de Artículos</button>
@@ -158,6 +159,10 @@
 
         function goToFacturasManagement(){
             window.location.href = "facturas.html";
+        }
+
+        function goToAbonar(){
+            window.location.href = "abonar.html";
         }
 
         function goToItemsManagement(){

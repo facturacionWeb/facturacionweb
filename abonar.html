@@ -303,10 +303,13 @@
           sel.appendChild(opt);
         });
         $(sel).select2({ placeholder:'Seleccione nota de crédito' });
+
+        $(sel).off('change select2:select').on('change select2:select', setMontoPorNotaCredito);
+        
       });
   }
 
-  function setMontoPorNotaCredito() {
+  /*function setMontoPorNotaCredito() {
     const metodo = document.getElementById('metodoPago').value;
     if (metodo !== 'NotaCredito') return;
     const sel = document.getElementById('notaCreditoSelect');
@@ -318,7 +321,25 @@
       document.getElementById('montoAbono').value = '';
       document.getElementById('montoAbono').readOnly = false;
     }
+  }*/
+
+  function setMontoPorNotaCredito() {
+  if (document.getElementById('metodoPago').value !== 'NotaCredito') return;
+
+  const sel = document.getElementById('notaCreditoSelect');
+
+  // ✅ LÍNEA NUEVA (aquí es donde va):
+  const opt = sel.querySelector(`option[value="${sel.value}"]`);
+
+  if (opt && opt.dataset.monto) {
+    document.getElementById('montoAbono').value = parseFloat(opt.dataset.monto).toFixed(2);
+    document.getElementById('montoAbono').readOnly = true;
+  } else {
+    document.getElementById('montoAbono').value = '';
+    document.getElementById('montoAbono').readOnly = false;
   }
+}
+
 
   /*********************** REGISTRAR ABONO *************************/
   async function registrarAbono() {

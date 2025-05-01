@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Abonos a Facturas de Crédito :)</title>
+  <title>Gestión de Abonos a Facturas de Crédito</title>
 
   <!-- Firebase SDK (v8 para compatibilidad con el resto del proyecto) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -81,7 +81,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>Registrar Abonos 💸</h1>
+  <h1>💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -342,6 +342,17 @@
 
 
   /*********************** REGISTRAR ABONO *************************/
+  function generateReference() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return `${yyyy}${mm}${dd}${hh}${min}${ss}`;
+    }
+  
   async function registrarAbono() {
     const clienteId = document.getElementById('clienteSelect').value;
     const facturaId = document.getElementById('facturaSelect').value;
@@ -378,10 +389,11 @@
           pendingBalance: nuevoSaldo,
           dateTime: fecha,
           route: ruta,
-          paymentMethod: metodo,
-          paymentType: (metodo==='Transferencia')? `Transferencia - ${banco}` : metodo,
+          metodoPago: metodo,
+          banco: banco,
           referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
-          notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null
+          notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null,
+          reference: generateReference()
         };
 
         // Actualizar factura

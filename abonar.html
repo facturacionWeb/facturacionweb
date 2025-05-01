@@ -2,143 +2,472 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Registrar Abonos con Nota de Crédito</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Abonos a Facturas de Crédito</title>
+
+  <!-- Firebase SDK (v8 para compatibilidad con el resto del proyecto) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Config de Firebase (ajusta la ruta si la tienes en otro lugar) -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+
+  <!-- jQuery + Select2 para mejor UX en combos -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
-    .container { max-width: 800px; margin: auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    label, select, input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; }
-    #bancoSelect, #referenciaInput, #notaCreditoSelect { display: none; }
+    body {
+      font-family: Arial, sans-serif;
+      background:#f4f4f4;
+      margin:0;
+      padding:0;
+    }
+    .container {
+      max-width: 900px;
+      margin: 20px auto;
+      background:#fff;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,.1);
+    }
+    h1, h2 { text-align:center; }
+    label { margin-top:10px; display:block; font-weight:bold; }
+    select, input[type="number"], input[type="text"], button {
+      width:100%;
+      padding:10px;
+      margin:5px 0 15px;
+      box-sizing:border-box;
+    }
+    button { cursor:pointer; }
+    .flex-row {
+      display:flex;
+      gap:10px;
+    }
+    .flex-row > * { flex:1; }
+    table {
+      width:100%;
+      border-collapse:collapse;
+      margin-top:20px;
+    }
+    th,td {
+      border:1px solid #ccc;
+      padding:8px;
+      text-align:center;
+    }
+    th { background:#333; color:#fff; }
+    /* Snackbar */
+    #snackbar {
+      visibility:hidden;
+      min-width:250px;
+      background-color:#333;
+      color:#fff;
+      text-align:center;
+      border-radius:2px;
+      padding:12px;
+      position:fixed;
+      z-index:1000;
+      left:50%;
+      bottom:30px;
+      transform:translateX(-50%);
+    }
+    #snackbar.show {
+      visibility:visible;
+      animation:fadein .5s, fadeout .5s 2.5s;
+    }
+    @keyframes fadein { from {bottom:0; opacity:0;} to {bottom:30px; opacity:1;} }
+    @keyframes fadeout { from {bottom:30px; opacity:1;} to {bottom:0; opacity:0;} }
   </style>
 </head>
 <body>
+<a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>Registrar Abono</h1>
-  <label for="clienteSelect">Seleccionar Cliente:</label>
+  <h1>Registrar Abonos 💸</h1>
+
+  <!-- Selección de Cliente -->
+  <label for="clienteSelect">Selecciona Cliente:</label>
   <select id="clienteSelect"></select>
 
-  <label for="facturaSelect">Seleccionar Factura de Crédito:</label>
+  <!-- Selección de Factura Crédito -->
+  <label for="facturaSelect">Selecciona Factura de Crédito:</label>
   <select id="facturaSelect"></select>
 
-  <label for="metodoPagoSelect">Método de Pago:</label>
-  <select id="metodoPagoSelect">
+  <!-- Monto a Abonar -->
+  <label for="montoAbono">Monto a Abonar (C$):</label>
+  <input type="number" id="montoAbono" min="0.01" step="0.01" />
+
+  <!-- Ruta del Abono -->
+  <label for="rutaAbono">Ruta (Opcional):</label>
+  <select id="rutaAbono">
+    <option value="SIN RUTA">SIN RUTA</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+    <option value="10">10</option>
+  </select>
+
+  <!-- Método de Pago -->
+  <label for="metodoPago">Método de Pago:</label>
+  <select id="metodoPago">
     <option value="Efectivo">Efectivo</option>
     <option value="Transferencia">Transferencia</option>
     <option value="NotaCredito">Nota de Crédito</option>
   </select>
 
-  <div id="bancoSelectContainer">
-    <label for="bancoSelect">Banco:</label>
-    <select id="bancoSelect">
-      <option value="BAC">BAC</option>
-      <option value="LA FISE">LA FISE</option>
-      <option value="BANPRO">BANPRO</option>
-      <option value="AVANZ">AVANZ</option>
-    </select>
-
-    <label for="referenciaInput">Referencia Bancaria:</label>
-    <input type="text" id="referenciaInput" placeholder="Número de referencia">
+  <!-- Info de Transferencia -->
+  <div id="infoTransferencia" style="display:none;">
+    <div class="flex-row">
+      <div>
+        <label for="bancoSelect">Banco:</label>
+        <select id="bancoSelect">
+          <option value="BAC">BAC</option>
+          <option value="LA FISE">LA FISE</option>
+          <option value="BANPRO">BANPRO</option>
+          <option value="AVANZ">AVANZ</option>
+        </select>
+      </div>
+      <div>
+        <label for="referenciaBancaria"># Referencia:</label>
+        <input type="text" id="referenciaBancaria" placeholder="Número / Código de referencia" />
+      </div>
+    </div>
   </div>
 
-  <div id="notaCreditoSelectContainer">
-    <label for="notaCreditoSelect">Seleccionar Nota de Crédito:</label>
+  <!-- Info de Nota de Crédito -->
+  <div id="infoNotaCredito" style="display:none;">
+    <label for="notaCreditoSelect">Selecciona Nota de Crédito:</label>
     <select id="notaCreditoSelect"></select>
   </div>
 
-  <label for="montoInput">Monto a Abonar:</label>
-  <input type="number" id="montoInput" readonly />
+  <!-- Botones -->
+  <button id="btnRegistrar">REGISTRAR ABONO</button>
+  <button id="btnCancelar" style="background:#aaa;">CANCELAR</button>
 
-  <button onclick="registrarAbono()">Registrar Abono</button>
+  <!-- Recibo en pantalla -->
+  <div id="reciboContainer" style="display:none; margin-top:30px;">
+    <div id="recibo" style="border:1px solid #333; padding:15px;"></div>
+    <button id="btnImprimir">Imprimir Recibo 🖨️</button>
+  </div>
+
+  <h2>Historial de Abonos Recientes</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha/Hora</th>
+        <th>Factura</th>
+        <th>Método</th>
+        <th>Monto (C$)</th>
+        <th>Saldo Pendiente</th>
+      </tr>
+    </thead>
+    <tbody id="tablaHistorial"></tbody>
+  </table>
 </div>
 
+<!-- Snackbar -->
+<div id="snackbar"></div>
+
 <script>
-const db = firebase.firestore();
+  // Inicializar Firestore
+  const db = firebase.firestore();
+  const clientesMap = {}; // Para mostrar nombres de clientes
 
-$(document).ready(function() {
-  cargarClientes();
-
-  $('#metodoPagoSelect').change(function() {
-    const metodo = $(this).val();
-    $('#bancoSelect, #referenciaInput').parent().hide();
-    $('#notaCreditoSelectContainer').hide();
-    $('#montoInput').prop('readonly', false);
-    if (metodo === 'Transferencia') {
-      $('#bancoSelectContainer').show();
-      $('#referenciaInput').parent().show();
-    } else if (metodo === 'NotaCredito') {
-      $('#notaCreditoSelectContainer').show();
-      cargarNotasCredito();
-    }
-  });
-
-  $('#notaCreditoSelect').change(function() {
-    const selectedOption = $(this).find('option:selected');
-    const monto = parseFloat(selectedOption.data('monto')) || 0;
-    $('#montoInput').val(monto.toFixed(2)).prop('readonly', true);
-  });
-});
-
-function cargarClientes() {
-  db.collection("clientes").get().then(snapshot => {
-    snapshot.forEach(doc => {
-      const cliente = doc.data();
-      $('#clienteSelect').append(`<option value="${doc.id}">${cliente.nombreCliente} - ${cliente.nombreTienda}</option>`);
-    });
-  });
-}
-
-function cargarNotasCredito() {
-  const clienteId = $('#clienteSelect').val();
-  if (!clienteId) return;
-
-  $('#notaCreditoSelect').empty();
-  db.collection("notasCredito").where("clienteId", "==", clienteId).where("abonoId", "==", null).get()
-    .then(snapshot => {
-      snapshot.forEach(doc => {
-        const nota = doc.data();
-        $('#notaCreditoSelect').append(`<option value="${doc.id}" data-monto="${nota.monto}">${nota.descripcion} - C$${nota.monto.toFixed(2)}</option>`);
-      });
-    });
-}
-
-function registrarAbono() {
-  const clienteId = $('#clienteSelect').val();
-  const facturaId = $('#facturaSelect').val();
-  const metodoPago = $('#metodoPagoSelect').val();
-  const monto = parseFloat($('#montoInput').val());
-  const banco = $('#bancoSelect').val();
-  const referencia = $('#referenciaInput').val();
-  const notaCreditoId = $('#notaCreditoSelect').val();
-
-  if (!clienteId || !facturaId || isNaN(monto)) {
-    alert("Por favor completa todos los campos obligatorios.");
-    return;
+  /*********************** HELPER: Snackbar *************************/
+  function toast(msg) {
+    const x = document.getElementById('snackbar');
+    x.textContent = msg;
+    x.className = 'show';
+    setTimeout(() => x.className = x.className.replace('show',''), 3000);
   }
 
-  const abonoData = {
-    clienteId,
-    facturaId,
-    paymentMethod: metodoPago,
-    paymentType: banco || null,
-    referenciaBancaria: referencia || null,
-    monto,
-    fecha: new Date()
+  /*********************** CARGA INICIAL *************************/
+  window.onload = () => {
+    verificarAuth();
+    cargarClientes();
+
+    // Eventos
+    document.getElementById('clienteSelect').addEventListener('change', cargarFacturasCredito);
+    document.getElementById('facturaSelect').addEventListener('change', actualizarMontoPorSaldo);
+    document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
+    document.getElementById('notaCreditoSelect').addEventListener('change', setMontoPorNotaCredito);
+    document.getElementById('btnRegistrar').addEventListener('click', registrarAbono);
+    document.getElementById('btnCancelar').addEventListener('click', limpiarFormulario);
+    document.getElementById('btnImprimir').addEventListener('click', imprimirRecibo);
   };
 
-  const facturaRef = db.collection("facturas").doc(facturaId);
-  facturaRef.collection("abonos").add(abonoData).then(docRef => {
-    if (metodoPago === 'NotaCredito' && notaCreditoId) {
-      db.collection("notasCredito").doc(notaCreditoId).update({ abonoId: docRef.id });
+  function verificarAuth() {
+    const auth = sessionStorage.getItem('isAuthenticated');
+    if (!auth) {
+      alert('Debe autenticarse primero');
+      window.location.href = 'index.html';
     }
-    alert("Abono registrado exitosamente.");
-    location.reload();
-  });
-}
+  }
+
+  /*********************** CLIENTES *************************/
+  function cargarClientes() {
+    const sel = document.getElementById('clienteSelect');
+    sel.innerHTML = '';
+    db.collection('clientes').get().then(qs => {
+      qs.forEach(doc => {
+        const cliente = doc.data();
+        const nombre = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
+        clientesMap[doc.id] = nombre;
+        const opt = document.createElement('option');
+        opt.value = doc.id;
+        opt.textContent = nombre;
+        sel.appendChild(opt);
+      });
+      // Activar select2
+      $(sel).select2({ placeholder:'Seleccione un cliente' });
+      // Disparar carga de facturas de primer cliente (si existe)
+      if (sel.value) cargarFacturasCredito();
+    });
+  }
+
+  /*********************** FACTURAS CRÉDITO *************************/
+  function cargarFacturasCredito() {
+    const clienteId = document.getElementById('clienteSelect').value;
+    const sel = document.getElementById('facturaSelect');
+    sel.innerHTML = '';
+    if (!clienteId) return;
+    db.collection('facturas')
+      .where('clientId','==',clienteId)
+      .where('paymentType','==','Credito')
+      .where('anulada','==',false)
+      .orderBy('fecha','asc')
+      .get().then(qs => {
+        qs.forEach(doc => {
+          const f = doc.data();
+          const saldo = f.saldo !== undefined ? f.saldo : f.total;
+          if (saldo > 0) {
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = `Factura ${doc.id} - Saldo: C$${saldo.toFixed(2)}`;
+            opt.dataset.saldo = saldo;
+            sel.appendChild(opt);
+          }
+        });
+        $(sel).select2({ placeholder:'Seleccione una factura crédito' });
+        actualizarMontoPorSaldo();
+        // Cargar notas crédito disponibles
+        cargarNotasCreditoDisponibles();
+      });
+  }
+
+  function actualizarMontoPorSaldo() {
+    const selFactura = document.getElementById('facturaSelect');
+    const opt = selFactura.options[selFactura.selectedIndex];
+    if (opt && opt.dataset.saldo) {
+      document.getElementById('montoAbono').value = parseFloat(opt.dataset.saldo).toFixed(2);
+    } else {
+      document.getElementById('montoAbono').value = '';
+    }
+  }
+
+  /*********************** MÉTODO PAGO *************************/
+  function toggleMetodoPago() {
+    const metodo = document.getElementById('metodoPago').value;
+    document.getElementById('infoTransferencia').style.display = (metodo==='Transferencia')? 'block':'none';
+    document.getElementById('infoNotaCredito').style.display = (metodo==='NotaCredito')? 'block':'none';
+
+    if (metodo==='NotaCredito') {
+      // Al cambiar a nota crédito, fijar monto readonly (si hay nota seleccionada)
+      setMontoPorNotaCredito();
+    } else {
+      document.getElementById('montoAbono').readOnly = false;
+    }
+  }
+
+  /*********************** NOTAS CRÉDITO *************************/
+  function cargarNotasCreditoDisponibles() {
+    const clienteId = document.getElementById('clienteSelect').value;
+    const sel = document.getElementById('notaCreditoSelect');
+    sel.innerHTML = '';
+    if (!clienteId) return;
+    // Solo notas del cliente SIN abonoId asociado
+    db.collection('notasCredito')
+      .where('clienteId','==',clienteId)
+      .where('abonoId','==',null)
+      .get().then(qs => {
+        qs.forEach(doc => {
+          const n = doc.data();
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = `${n.codigo} - C$${n.monto.toFixed(2)}`;
+          opt.dataset.monto = n.monto;
+          sel.appendChild(opt);
+        });
+        $(sel).select2({ placeholder:'Seleccione nota de crédito' });
+      });
+  }
+
+  function setMontoPorNotaCredito() {
+    const metodo = document.getElementById('metodoPago').value;
+    if (metodo !== 'NotaCredito') return;
+    const sel = document.getElementById('notaCreditoSelect');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.dataset.monto) {
+      document.getElementById('montoAbono').value = parseFloat(opt.dataset.monto).toFixed(2);
+      document.getElementById('montoAbono').readOnly = true;
+    } else {
+      document.getElementById('montoAbono').value = '';
+      document.getElementById('montoAbono').readOnly = false;
+    }
+  }
+
+  /*********************** REGISTRAR ABONO *************************/
+  async function registrarAbono() {
+    const clienteId = document.getElementById('clienteSelect').value;
+    const facturaId = document.getElementById('facturaSelect').value;
+    const monto = parseFloat(document.getElementById('montoAbono').value);
+    const ruta = document.getElementById('rutaAbono').value;
+    const metodo = document.getElementById('metodoPago').value;
+    const banco = document.getElementById('bancoSelect').value;
+    const referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();
+    const notaCreditoId = document.getElementById('notaCreditoSelect').value;
+
+    // Validaciones básicas
+    if (!clienteId || !facturaId) return alert('Seleccione cliente y factura');
+    if (isNaN(monto) || monto<=0) return alert('Monto inválido');
+    if (metodo==='Transferencia' && !referenciaBancaria) return alert('Ingrese referencia bancaria');
+    if (metodo==='NotaCredito' && !notaCreditoId) return alert('Seleccione una nota de crédito');
+
+    try {
+      await db.runTransaction(async (tx) => {
+        const facturaRef = db.collection('facturas').doc(facturaId);
+        const facturaSnap = await tx.get(facturaRef);
+        if (!facturaSnap.exists) throw new Error('La factura no existe');
+        const facturaData = facturaSnap.data();
+        const saldoActual = facturaData.saldo!==undefined ? facturaData.saldo : facturaData.total;
+        if (saldoActual<=0) throw new Error('La factura ya está saldada');
+        if (monto>saldoActual) throw new Error('El abono excede el saldo pendiente');
+
+        // Preparar datos abono
+        const nuevoSaldo = saldoActual - monto;
+        const fecha = new Date();
+        const abonoRef = facturaRef.collection('abonos').doc();
+        const abonoData = {
+          clientId: clienteId,
+          amount: monto,
+          pendingBalance: nuevoSaldo,
+          dateTime: fecha,
+          route: ruta,
+          paymentMethod: metodo,
+          paymentType: (metodo==='Transferencia')? `Transferencia - ${banco}` : metodo,
+          referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
+          notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null
+        };
+
+        // Actualizar factura
+        tx.update(facturaRef,{ saldo: nuevoSaldo });
+        // Crear abono
+        tx.set(abonoRef, abonoData);
+
+        // Si es nota crédito, marcar nota con abonoId
+        if (metodo==='NotaCredito') {
+          const notaRef = db.collection('notasCredito').doc(notaCreditoId);
+          tx.update(notaRef,{ abonoId: abonoRef.id });
+        }
+      });
+
+      toast('✅ Abono registrado');
+      mostrarReciboEnPantalla({
+        facturaId,
+        monto,
+        saldoPendiente: (document.querySelector(`#facturaSelect option[value="${facturaId}"]`).dataset.saldo - monto),
+        fecha: new Date(),
+        ruta,
+        metodo,
+        banco,
+        referenciaBancaria,
+        notaCreditoId
+      });
+
+      limpiarFormulario(false);
+      cargarFacturasCredito();
+      cargarHistorialAbonos();
+    } catch(err) {
+      console.error(err);
+      alert('Error: '+err.message);
+    }
+  }
+
+  /*********************** RECIBO *************************/
+  function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId }) {
+    const div = document.getElementById('recibo');
+    const fechaStr = fecha.toLocaleString();
+
+    let metodoTxt = metodo;
+    if (metodo==='Transferencia') metodoTxt += ` (${banco} #${referenciaBancaria})`;
+    if (metodo==='NotaCredito') metodoTxt += ` (NC: ${notaCreditoId})`;
+
+    div.innerHTML = `
+      <h3 style="text-align:center;">Recibo de Abono</h3>
+      <p><strong>Fecha:</strong> ${fechaStr}</p>
+      <p><strong>Ruta:</strong> ${ruta}</p>
+      <p><strong>Factura #:</strong> ${facturaId}</p>
+      <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
+      <hr>
+      <p><strong>Abonado:</strong> C$${monto.toFixed(2)}</p>
+      <p><strong>Saldo Pendiente:</strong> C$${saldoPendiente.toFixed(2)}</p>
+    `;
+    document.getElementById('reciboContainer').style.display = 'block';
+  }
+
+  function imprimirRecibo() {
+    const contenido = document.getElementById('recibo').innerHTML;
+    const w = window.open('', '_blank', 'width=800,height=600');
+    w.document.write(`<!DOCTYPE html><html><head><title>Recibo</title><style>body{font-family:Arial;margin:20px;}hr{margin:10px 0;}</style></head><body>${contenido}</body></html>`);
+    w.document.close();
+    w.focus();
+    w.print();
+    w.close();
+  }
+
+  /*********************** LIMPIAR FORM *************************/
+  function limpiarFormulario(resetCliente=true) {
+    if (resetCliente) {
+      $('#clienteSelect').val(null).trigger('change');
+    }
+    $('#facturaSelect').val(null).trigger('change');
+    document.getElementById('montoAbono').value='';
+    document.getElementById('montoAbono').readOnly=false;
+    document.getElementById('metodoPago').value='Efectivo';
+    document.getElementById('referenciaBancaria').value='';
+    $('#notaCreditoSelect').val(null).trigger('change');
+    toggleMetodoPago();
+    document.getElementById('reciboContainer').style.display='none';
+  }
+
+  /*********************** HISTORIAL *************************/
+  function cargarHistorialAbonos() {
+    const tbody = document.getElementById('tablaHistorial');
+    tbody.innerHTML = '';
+    // Últimos 20 abonos (de cualquier factura) ordenados por fecha desc
+    db.collectionGroup('abonos').orderBy('dateTime','desc').limit(20).get().then(qs => {
+      qs.forEach(doc => {
+        const a = doc.data();
+        const tr = document.createElement('tr');
+        const fecha = (typeof a.dateTime.toDate==='function')? a.dateTime.toDate() : new Date(a.dateTime);
+        tr.innerHTML = `
+          <td>${fecha.toLocaleString()}</td>
+          <td>${doc.ref.parent.parent.id}</td>
+          <td>${a.paymentMethod}</td>
+          <td>${a.amount.toFixed(2)}</td>
+          <td>${a.pendingBalance.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
+  }
+
+  // Cargar historial de arranque
+  cargarHistorialAbonos();
 </script>
 </body>
 </html>

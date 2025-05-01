@@ -162,11 +162,11 @@
     </select>
 
     <!-- Nuevo selector de Moneda -->
-    <label for="currencySelect">Moneda:</label>
+    <!--<label for="currencySelect">Moneda:</label>
     <select id="currencySelect">
       <option value="CORD">Córdobas (C$)</option>
       <option value="USD">Dólares ($)</option>
-    </select>
+    </select>-->
 
     <!-- Nuevo selector de Método de Pago -->
     <label for="paymentType">Método de Pago:</label>
@@ -636,7 +636,7 @@
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
-      const currency = document.getElementById('currencySelect').value;
+      const currency = "N/A";//document.getElementById('currencySelect').value;
 
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;

@@ -2,349 +2,143 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Registrar Abonos 😎📲</title>
-  <!-- Firebase SDK -->
+  <title>Registrar Abonos con Nota de Crédito</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Firebase Config (ajusta la URL si tu config está en otro lado) -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  <!-- jQuery -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- Select2 CSS y JS -->
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <style>
-    /* Estilos básicos */
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-    label { display:block; margin-top:8px; }
-    select, input { width:100%; padding:6px; margin-top:4px; }
-    button { margin-top:12px; padding:8px 16px; }
-    .select2-container { width:100%!important; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f9f9f9; }
+    .container { max-width: 800px; margin: auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    label, select, input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; }
+    #bancoSelect, #referenciaInput, #notaCreditoSelect { display: none; }
   </style>
 </head>
 <body>
+<div class="container">
+  <h1>Registrar Abono</h1>
+  <label for="clienteSelect">Seleccionar Cliente:</label>
+  <select id="clienteSelect"></select>
 
-  <!-- ====================================================== -->
-  <!-- SECCIÓN: Registrar Abonos (Subcolección)               -->
-  <!-- ====================================================== -->
-  <h2>Registrar Abonos a Facturas de Crédito 💸</h2>
+  <label for="facturaSelect">Seleccionar Factura de Crédito:</label>
+  <select id="facturaSelect"></select>
 
-  <label for="abonoClientSelect">Selecciona Cliente:</label>
-  <select id="abonoClientSelect" onchange="loadCreditInvoicesForAbonos()"></select>
-
-  <label for="abonoInvoiceSelect">Selecciona Factura (Crédito Pendiente):</label>
-  <select id="abonoInvoiceSelect" onchange="updateAbonoAmount()"></select>
-
-  <!-- NUEVO: Selector Método de Pago -->
-  <label for="abonoPaymentMethod">Método de Pago:</label>
-  <select id="abonoPaymentMethod" onchange="toggleAbonoPaymentFields()">
-    <option value="">-- Selecciona método --</option>
-    <option value="EFECTIVO">Efectivo</option>
-    <option value="TRANSFERENCIA">Transferencia</option>
-    <option value="NOTA_CREDITO">Nota de Crédito</option>
+  <label for="metodoPagoSelect">Método de Pago:</label>
+  <select id="metodoPagoSelect">
+    <option value="Efectivo">Efectivo</option>
+    <option value="Transferencia">Transferencia</option>
+    <option value="NotaCredito">Nota de Crédito</option>
   </select>
 
-  <!-- Campos para Transferencia -->
-  <div id="transferFields" style="display:none;">
-    <label for="abonoBankSelect">Banco:</label>
-    <select id="abonoBankSelect">
-      <option value="">-- Banco --</option>
+  <div id="bancoSelectContainer">
+    <label for="bancoSelect">Banco:</label>
+    <select id="bancoSelect">
       <option value="BAC">BAC</option>
-      <option value="LAFISE">LA FISE</option>
+      <option value="LA FISE">LA FISE</option>
       <option value="BANPRO">BANPRO</option>
       <option value="AVANZ">AVANZ</option>
     </select>
 
-    <label for="abonoReference">Referencia Bancaria:</label>
-    <input type="text" id="abonoReference" maxlength="50" />
+    <label for="referenciaInput">Referencia Bancaria:</label>
+    <input type="text" id="referenciaInput" placeholder="Número de referencia">
   </div>
 
-  <!-- Campos para Nota de Crédito -->
-  <div id="notaCreditoFields" style="display:none;">
-    <label for="abonoNotaCreditoSelect">Nota de Crédito:</label>
-    <select id="abonoNotaCreditoSelect" onchange="setMontoFromNotaCredito()">
-      <!-- Opciones cargadas dinámicamente -->
-    </select>
+  <div id="notaCreditoSelectContainer">
+    <label for="notaCreditoSelect">Seleccionar Nota de Crédito:</label>
+    <select id="notaCreditoSelect"></select>
   </div>
 
-  <label for="abonoAmount">Monto a Abonar (C$):</label>
-  <input type="number" id="abonoAmount" step="0.01" min="0.01" />
+  <label for="montoInput">Monto a Abonar:</label>
+  <input type="number" id="montoInput" readonly />
 
-  <label for="abonoRoute">Ruta del Abono:</label>
-  <select id="abonoRoute"></select>
+  <button onclick="registrarAbono()">Registrar Abono</button>
+</div>
 
-  <button onclick="registerAbono()">REGISTRAR ABONO</button>
-  <button onclick="cancelAbono()">CANCELAR</button>
+<script>
+const db = firebase.firestore();
 
-  <!-- Contenedor para mostrar el recibo del abono -->
-  <div id="abonoReceiptContainer" style="display:none; margin-top:20px;">
-    <div id="abonoReceipt" style="border:1px solid #333; padding:10px;">
-      <!-- Aquí se generará dinámicamente el recibo de abono -->
-    </div>
-    <button onclick="printAbonoReceipt()">Imprimir Recibo 🖨️</button>
-  </div>
+$(document).ready(function() {
+  cargarClientes();
 
-  <!-- ====================================================== -->
-  <!-- SECCIÓN DE SCRIPTS                                     -->
-  <!-- ====================================================== -->
-  <script>
-    /* ---------- Configuración básica de Firebase ---------- */
-    const db = firebase.firestore();
-
-    /* ---------- Utilidades generales ---------- */
-    function generateReference() {
-      return Math.random().toString(36).substring(2, 8).toUpperCase();
+  $('#metodoPagoSelect').change(function() {
+    const metodo = $(this).val();
+    $('#bancoSelect, #referenciaInput').parent().hide();
+    $('#notaCreditoSelectContainer').hide();
+    $('#montoInput').prop('readonly', false);
+    if (metodo === 'Transferencia') {
+      $('#bancoSelectContainer').show();
+      $('#referenciaInput').parent().show();
+    } else if (metodo === 'NotaCredito') {
+      $('#notaCreditoSelectContainer').show();
+      cargarNotasCredito();
     }
-    function cancelAbono() {
-      document.getElementById('abonoAmount').value = '';
-      document.getElementById('abonoPaymentMethod').value = '';
-      toggleAbonoPaymentFields();
-      $('#abonoInvoiceSelect').val(null).trigger('change');
-    }
-    function printAbonoReceipt() {
-      const contenido = document.getElementById("abonoReceipt").innerHTML;
-      const ventana = window.open("", "Imprimir", "height=600,width=800");
-      ventana.document.write("<html><head><title>Recibo de Abono</title></head><body>");
-      ventana.document.write(contenido);
-      ventana.document.write("</body></html>");
-      ventana.document.close();
-      ventana.print();
-    }
+  });
 
-    /* ---------- Nuevas funciones para método de pago ---------- */
-    function toggleAbonoPaymentFields() {
-      const method = document.getElementById("abonoPaymentMethod").value;
-      document.getElementById("transferFields").style.display   = (method === "TRANSFERENCIA") ? "block" : "none";
-      document.getElementById("notaCreditoFields").style.display = (method === "NOTA_CREDITO") ? "block" : "none";
+  $('#notaCreditoSelect').change(function() {
+    const selectedOption = $(this).find('option:selected');
+    const monto = parseFloat(selectedOption.data('monto')) || 0;
+    $('#montoInput').val(monto.toFixed(2)).prop('readonly', true);
+  });
+});
 
-      // Reset campos si cambian
-      if (method !== "TRANSFERENCIA") {
-        document.getElementById("abonoBankSelect").value = "";
-        document.getElementById("abonoReference").value  = "";
-      }
-      if (method !== "NOTA_CREDITO") {
-        document.getElementById("abonoNotaCreditoSelect").innerHTML =
-          "<option value=''>-- Nota de Crédito --</option>";
-        document.getElementById("abonoAmount").readOnly = false;
-      }
-    }
-
-    function loadNotasCreditoForClient(clientId) {
-      if (!clientId) return;
-      db.collection("notasCredito")
-        .where("clienteId", "==", clientId)
-        .where("abonoId", "==", null)
-        .get()
-        .then((snap) => {
-          const select = document.getElementById("abonoNotaCreditoSelect");
-          select.innerHTML = "<option value=''>-- Nota de Crédito --</option>";
-          snap.forEach((doc) => {
-            const opt = document.createElement("option");
-            opt.value = doc.id;
-            opt.dataset.monto = doc.data().monto;
-            opt.text = `${doc.id} – C$${doc.data().monto.toFixed(2)}`;
-            select.appendChild(opt);
-          });
-        });
-    }
-
-    function setMontoFromNotaCredito() {
-      const sel   = document.getElementById("abonoNotaCreditoSelect");
-      const monto = sel.options[sel.selectedIndex]?.dataset?.monto;
-      if (monto) {
-        const input = document.getElementById("abonoAmount");
-        input.value = monto;
-        input.readOnly = true;
-      } else {
-        document.getElementById("abonoAmount").readOnly = false;
-      }
-    }
-
-    /* ---------- Carga de clientes y facturas existentes ---------- */
-    async function loadClientsForAbonos() {
-      const snap = await db.collection("clientes").get();
-      const select = $("#abonoClientSelect");
-      select.empty().append('<option value="">-- Cliente --</option>');
-      snap.forEach((doc) => {
-        const data = doc.data();
-        select.append(
-          `<option value="${doc.id}">${data.nombre} (${data.codigo})</option>`
-        );
-      });
-      select.select2();
-    }
-
-    async function loadCreditInvoicesForAbonos() {
-      const clientId = document.getElementById("abonoClientSelect").value;
-      if (!clientId) return;
-
-      // Notas de crédito disponibles
-      loadNotasCreditoForClient(clientId);
-
-      const select = $("#abonoInvoiceSelect");
-      select.empty().append('<option value="">-- Factura --</option>');
-
-      const snap = await db
-        .collection("facturas")
-        .where("clienteId", "==", clientId)
-        .where("saldo", ">", 0)
-        .get();
-
-      snap.forEach((doc) => {
-        const d = doc.data();
-        select.append(
-          `<option value="${doc.id}">${doc.id} - Saldo C$${d.saldo.toFixed(
-            2
-          )}</option>`
-        );
-      });
-      select.select2();
-    }
-
-    /* ---------- Registrar Abono ---------- */
-    async function registerAbono() {
-      const clientId  = document.getElementById("abonoClientSelect").value;
-      const invoiceId = document.getElementById("abonoInvoiceSelect").value;
-      const abonoAmountInput = document.getElementById("abonoAmount");
-      const route     = document.getElementById("abonoRoute").value;
-
-      // Nuevos campos de pago
-      const paymentMethod = document.getElementById("abonoPaymentMethod").value;
-      let   paymentType = null;
-      let   referenciaBancaria = null;
-      let   notaCreditoId = null;
-
-      if (!paymentMethod) {
-        alert("Debes seleccionar el método de pago.");
-        return;
-      }
-      if (paymentMethod === "TRANSFERENCIA") {
-        paymentType       = document.getElementById("abonoBankSelect").value;
-        referenciaBancaria = document.getElementById("abonoReference").value.trim();
-        if (!paymentType || !referenciaBancaria) {
-          alert("Completa banco y referencia bancaria.");
-          return;
-        }
-      }
-      if (paymentMethod === "NOTA_CREDITO") {
-        notaCreditoId = document.getElementById("abonoNotaCreditoSelect").value;
-        if (!notaCreditoId) {
-          alert("Debes seleccionar la nota de crédito.");
-          return;
-        }
-        paymentType = "NOTA_CREDITO";
-      }
-
-      if (!clientId || !invoiceId) {
-        alert("Debes seleccionar cliente y factura primero. 😬");
-        return;
-      }
-
-      let abonoAmount = parseFloat(abonoAmountInput.value);
-      if (isNaN(abonoAmount) || abonoAmount <= 0) {
-        alert("Monto de abono inválido. 😬");
-        return;
-      }
-
-      // GENERAR ID del abono por adelantado (para vincular con nota de crédito)
-      const abonoId = db.collection("tmp").doc().id;
-
-      try {
-        await db.runTransaction(async (transaction) => {
-          const invoiceRef = db.collection("facturas").doc(invoiceId);
-          const invoiceDoc = await transaction.get(invoiceRef);
-          if (!invoiceDoc.exists) throw new Error("Factura no encontrada.");
-
-          const factData = invoiceDoc.data();
-          const currentSaldo =
-            factData.saldo !== undefined ? factData.saldo : factData.total;
-
-          if (currentSaldo <= 0) throw new Error("La factura ya está pagada.");
-          if (abonoAmount > currentSaldo)
-            throw new Error(
-              `El abono excede el saldo pendiente (C$${currentSaldo.toFixed(2)}).`
-            );
-
-          // Nuevo saldo
-          const newSaldo = currentSaldo - abonoAmount;
-          transaction.update(invoiceRef, { saldo: newSaldo });
-
-          // Datos del abono
-          const reference = generateReference();
-          const dateTime  = new Date();
-
-          // Crear doc de abono (subcolección)
-          const abonoRef = invoiceRef.collection("abonos").doc(abonoId);
-          transaction.set(abonoRef, {
-            clientId,
-            amount: abonoAmount,
-            pendingBalance: newSaldo,
-            reference,
-            dateTime,
-            route,
-            paymentMethod,
-            paymentType,
-            referenciaBancaria,
-            notaCreditoId
-          });
-        });
-
-        // Vincular nota de crédito si aplica
-        if (notaCreditoId) {
-          await db
-            .collection("notasCredito")
-            .doc(notaCreditoId)
-            .update({ abonoId });
-        }
-
-        alert("Abono registrado con éxito. 🎉");
-
-        /* -------- Mostrar recibo -------- */
-        const factDocSnap = await db.collection("facturas").doc(invoiceId).get();
-        const facturaData = factDocSnap.data();
-        showAbonoReceipt(
-          {
-            invoiceId,
-            abono: abonoAmount,
-            saldoPendiente: facturaData.saldo || 0,
-            fecha: new Date(),
-            route
-          },
-          facturaData
-        );
-
-        // Recargar facturas pendientes / limpiar
-        loadCreditInvoicesForAbonos();
-        cancelAbono();
-      } catch (error) {
-        console.error("Error al registrar abono:", error);
-        alert("Ocurrió un error al registrar el abono: " + error.message);
-      }
-    }
-
-    /* ---------- Recibo en pantalla ---------- */
-    function showAbonoReceipt(data, factura) {
-      const cont = document.getElementById("abonoReceipt");
-      cont.innerHTML = `
-        <h3>Recibo de Abono</h3>
-        <p><strong>Factura:</strong> ${data.invoiceId}</p>
-        <p><strong>Monto abonado:</strong> C$${data.abono.toFixed(2)}</p>
-        <p><strong>Nuevo saldo:</strong> C$${data.saldoPendiente.toFixed(2)}</p>
-        <p><strong>Fecha:</strong> ${data.fecha.toLocaleString()}</p>
-        <p><strong>Ruta:</strong> ${data.route}</p>
-      `;
-      document.getElementById("abonoReceiptContainer").style.display = "block";
-    }
-
-    /* ---------- OnLoad ---------- */
-    window.addEventListener("load", () => {
-      loadClientsForAbonos();
-      $("#abonoRoute").select2({ placeholder: "Ruta" });
+function cargarClientes() {
+  db.collection("clientes").get().then(snapshot => {
+    snapshot.forEach(doc => {
+      const cliente = doc.data();
+      $('#clienteSelect').append(`<option value="${doc.id}">${cliente.nombreCliente} - ${cliente.nombreTienda}</option>`);
     });
-  </script>
+  });
+}
+
+function cargarNotasCredito() {
+  const clienteId = $('#clienteSelect').val();
+  if (!clienteId) return;
+
+  $('#notaCreditoSelect').empty();
+  db.collection("notasCredito").where("clienteId", "==", clienteId).where("abonoId", "==", null).get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        const nota = doc.data();
+        $('#notaCreditoSelect').append(`<option value="${doc.id}" data-monto="${nota.monto}">${nota.descripcion} - C$${nota.monto.toFixed(2)}</option>`);
+      });
+    });
+}
+
+function registrarAbono() {
+  const clienteId = $('#clienteSelect').val();
+  const facturaId = $('#facturaSelect').val();
+  const metodoPago = $('#metodoPagoSelect').val();
+  const monto = parseFloat($('#montoInput').val());
+  const banco = $('#bancoSelect').val();
+  const referencia = $('#referenciaInput').val();
+  const notaCreditoId = $('#notaCreditoSelect').val();
+
+  if (!clienteId || !facturaId || isNaN(monto)) {
+    alert("Por favor completa todos los campos obligatorios.");
+    return;
+  }
+
+  const abonoData = {
+    clienteId,
+    facturaId,
+    paymentMethod: metodoPago,
+    paymentType: banco || null,
+    referenciaBancaria: referencia || null,
+    monto,
+    fecha: new Date()
+  };
+
+  const facturaRef = db.collection("facturas").doc(facturaId);
+  facturaRef.collection("abonos").add(abonoData).then(docRef => {
+    if (metodoPago === 'NotaCredito' && notaCreditoId) {
+      db.collection("notasCredito").doc(notaCreditoId).update({ abonoId: docRef.id });
+    }
+    alert("Abono registrado exitosamente.");
+    location.reload();
+  });
+}
+</script>
 </body>
 </html>

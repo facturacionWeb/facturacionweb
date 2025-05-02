@@ -861,7 +861,7 @@
                 promises.push(docRef.set(item.imeiDocData));
               }
             });*/
-            items.forEach(item => {
+            /*items.forEach(item => {
                 if (item.imei && item.articleId) {
                     const imeiDoc = {
                     imei: item.imei,
@@ -871,7 +871,32 @@
                     const newDocRef = db.collection("Articulos_X_IMEI").doc(); // o .doc(item.imei)
                     promises.push(newDocRef.set(imeiDoc));
                 }
-            });
+            });*/
+            items.forEach(item => {
+                console.log("Procesando item:", item); // 🔍 Muestra todo el item
+              
+                if (item.imei && item.articleId) {
+                  const imeiDoc = {
+                    imei: item.imei,
+                    articleId: item.articleId
+                  };
+              
+                  // 🔍 Mostrar el contenido a insertar
+                  console.log("Preparando restauración:", imeiDoc);
+              
+                  // Podés usar el imei como ID si lo manejás así en Firestore
+                  const newDocRef = db.collection("Articulos_X_IMEI").doc(item.imei);
+                  const promise = newDocRef.set(imeiDoc)
+                    .then(() => console.log(`✅ IMEI ${item.imei} restaurado correctamente`))
+                    .catch(err => console.error(`❌ Error al restaurar IMEI ${item.imei}`, err));
+              
+                  promises.push(promise);
+                } else {
+                  console.warn("⚠️ Item ignorado por falta de imei o articleId:", item);
+                }
+              });
+              
+              console.log("Total de operaciones push a promises:", promises.length);
             
             return Promise.all(promises);
           })

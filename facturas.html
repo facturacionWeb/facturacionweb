@@ -697,6 +697,7 @@
 
       // 🚨 IMPORTANTE: Guardar "saldo" en la factura igual a "invoiceTotal"
       // para manejar pagos parciales
+      const consecutivo = `${yyyy}${mm}${dd}-${hh}${min}${ss}-${random}`;
       const invoice = {
         clientId,
         route,
@@ -708,7 +709,7 @@
         fecha: now,
         fechaStr,
         anulada: false,
-        consecutivo: Date.now().toString(),
+        consecutivo: consecutivo,
         saldo: invoiceTotal // <-- Aquí almacenamos el saldo inicial
       };
 

@@ -633,6 +633,20 @@
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
     }
 
+    function generarConsecutivoFactura() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    
+      return `${yyyy}${mm}${dd}-${hh}${min}${ss}-${random}`;
+    }
+
+
     // Crear factura y guardar en Firestore (eliminando IMEIs usados)
     function createInvoice() {
       const clientId = document.getElementById('clientSelect').value;
@@ -697,7 +711,7 @@
 
       // 🚨 IMPORTANTE: Guardar "saldo" en la factura igual a "invoiceTotal"
       // para manejar pagos parciales
-      const consecutivo = `${yyyy}${mm}${dd}-${hh}${min}${ss}-${random}`;
+      const consecutivo = generarConsecutivoFactura();
       const invoice = {
         clientId,
         route,

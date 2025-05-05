@@ -1004,7 +1004,7 @@
             const invoiceHTML = `
               <div class="invoice-header">
                 <h2>Factura - ${invoiceId} ${invoiceStatus}</h2>
-                <p class="currency"><strong>Moneda:</strong> ${currencyText}</p>
+                <p class="currency"><strong>Consecutivo:</strong> ${invoice.consecutivo || 'N/A'}</p>
                 <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
               </div>
               <div class="invoice-body">

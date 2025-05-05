@@ -855,23 +855,6 @@
           .then(() => {
             const items = invoiceData.items || [];
             const promises = [];
-            /*items.forEach(item => {
-              if (item.imeiDocId && item.imeiDocData) {
-                const docRef = db.collection("Articulos_X_IMEI").doc(item.imeiDocId);
-                promises.push(docRef.set(item.imeiDocData));
-              }
-            });*/
-            /*items.forEach(item => {
-                if (item.imei && item.articleId) {
-                    const imeiDoc = {
-                    imei: item.imei,
-                    articleId: item.articleId
-                    };
-                    // Restaurar con nuevo ID basado en imei (o como se genere en tu sistema)
-                    const newDocRef = db.collection("Articulos_X_IMEI").doc(); // o .doc(item.imei)
-                    promises.push(newDocRef.set(imeiDoc));
-                }
-            });*/
             items.forEach(item => {
                 console.log("Procesando item:", item); // 🔍 Muestra todo el item
               

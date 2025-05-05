@@ -824,6 +824,7 @@
           const row = document.createElement('tr');
           row.innerHTML = `
             <td>${doc.id}</td>
+            <td>${invoice.consecutivo || 'N/A'}</td>
             <td>${fecha}</td>
             <td>${invoice.clientId}</td>
             <td>${invoice.route}</td>
@@ -942,6 +943,7 @@
             const row = document.createElement('tr');
             row.innerHTML = `
               <td>${doc.id}</td>
+              <td>${invoice.consecutivo || 'N/A'}</td>
               <td>${fecha}</td>
               <td>${invoice.clientId}</td>
               <td>${invoice.route}</td>

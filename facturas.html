@@ -759,12 +759,25 @@
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
-        //let currencyText = invoice.currency === 'CORD' ? 'Córdobas (C$)' : 'Dólares ($)';
-        const invoiceHTML = `
-          <div class="invoice-header">
+        /*
+            <div class="invoice-header">
             <h2>Factura - ${invoiceId}</h2>
             <p class="currency"><strong>Consecutivo:</strong> ${invoice.consecutivo || 'N/A'}</p>
             <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
+            </div>
+        */
+        const invoiceHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <div style="flex: 0 0 130px;">
+              <img src="https://facturacionweb.github.io/facturacionweb/galaxia.jpg" 
+              alt="Logo del negocio" 
+              style="width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.1);" />
+            </div>
+            <div style="flex: 1; text-align: left; padding-left: 20px;">
+              <h2 style="margin: 0;">Factura - ${invoiceId}</h2>
+              <p style="margin: 5px 0;"><strong>Consecutivo:</strong> ${invoice.consecutivo || 'N/A'}</p>
+              <p style="margin: 5px 0;"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
+            </div>
           </div>
           <div class="invoice-body">
             <table class="details-table">

@@ -660,7 +660,13 @@
         let bankReference = document.getElementById('bankReference').value;
         paymentMethod = `Transferencia - Banco: ${bank} (#Ref: ${bankReference})`;
       } else if (paymentType === "Credito") {
-        paymentMethod = "Crédito a 30 días";
+        const diasCredito = prompt("¿Cuántos días de crédito desea asignar?", "30");
+        if (!diasCredito || isNaN(diasCredito) || diasCredito <= 0) {
+          alert("Número de días inválido. Por defecto se asignarán 30 días.");
+          paymentMethod = "Crédito a 30 días";
+        } else {
+          paymentMethod = `Crédito a ${parseInt(diasCredito)} días`;
+        }
       } else {
         paymentMethod = "Efectivo";
       }

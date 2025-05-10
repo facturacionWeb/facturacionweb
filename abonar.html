@@ -293,6 +293,7 @@
     /* .where('clienteId','==',clienteId)
       .where('abonoId','==',null)*/
     db.collection('notasCredito')
+      .where('clienteId','==',clienteId)
       .get().then(qs => {
         qs.forEach(doc => {
           const n = doc.data();

@@ -293,9 +293,10 @@
     /* .where('clienteId','==',clienteId)
       .where('abonoId','==',null)*/
     db.collection('notasCredito')
-      .where('clienteId','==',clienteId)
       .get().then(qs => {
         qs.forEach(doc => {
+          const nota = doc.data();
+          console.log(`Doc ${doc.id} → clienteId: [${nota.clienteId}] | == [${clienteId}] → ${nota.clienteId === clienteId}`);
           const n = doc.data();
           const opt = document.createElement('option');
           opt.value = doc.id;

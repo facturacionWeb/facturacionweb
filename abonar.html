@@ -235,14 +235,15 @@
     const sel = document.getElementById('facturaSelect');
     sel.innerHTML = '';
     if (!clienteId) return;
+    //.where('clientId','==',clienteId)
     db.collection('facturas')
-      .where('clientId','==',clienteId)
       .where('paymentType','==','Credito')
       .where('anulada','==',false)
       .orderBy('fecha','asc')
       .get().then(qs => {
         qs.forEach(doc => {
           const f = doc.data();
+          console.log(`🧾 Factura ${doc.id} → clientId: [${f.clientId}] | == [${clienteId}] → ${f.clientId === clienteId}`);
           const saldo = f.saldo !== undefined ? f.saldo : f.total;
           if (saldo > 0) {
             const opt = document.createElement('option');

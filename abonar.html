@@ -192,11 +192,16 @@
 
     // Eventos
     //document.getElementById('clienteSelect').addEventListener('change', cargarFacturasCredito);
-      document.getElementById('clienteSelect').addEventListener('change', () => {
+     /* document.getElementById('clienteSelect').addEventListener('change', () => {
         console.log("Cliente cambiado!");
         cargarFacturasCredito();
         cargarNotasCreditoDisponibles();
-      });
+      });*/
+    $('#clienteSelect').on('change', function () {
+      console.log("🔥 Cliente cambiado (vía Select2)");
+      cargarFacturasCredito();
+      cargarNotasCreditoDisponibles();
+    });
     document.getElementById('facturaSelect').addEventListener('change', actualizarMontoPorSaldo);
     document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
     document.getElementById('notaCreditoSelect').addEventListener('change', setMontoPorNotaCredito);

@@ -191,7 +191,12 @@
     cargarClientes();
 
     // Eventos
-    document.getElementById('clienteSelect').addEventListener('change', cargarFacturasCredito);
+    //document.getElementById('clienteSelect').addEventListener('change', cargarFacturasCredito);
+      document.getElementById('clienteSelect').addEventListener('change', () => {
+        console.log("Cliente cambiado!");
+        cargarFacturasCredito();
+        cargarNotasCreditoDisponibles();
+      });
     document.getElementById('facturaSelect').addEventListener('change', actualizarMontoPorSaldo);
     document.getElementById('metodoPago').addEventListener('change', toggleMetodoPago);
     document.getElementById('notaCreditoSelect').addEventListener('change', setMontoPorNotaCredito);
@@ -237,6 +242,7 @@
     if (!clienteId) return;
     //.where('clientId','==',clienteId)
     db.collection('facturas')
+      .where('clientId','==',clienteId)
       .where('paymentType','==','Credito')
       .where('anulada','==',false)
       .orderBy('fecha','asc')
@@ -294,6 +300,8 @@
     /* .where('clienteId','==',clienteId)
       .where('abonoId','==',null)*/
     db.collection('notasCredito')
+      .where('clienteId','==',clienteId)
+      .where('abonoId','==',null)
       .get().then(qs => {
         qs.forEach(doc => {
           const nota = doc.data();

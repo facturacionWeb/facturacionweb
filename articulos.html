@@ -232,7 +232,7 @@
     }
 
     // Función para eliminar un artículo solo si no tiene IMEIs asociados
-    function deleteArticle(id) {
+    /*function deleteArticle(id) {
       // Verificar si hay IMEIs asociados al artículo
       db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
       .then((querySnapshot) => {
@@ -255,7 +255,51 @@
       .catch((error) => {
         console.error("Error al verificar IMEIs asociados: ", error);
       });
+    }*/
+    function deleteArticle(id) {
+      // Verificar si hay IMEIs asociados al artículo
+      db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
+      .then((querySnapshot) => {
+        if (!querySnapshot.empty) {
+          if (confirm("Este artículo tiene IMEIs asociados. Si lo borra, se eliminarán también todos los IMEIs asociados. ¿Está seguro?")) {
+            // Eliminar todos los IMEIs asociados
+            let deletePromises = [];
+            querySnapshot.forEach((doc) => {
+              deletePromises.push(db.collection("Articulos_X_IMEI").doc(doc.id).delete());
+            });
+            // Después eliminar el artículo
+            Promise.all(deletePromises).then(() => {
+              db.collection("Articulos").doc(id).delete()
+              .then(() => {
+                alert("Artículo e IMEIs eliminados correctamente 😊");
+                loadArticles();
+              })
+              .catch((error) => {
+                console.error("Error al eliminar el artículo: ", error);
+              });
+            }).catch((error) => {
+              console.error("Error al eliminar los IMEIs: ", error);
+            });
+          }
+        } else {
+          // Si no hay IMEIs, confirmar eliminación normal
+          if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
+            db.collection("Articulos").doc(id).delete()
+            .then(() => {
+              alert("Artículo eliminado 😊");
+              loadArticles();
+            })
+            .catch((error) => {
+              console.error("Error al eliminar el artículo: ", error);
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error al verificar IMEIs asociados: ", error);
+      });
     }
+
 
     /* =============================
        Funciones para IMEI

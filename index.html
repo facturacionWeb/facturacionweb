@@ -101,6 +101,7 @@
         <button onclick="goToItemsReport()">📊 Reporte de Artículos</button>
         <button onclick="goToItemsXRutaReport()">🚛 Reporte por Ruta</button>
         <button onclick="goToEstadoCuentaReport()">👤🧾 Reporte Estado Cuenta por Cliente</button>
+        <button onclick="sendToPrinter()">Print!<button>
         <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
         
         <div class="footer">
@@ -196,6 +197,12 @@
             document.getElementById('adminPanel').style.display = 'none';
             document.getElementById('loginContainer').style.display = 'block';
         }
+
+        function sendToPrinter() {
+            const text = "[C]¡Hola desde la Web!\n[L]Total: $5.00\n";
+            AndroidBridge.printTicket(text);
+        }
+      
     </script>  
 </body>
 </html>

@@ -819,7 +819,7 @@
             <td>${doc.id}</td>
             <td>${invoice.consecutivo || 'N/A'}</td>
             <td>${fecha}</td>
-            <td>${invoice.clientId}</td>
+            <td>${clientNameMap[invoice.clientId] || invoice.clientId}</td>
             <td>${invoice.route}</td>
             <td>${invoice.total.toFixed(2)}</td>
             <td>${status}</td>
@@ -938,7 +938,7 @@
               <td>${doc.id}</td>
               <td>${invoice.consecutivo || 'N/A'}</td>
               <td>${fecha}</td>
-              <td>${invoice.clientId}</td>
+              <td>${clientNameMap[invoice.clientId] || invoice.clientId}</td>
               <td>${invoice.route}</td>
               <td>${invoice.total.toFixed(2)}</td>
               <td>${status}</td>
@@ -1421,6 +1421,24 @@
   
     return Object.values(grupos);
   }
+
+  const clientNameMap = {}; 
+
+  function loadClients() {
+    db.collection("clientes").get().then((querySnapshot) => {
+      querySnapshot.forEach((doc) => {
+        const cliente = doc.data();
+        const fullName = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
+        clientNameMap[doc.id] = fullName;
+  
+        const option = document.createElement("option");
+        option.value = doc.id;
+        option.text = fullName;
+        document.getElementById("clientSelect").appendChild(option);
+      });
+    });
+  }
+  
 
 
     

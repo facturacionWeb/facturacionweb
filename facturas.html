@@ -964,6 +964,7 @@
       db.collection("facturas").doc(invoiceId).get().then((doc) => {
         if(doc.exists) {
           const invoice = doc.data();
+          window.__currentInvoiceItems = invoice.items;
           db.collection("clientes").doc(invoice.clientId).get().then((clientDoc) => {
             const client = clientDoc.data();
             let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
@@ -1011,10 +1012,15 @@
                     <th>Descuento</th>
                     <th>Total</th>
                   </tr>
-                  ${invoice.items.map(item => `
+                  ${agruparItemsFactura(invoice.items).map(item => `
                     <tr>
                       <td>${item.quantity}</td>
-                      <td>${item.brand} ${item.model} ${item.imei ? '(IMEI: ' + item.imei + ')' : ''}</td>
+                      <td>
+                        ${item.brand} ${item.model}<br>
+                        <small>
+                          ${item.imeis.length > 0 ? 'IMEIs:<br>' + item.imeis.map(i => `- ${i}`).join('<br>') : ''}
+                        </small>
+                      </td>
                       <td>${currencySymbol}${item.price.toFixed(2)}</td>
                       <td>${item.discount}%</td>
                       <td>${currencySymbol}${item.total.toFixed(2)}</td>

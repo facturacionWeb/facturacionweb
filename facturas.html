@@ -301,51 +301,6 @@
         <!-- Aquí se listan las facturas -->
       </tbody>
     </table>
-
-    <!-- ******************************************************************
-         SECCIÓN: Registrar Abonos (Subcolección)
-    ****************************************************************** -->
-    <!--<hr>
-    <h2>Registrar Abonos a Facturas de Crédito 💸</h2>
-    <label for="abonoClientSelect">Selecciona Cliente:</label>
-    <select id="abonoClientSelect" onchange="loadCreditInvoicesForAbonos()">
-      
-    </select>
-
-    <label for="abonoInvoiceSelect">Selecciona Factura (Crédito Pendiente):</label>
-    <select id="abonoInvoiceSelect" onchange="updateAbonoAmount()">
-      
-    </select>
-
-    <label for="abonoAmount">Monto a Abonar (C$):</label>
-    <input type="number" id="abonoAmount" step="0.01" min="0.01" />
-
-    <label for="abonoRoute">Ruta del Abono:</label>
-    <select id="abonoRoute">
-      <option value="SIN RUTA">SIN RUTA</option>
-      <option value="1">1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-      <option value="9">9</option>
-      <option value="10">10</option>
-    </select>
-
-    <button onclick="registerAbono()">REGISTRAR ABONO</button>
-    <button onclick="cancelAbono()">CANCELAR</button>
-
-    
-    <div id="abonoReceiptContainer" style="display:none; margin-top:20px;">
-      <div id="abonoReceipt" style="border:1px solid #333; padding:10px;">
-        
-      </div>
-      <button onclick="printAbonoReceipt()">Imprimir Recibo 🖨️</button>
-    </div>-->
-    <!-- ****************************************************************** -->
   </div>
 
   <script>
@@ -773,14 +728,8 @@
     function displayInvoice(invoiceId, invoice) {
       db.collection("clientes").doc(invoice.clientId).get().then((doc) => {
         const client = doc.data();
+        window.__currentInvoiceItems = invoice.items; 
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
-        /*
-            <div class="invoice-header">
-            <h2>Factura - ${invoiceId}</h2>
-            <p class="currency"><strong>Consecutivo:</strong> ${invoice.consecutivo || 'N/A'}</p>
-            <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
-            </div>
-        */
         const invoiceHTML = `
           ${renderInvoiceHeader(invoiceId, invoice.consecutivo, invoice.route)}
           <div class="invoice-body">
@@ -806,10 +755,15 @@
                 <th>Descuento</th>
                 <th>Total</th>
               </tr>
-              ${invoice.items.map(item => `
+              ${agruparItemsFactura(invoice.items).map(item => `
                 <tr>
                   <td>${item.quantity}</td>
-                  <td>${item.brand} ${item.model} ${item.imei ? '(IMEI: ' + item.imei + ')' : ''}</td>
+                  <td>
+                    ${item.brand} ${item.model}<br>
+                    <small>
+                      ${item.imeis.length > 0 ? 'IMEIs:<br>' + item.imeis.map(i => `- ${i}`).join('<br>') : ''}
+                    </small>
+                  </td>
                   <td>${currencySymbol}${item.price.toFixed(2)}</td>
                   <td>${item.discount}%</td>
                   <td>${currencySymbol}${item.total.toFixed(2)}</td>
@@ -1436,6 +1390,34 @@
       loadClients();          // Para facturación
       loadInvoices();         // Para listado de facturas
     };
+
+
+  function agruparItemsFactura(items) {
+    const grupos = {};
+  
+    items.forEach(item => {
+      const key = `${item.brand}||${item.model}||${item.price}||${item.discount}`;
+      if (!grupos[key]) {
+        grupos[key] = {
+          brand: item.brand,
+          model: item.model,
+          price: item.price,
+          discount: item.discount,
+          quantity: 0,
+          total: 0,
+          imeis: []
+        };
+      }
+      grupos[key].quantity += item.quantity;
+      grupos[key].total += item.total;
+      if (item.imei) grupos[key].imeis.push(item.imei);
+    });
+  
+    return Object.values(grupos);
+  }
+
+
+    
   </script>
   
   <!-- Modal para ver el detalle de una factura -->

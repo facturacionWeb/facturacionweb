@@ -1080,6 +1080,9 @@
               <div style="text-align:center; margin-top:20px;">
                 <button onclick="printModalInvoice()">Imprimir Factura 🖨️</button>
               </div>
+              <div style="text-align:center; margin-top:10px;">
+                  <button onclick="printThermalFromModal()">Impresión Móvil 🖨️📲</button>
+              </div>
             `;
             document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
             document.getElementById('invoiceModal').style.display = 'block';
@@ -1146,6 +1149,66 @@
       printWindow.close();
     }
 
+  function printThermalFromModal() {
+    try {
+      const modal = document.getElementById('modalInvoiceContent');
+      if (!modal) {
+        alert("No se encontró el contenido del modal.");
+        return;
+      }
+  
+      const textParts = [];
+      textParts.push("[C]<b>Factura</b>\n");
+  
+      // Extraer detalles del cliente y factura
+      const tdElements = modal.querySelectorAll('.details-table td');
+      tdElements.forEach(td => {
+        const label = td.querySelector('strong');
+        if (label) {
+          const key = label.innerText.trim().replace(':', '');
+          const value = td.innerText.replace(label.innerText, '').trim();
+          textParts.push(`[L]${key}: ${value}`);
+        }
+      });
+  
+      textParts.push("[C]==============================");
+  
+      // Extraer items
+      const rows = modal.querySelectorAll('.items-table tr');
+      for (let i = 1; i < rows.length - 1; i++) {
+        const cols = rows[i].querySelectorAll('td');
+        const qty = cols[0].innerText.trim();
+        const desc = cols[1].innerText.trim();
+        const price = cols[2].innerText.trim();
+        const discount = cols[3].innerText.trim();
+        const total = cols[4].innerText.trim();
+  
+        textParts.push(`[L]${qty} x ${desc}`);
+        textParts.push(`[L]Precio: ${price}  Desc: ${discount}`);
+        textParts.push(`[L]Total: ${total}\n`);
+      }
+  
+      // Total final
+      const lastRow = rows[rows.length - 1];
+      const totalFinal = lastRow.querySelectorAll('td')[1].innerText.trim();
+      textParts.push("[C]------------------------------");
+      textParts.push(`[C]<b>${totalFinal}</b>`);
+      textParts.push("[C]==============================");
+  
+      textParts.push("\n[Firma del Cliente]\n\n\n");
+  
+      const finalText = textParts.join("\n");
+      if (typeof AndroidBridge !== "undefined" && AndroidBridge.printTicket) {
+        AndroidBridge.printTicket(finalText);
+      } else {
+        alert("AndroidBridge no está disponible. ¿Estás en la app Android?");
+      }
+    } catch (e) {
+      alert("Ocurrió un error al preparar la impresión móvil: " + e.message);
+    }
+  }
+
+    
     function closeInvoiceModal() {
       document.getElementById('invoiceModal').style.display = 'none';
     }

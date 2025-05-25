@@ -598,9 +598,16 @@
       return `${yyyy}${mm}${dd}-${hh}${min}${ss}-${random}`;
     }
 
-
+    let creatingInvoice = false;
     // Crear factura y guardar en Firestore (eliminando IMEIs usados)
     function createInvoice() {
+
+      if (creatingInvoice) return; // 🛑 Bloqueo si ya está en proceso
+      creatingInvoice = true;
+      const btn = document.getElementById("createInvoiceBtn");
+      btn.disabled = true;
+      btn.innerText = "Creando factura...";
+      
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
       const currency = "N/A";//document.getElementById('currencySelect').value;
@@ -698,11 +705,22 @@
         });
 
         displayInvoice(docRef.id, invoice);
+
+        creatingInvoice = false;
+        btn.disabled = false;
+        btn.innerText = "Crear Factura 💵";
+        
         loadInvoices();
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
       }).catch((error) => {
+        
+        creatingInvoice = false;
+        btn.disabled = false;
+        btn.innerText = "Crear Factura 💵";
+        alert("Error al crear factura: " + error.message);
         console.error("Error al crear factura: ", error);
+        
       });
     }
 

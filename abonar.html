@@ -181,7 +181,7 @@
     <button id="btnImprimir">Imprimir Recibo 🖨️</button>
   </div>
 
-  <h2>Historial de Abonos Recientes.</h2>
+  <h2>Historial de Abonos Recientes!</h2>
   <table>
     <thead>
       <tr>
@@ -710,6 +710,23 @@ function viewInvoiceDetail(invoiceId) {
   }).catch((error) => {
     console.error("Error al ver factura: ", error);
   });
+}
+
+function renderInvoiceHeader(invoiceId, consecutivo, ruta) {
+return `
+  <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 20px;">
+    <div style="flex: 0 0 130px;">
+      <img src="https://facturacionweb.github.io/facturacionweb/galaxia.jpg" 
+           alt="Logo del negocio" 
+           style="width: 100%; height: auto; border-radius: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.1);" />
+    </div>
+    <div style="flex: 1; text-align: left; padding-left: 20px;">
+      <h2 style="margin: 0 0 5px 0;">Factura - ${invoiceId}</h2>
+      <p style="margin: 5px 0;"><strong>Consecutivo:</strong> ${consecutivo || 'N/A'}</p>
+      <p style="margin: 5px 0;"><strong>Ruta de la Factura:</strong> ${ruta || 'N/A'}</p>
+    </div>
+  </div>
+`;
 }
   
 </script>

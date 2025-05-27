@@ -690,18 +690,6 @@ function viewInvoiceDetail(invoiceId) {
                 <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
               </tr>
             </table>
-            <div class="signature">
-              <p>_______________________</p>
-              <p>Firma del Cliente</p>
-            </div>
-          </div>
-          <!-- Botón para imprimir SOLO esta factura -->
-          <div style="text-align:center; margin-top:20px;">
-            <button onclick="printModalInvoice()">Imprimir Factura 🖨️</button>
-          </div>
-          <div style="text-align:center; margin-top:10px;">
-              <button onclick="printThermalFromModal()">Impresión Móvil 🖨️📲</button>
-          </div>
         `;
         document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
         document.getElementById('invoiceModal').style.display = 'block';

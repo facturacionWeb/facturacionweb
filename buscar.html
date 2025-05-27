@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🔍 Buscar IMEI en Facturas</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+    .container { max-width: 900px; background: #fff; margin: auto; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+    .invoice-body, .details-table, .items-table {
+      width: 100%; border-collapse: collapse; margin-top: 20px;
+    }
+    .details-table td, .items-table td, .items-table th {
+      border: 1px solid #ccc; padding: 8px; text-align: left;
+    }
+    .items-table th { background-color: #333; color: white; }
+    .invoice-header h2 { margin: 0; }
+    .signature { margin-top: 30px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Buscar Factura por IMEI</h1>
+    <input type="text" id="imeiInput" placeholder="Ingresa el IMEI a buscar" />
+    <button onclick="buscarFacturaPorIMEI()">Buscar IMEI 📲</button>
+    <div id="facturaResultado"></div>
+  </div>
+
+  <script>
+    const db = firebase.firestore();
+
+    async function buscarFacturaPorIMEI() {
+      const imei = document.getElementById('imeiInput').value.trim();
+      if (!imei) return alert('Debés ingresar un IMEI válido 😅');
+
+      const snapshot = await db.collection("facturas").where("anulada", "==", false).get();
+      let facturaEncontrada = null;
+      let facturaId = null;
+
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        const item = data.items.find(i => i.imei === imei);
+        if (item) {
+          facturaEncontrada = data;
+          facturaId = doc.id;
+          break;
+        }
+      }
+
+      if (!facturaEncontrada) {
+        document.getElementById('facturaResultado').innerHTML = `<p style="color:red;">No se encontró ninguna factura con ese IMEI 😢</p>`;
+        return;
+      }
+
+      const clientDoc = await db.collection("clientes").doc(facturaEncontrada.clientId).get();
+      const cliente = clientDoc.exists ? clientDoc.data() : {};
+      const symbol = facturaEncontrada.currency === 'CORD' ? 'C$' : '$';
+      const fecha = facturaEncontrada.fecha?.toDate ? facturaEncontrada.fecha.toDate() : new Date(facturaEncontrada.fecha);
+
+      const html = `
+        <div class="invoice-header">
+          <h2>Factura - ${facturaId}</h2>
+          <p><strong>Consecutivo:</strong> ${facturaEncontrada.consecutivo}</p>
+          <p><strong>Ruta:</strong> ${facturaEncontrada.route}</p>
+        </div>
+        <div class="invoice-body">
+          <table class="details-table">
+            <tr>
+              <td><strong>Fecha:</strong><br>${fecha.toLocaleString()}</td>
+              <td><strong>Cliente:</strong><br>${cliente.nombreCliente || facturaEncontrada.clientId}</td>
+            </tr>
+            <tr>
+              <td><strong>Tienda:</strong><br>${cliente.nombreTienda || ''}</td>
+              <td><strong>Dirección:</strong><br>${cliente.direccion || ''}</td>
+            </tr>
+            <tr>
+              <td><strong>Teléfono:</strong><br>${cliente.telefono || ''}</td>
+              <td><strong>Pago:</strong><br>${facturaEncontrada.paymentMethod}</td>
+            </tr>
+          </table>
+
+          <table class="items-table">
+            <tr>
+              <th>Cantidad</th>
+              <th>Descripción</th>
+              <th>Precio Venta</th>
+              <th>Descuento</th>
+              <th>Total</th>
+            </tr>
+            ${facturaEncontrada.items.map(i => `
+              <tr>
+                <td>${i.quantity}</td>
+                <td>${i.brand} ${i.model}<br><small>IMEI: ${i.imei}</small></td>
+                <td>${symbol}${i.price.toFixed(2)}</td>
+                <td>${i.discount}%</td>
+                <td>${symbol}${i.total.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+            <tr>
+              <td colspan="4" style="text-align:right;"><strong>Total a Pagar:</strong></td>
+              <td><strong>${symbol}${facturaEncontrada.total.toFixed(2)}</strong></td>
+            </tr>
+          </table>
+
+          <div class="signature">
+            <p>_______________________</p>
+            <p>Firma del Cliente</p>
+          </div>
+        </div>
+      `;
+
+      document.getElementById('facturaResultado').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

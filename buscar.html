@@ -33,6 +33,29 @@
   <script>
     const db = firebase.firestore();
 
+    function agruparItemsFactura(items) {
+      const map = new Map();
+      items.forEach(item => {
+        const key = `${item.articleId}|${item.brand}|${item.model}|${item.price}|${item.discount}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            quantity: 0,
+            brand: item.brand,
+            model: item.model,
+            price: item.price,
+            discount: item.discount,
+            total: 0,
+            imeis: []
+          });
+        }
+        const group = map.get(key);
+        group.quantity += item.quantity;
+        group.total += item.total;
+        group.imeis.push(item.imei);
+      });
+      return Array.from(map.values());
+    }
+
     async function buscarFacturaPorIMEI() {
       const imei = document.getElementById('imeiInput').value.trim();
       if (!imei) return alert('Debés ingresar un IMEI válido 😅');
@@ -60,6 +83,8 @@
       const cliente = clientDoc.exists ? clientDoc.data() : {};
       const symbol = facturaEncontrada.currency === 'CORD' ? 'C$' : '$';
       const fecha = facturaEncontrada.fecha?.toDate ? facturaEncontrada.fecha.toDate() : new Date(facturaEncontrada.fecha);
+
+      const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items);
 
       const html = `
         <div class="invoice-header">
@@ -91,13 +116,18 @@
               <th>Descuento</th>
               <th>Total</th>
             </tr>
-            ${facturaEncontrada.items.map(i => `
+            ${itemsAgrupados.map(item => `
               <tr>
-                <td>${i.quantity}</td>
-                <td>${i.brand} ${i.model}<br><small>IMEI: ${i.imei}</small></td>
-                <td>${symbol}${i.price.toFixed(2)}</td>
-                <td>${i.discount}%</td>
-                <td>${symbol}${i.total.toFixed(2)}</td>
+                <td>${item.quantity}</td>
+                <td>
+                  ${item.brand} ${item.model}<br>
+                  <small>
+                    ${item.imeis.length > 0 ? 'IMEIs:<br>' + item.imeis.map(i => `- ${i}`).join('<br>') : ''}
+                  </small>
+                </td>
+                <td>${symbol}${item.price.toFixed(2)}</td>
+                <td>${item.discount}%</td>
+                <td>${symbol}${item.total.toFixed(2)}</td>
               </tr>
             `).join('')}
             <tr>

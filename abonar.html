@@ -538,27 +538,7 @@
   }
 
   /*********************** HISTORIAL *************************/
-  /*function cargarHistorialAbonos() {
-    const tbody = document.getElementById('tablaHistorial');
-    tbody.innerHTML = '';
-    // Últimos 20 abonos (de cualquier factura) ordenados por fecha desc
-    db.collectionGroup('abonos').orderBy('dateTime','desc').limit(20).get().then(qs => {
-      qs.forEach(doc => {
-        const a = doc.data();
-        const tr = document.createElement('tr');
-        const fecha = (typeof a.dateTime.toDate==='function')? a.dateTime.toDate() : new Date(a.dateTime);
-        tr.innerHTML = `
-          <td>${fecha.toLocaleString()}</td>
-          <td>${doc.ref.parent.parent.id}</td>
-          <td>${a.metodoPago}</td>
-          <td>${a.amount.toFixed(2)}</td>
-          <td>${a.pendingBalance.toFixed(2)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    });
-  }*/
-  function cargarHistorialAbonos() {
+/*  function cargarHistorialAbonos() {
   const tbody = document.getElementById('tablaHistorial');
   tbody.innerHTML = '';
 
@@ -587,9 +567,84 @@
         tbody.appendChild(tr);
       });
     });
+}*/
+function cargarHistorialAbonos() {
+  const tbody = document.getElementById('tablaHistorial');
+  tbody.innerHTML = '';
+
+  db.collectionGroup('abonos')
+    .orderBy('dateTime', 'desc')
+    .limit(20)
+    .get()
+    .then(qs => {
+      qs.forEach(doc => {
+        const a = doc.data();
+        const facturaId = doc.ref.parent.parent.id;
+        const abonoId = doc.id; // capturamos el ID del abono
+        const fecha = (typeof a.dateTime.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${fecha.toLocaleString()}</td>
+          <td>
+            <button onclick="viewInvoiceDetail('${facturaId}')" style="padding:5px 10px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
+              ${facturaId}
+            </button>
+          </td>
+          <td>${a.metodoPago}</td>
+          <td>C$${a.amount.toFixed(2)}</td>
+          <td>C$${a.pendingBalance.toFixed(2)}</td>
+          <td>
+            <button onclick="eliminarAbono('${facturaId}', '${abonoId}')" style="padding:5px 10px; background:#dc3545; color:white; border:none; border-radius:4px;">Eliminar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    });
 }
 
+async function eliminarAbono(facturaId, abonoId) {
+  if (!confirm("¿Estás seguro que deseas eliminar este abono?")) return;
 
+  const facturaRef = db.collection('facturas').doc(facturaId);
+  const abonoRef = facturaRef.collection('abonos').doc(abonoId);
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const abonoSnap = await tx.get(abonoRef);
+      if (!abonoSnap.exists) throw new Error("El abono no existe");
+
+      const abonoData = abonoSnap.data();
+      const monto = abonoData.amount;
+      const notaCreditoId = abonoData.notaCreditoId || null;
+
+      const facturaSnap = await tx.get(facturaRef);
+      const facturaData = facturaSnap.data();
+
+      const nuevoSaldo = (facturaData.saldo || 0) + monto;
+
+      // Actualizar saldo de la factura
+      tx.update(facturaRef, { saldo: nuevoSaldo });
+
+      // Eliminar el abono
+      tx.delete(abonoRef);
+
+      // Si tenía nota de crédito asociada, liberarla
+      if (notaCreditoId) {
+        const notaRef = db.collection("notasCredito").doc(notaCreditoId);
+        tx.update(notaRef, { abonoId: null });
+      }
+    });
+
+    toast("✅ Abono eliminado correctamente");
+    cargarFacturasCredito();
+    cargarHistorialAbonos();
+  } catch (err) {
+    console.error(err);
+    alert("Error al eliminar abono: " + err.message);
+  }
+}
+  
   // Cargar historial de arranque
   cargarHistorialAbonos();
 

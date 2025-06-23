@@ -23,14 +23,11 @@
   <div class="container">
     <h1>📋 Reporte de Facturas (Crédito vs Contado)</h1>
 
-    <label for="periodSelect">Selecciona el período:</label>
-    <select id="periodSelect">
-      <option value="week">Semanal</option>
-      <option value="month">Mensual</option>
-      <option value="quarter">Trimestral</option>
-      <option value="semester">Semestral</option>
-      <option value="year">Anual</option>
-    </select>
+    <label for="startDate">Desde:</label>
+    <input type="date" id="startDate">
+
+    <label for="endDate">Hasta:</label>
+    <input type="date" id="endDate">
 
     <button onclick="generarReporte()">Generar Reporte 📊</button>
 
@@ -61,21 +58,20 @@
     const db = firebase.firestore();
 
     async function generarReporte() {
-      const periodo = document.getElementById('periodSelect').value;
-      const hoy = new Date();
-      let fechaInicio;
+      const startInput = document.getElementById('startDate').value;
+      const endInput = document.getElementById('endDate').value;
 
-      switch (periodo) {
-        case 'week': hoy.setDate(hoy.getDate() - 7); break;
-        case 'month': hoy.setMonth(hoy.getMonth() - 1); break;
-        case 'quarter': hoy.setMonth(hoy.getMonth() - 3); break;
-        case 'semester': hoy.setMonth(hoy.getMonth() - 6); break;
-        case 'year': hoy.setFullYear(hoy.getFullYear() - 1); break;
+      if (!startInput || !endInput) {
+        alert('Por favor selecciona la fecha inicial y la fecha final.');
+        return;
       }
-      fechaInicio = hoy;
+
+      const fechaInicio = new Date(startInput);
+      const fechaFin = new Date(endInput);
 
       const snapshot = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
+        .where("fecha", "<=", fechaFin)
         .where("anulada", "==", false)
         .orderBy("fecha", "desc")
         .get();

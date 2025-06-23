@@ -18,223 +18,141 @@
   />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <style>
-    /* Estilos básicos */
+     /* ====== ESTILOS BASE ====== */
     body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 20px;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    h1, h2, h3 {
-      text-align: center;
-    }
-    label, select, button {
-      margin: 10px 0;
-      padding: 10px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    table, th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
-      vertical-align: top;
-    }
-    th {
-      background-color: #333;
-      color: #fff;
-    }
-/* Estilos para el modal */
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 100;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      background-color: rgba(0,0,0,0.5);
-    }
-    .modal-content {
-      background-color: #fff;
-      margin: 10% auto;
-      padding: 20px;
-      width: 90%;
-      max-width: 600px;
-      position: relative;
-      max-height: 80vh;
-      overflow-y: auto;
-    }
-    #abonosModal table {
-      width: 100%;
-      table-layout: fixed;
-      word-wrap: break-word;
-    }
-    #abonosModal th, #abonosModal td {
-      word-break: break-word;
-    }
-    .close {
-      color: #aaa;
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    /* Estilos para impresión: solo se imprime el reporte */
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #reportSection, #reportSection * {
-        visibility: visible;
-      }
-      #reportSection {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-      }
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+    margin: 20px;
+    padding: 20px;
     }
     
-  /* 🛠️ Estilos para el modal y tabla scrollable */
-  #abonosModal th,
-  #abonosModal td {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  #abonosModal .modal-content {
-    overflow-x: auto;
-  }
-
-  #abonosModal table {
-    table-layout: fixed;
+    .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    
+    h1, h2, h3 {
+    text-align: center;
+    }
+    
+    label, select, button {
+    margin: 10px 0;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    }
+    
+    table {
     width: 100%;
     border-collapse: collapse;
-  }
-
-  #abonosModal thead {
+    margin-top: 20px;
+    }
+    
+    th, td {
+    border: 1px solid #ccc;
+    padding: 10px;
+    text-align: center;
+    vertical-align: top;
+    }
+    
+    th {
+    background-color: #333;
+    color: #fff;
+    }
+    
+    /* ====== ESTILOS MODAL ====== */
+    .modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 800px;
+    position: relative;
+    max-height: 80vh;
+    }
+    
+    .close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    }
+    
+    /* ====== SCROLL INTERNO PARA TABLA ====== */
+    .table-wrapper {
+    max-height: 55vh;
+    overflow-y: auto;
+    overflow-x: auto;
+    }
+    
+    /* ====== TABLA DE ABONOS ====== */
+    #abonosModal table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto; /* ¡ESTO arregla el ancho! */
+    }
+    
+    #abonosModal thead th {
     position: sticky;
     top: 0;
     background-color: #555;
-    color: white;
-    z-index: 1;
-  }
-
-  #abonosModal tbody {
-    display: block;
-    max-height: 50vh;
-    overflow-y: auto;
-  }
-
-  #abonosModal tbody tr {
-    display: table;
-    width: 100%;
-    table-layout: fixed;
-  }
-
-  #abonosModal td,
-  #abonosModal th {
+    color: #fff;
+    z-index: 2;
+    }
+    
+    #abonosModal th, #abonosModal td {
     padding: 8px;
     text-align: center;
-  }
-
-  /* Opcional: truncar visualmente y mostrar tooltip */
-  .truncate {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  /* 👉 Reset: elimina hacks que rompían el ancho */
-  #abonosModal tbody,
-  #abonosModal tbody tr {
-  display: table-row;      /* vuelta a la normalidad */
-  }
-  
-  /* 👉 Wrapper scrollable */
-  #abonosModal .table-wrapper {
-  max-height: 55vh;        /* ajusta a tu gusto */
-  overflow-y: auto;
-  overflow-x: auto;        /* barra horizontal si hace falta */
-  }
-  
-  /* 👉 Tabla con columnas equilibradas */
-  #abonosModal table {
-  width: 100%;
-  table-layout: fixed;
-  border-collapse: collapse;
-  }
-  
-  /* 👉 Encabezado siempre visible */
-  #abonosModal thead th {
-  position: sticky;
-  top: 0;
-  background: #555;
-  color: #fff;
-  z-index: 2;
-  }
-  
-  /* 👉 Celdas: corte de palabras LAAARGAS */
-  #abonosModal th,
-  #abonosModal td {
-  padding: 8px;
-  text-align: center;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  }
-  
-  /* Opcional: anchos mínimos para ID y Referencia */
-  #abonosModal th:first-child,
-  #abonosModal td:first-child,
-  #abonosModal th:last-child,
-  #abonosModal td:last-child {
-  min-width: 140px;        /* ajusta a gusto */
-  }
-
-  #abonosModal table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: auto; /* 🎯 deja que el contenido mande */
-  }
+    vertical-align: top;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    }
     
- #abonosModal td,
-#abonosModal th {
-  padding: 8px;
-  text-align: center;
-  vertical-align: top;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-/* Dale anchos mínimos a columnas clave */
-#abonosModal th:nth-child(1),
-#abonosModal td:nth-child(1),
-#abonosModal th:nth-child(5),
-#abonosModal td:nth-child(5) {
-  min-width: 140px;
-}
-
-#abonosModal th:nth-child(2),
-#abonosModal td:nth-child(2) {
-  min-width: 120px;
-}
- 
+    /* Anchos mínimos para columnas largas */
+    #abonosModal th:nth-child(1),
+    #abonosModal td:nth-child(1),
+    #abonosModal th:nth-child(5),
+    #abonosModal td:nth-child(5) {
+    min-width: 150px;
+    }
     
-</style>
+    #abonosModal th:nth-child(2),
+    #abonosModal td:nth-child(2) {
+    min-width: 120px;
+    }
+    
+    /* ====== IMPRESIÓN ====== */
+    @media print {
+    body * {
+      visibility: hidden;
+    }
+    #reportSection, #reportSection * {
+      visibility: visible;
+    }
+    #reportSection {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+    }
+    }    
+  </style>
 </head>
 <body>
   <div class="container">

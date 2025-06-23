@@ -203,8 +203,38 @@
   #abonosModal th:last-child,
   #abonosModal td:last-child {
   min-width: 140px;        /* ajusta a gusto */
-  }   
-  </style>
+  }
+
+  #abonosModal table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto; /* 🎯 deja que el contenido mande */
+  }
+    
+ #abonosModal td,
+#abonosModal th {
+  padding: 8px;
+  text-align: center;
+  vertical-align: top;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Dale anchos mínimos a columnas clave */
+#abonosModal th:nth-child(1),
+#abonosModal td:nth-child(1),
+#abonosModal th:nth-child(5),
+#abonosModal td:nth-child(5) {
+  min-width: 140px;
+}
+
+#abonosModal th:nth-child(2),
+#abonosModal td:nth-child(2) {
+  min-width: 120px;
+}
+ 
+    
+</style>
 </head>
 <body>
   <div class="container">

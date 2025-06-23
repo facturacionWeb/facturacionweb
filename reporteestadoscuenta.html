@@ -56,6 +56,43 @@
       background-color: #333;
       color: #fff;
     }
+    /* Estilos para el modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 100;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+      background-color: #fff;
+      margin: 10% auto;
+      padding: 20px;
+      width: 90%;
+      max-width: 600px;
+      position: relative;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #abonosModal table {
+      width: 100%;
+      table-layout: fixed;
+      word-wrap: break-word;
+    }
+    #abonosModal th, #abonosModal td {
+      word-break: break-word;
+    }
+    .close {
+      color: #aaa;
+      float: right;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
     /* Estilos para impresión: solo se imprime el reporte */
     @media print {
       body * {
@@ -122,6 +159,26 @@
 
       <!-- Botón para Imprimir el Reporte -->
       <button onclick="printReport()">Imprimir Reporte 🖨️</button>
+    </div>
+  </div>
+
+  <!-- Modal para mostrar abonos -->
+  <div id="abonosModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAbonosModal()">&times;</span>
+      <h3 id="abonosModalTitle"></h3>
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background-color:#555;color:#fff;">
+            <th>ID Abono</th>
+            <th>Fecha</th>
+            <th>Monto</th>
+            <th>Balance Pendiente</th>
+            <th>Referencia</th>
+          </tr>
+        </thead>
+        <tbody id="abonosModalBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -223,6 +280,9 @@
 
           // Crear fila principal de la Factura
           const invoiceRow = document.createElement("tr");
+          invoiceRow.classList.add("invoice-row");
+          invoiceRow.dataset.invoiceId = invoiceId;
+          invoiceRow.dataset.abonos = JSON.stringify(abonosArray);
           invoiceRow.innerHTML = `
             <td>${invoiceId}</td>
             <td>${invoiceData.currency}</td>
@@ -232,53 +292,10 @@
             <td>${montoPagado.toFixed(2)}</td>
             <td>${saldoCalculado.toFixed(2)}</td>
           `;
+          invoiceRow.addEventListener('click', () => {
+            showAbonosModal(invoiceId, abonosArray);
+          });
           tbody.appendChild(invoiceRow);
-
-          // Crear subtabla para los abonos si existen
-          if (abonosArray.length > 0) {
-            const abonosRow = document.createElement("tr");
-            abonosRow.innerHTML = `
-              <td colspan="7" style="text-align: left;">
-                <table style="width: 100%; border-collapse: collapse;">
-                  <thead>
-                    <tr style="background-color: #555; color: #fff;">
-                      <th>ID Abono</th>
-                      <th>Fecha</th>
-                      <th>Monto</th>
-                      <th>Balance Pendiente</th>
-                      <th>Referencia</th>
-                    </tr>
-                  </thead>
-                  <tbody id="abonosTbody-${invoiceId}">
-                  </tbody>
-                </table>
-              </td>
-            `;
-            tbody.appendChild(abonosRow);
-
-            // Llenar la subtabla de abonos
-            const abonosTbody = document.getElementById(`abonosTbody-${invoiceId}`);
-            abonosArray.forEach((ab) => {
-              const abonoRow = document.createElement("tr");
-              let fechaAbonoStr = "";
-              if (ab.dateTime && ab.dateTime.seconds) {
-                const abonoDate = new Date(ab.dateTime.seconds * 1000);
-                fechaAbonoStr = abonoDate.toLocaleString();
-              }
-              // AQUI: mostramos _docId en la columna ID Abono
-              abonoRow.innerHTML = `
-                <td>${ab._docId || ""}</td>
-                <td>${fechaAbonoStr}</td>
-                <td>${parseFloat(ab.amount).toFixed(2)}</td>
-                <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
-                <td>${ab.reference || ""}</td>
-              `;
-
-              abonoRow.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'}`;
-              
-              abonosTbody.appendChild(abonoRow);
-            });
-          }
         }
 
         // 5) Actualizar la deuda total en el encabezado
@@ -299,6 +316,36 @@
     // Función para imprimir solo la sección del reporte
     function printReport() {
       window.print();
+    }
+
+    // Mostrar abonos en un modal
+    function showAbonosModal(invoiceId, abonosArray) {
+      const tbody = document.getElementById('abonosModalBody');
+      tbody.innerHTML = '';
+      document.getElementById('abonosModalTitle').textContent =
+        'Abonos de la factura ' + invoiceId;
+      abonosArray.forEach((ab) => {
+        const row = document.createElement('tr');
+        let fechaAbonoStr = '';
+        if (ab.dateTime && ab.dateTime.seconds) {
+          const abonoDate = new Date(ab.dateTime.seconds * 1000);
+          fechaAbonoStr = abonoDate.toLocaleString();
+        }
+        row.innerHTML = `
+          <td>${ab._docId || ''}</td>
+          <td>${fechaAbonoStr}</td>
+          <td>${parseFloat(ab.amount).toFixed(2)}</td>
+          <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
+          <td>${ab.reference || ''}</td>
+        `;
+        row.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'}`;
+        tbody.appendChild(row);
+      });
+      document.getElementById('abonosModal').style.display = 'block';
+    }
+
+    function closeAbonosModal() {
+      document.getElementById('abonosModal').style.display = 'none';
     }
 
     // Inicializar la carga de clientes al cargar la página

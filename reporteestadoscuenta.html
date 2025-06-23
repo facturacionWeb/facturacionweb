@@ -159,7 +159,51 @@
     text-overflow: ellipsis;
   }
 
-    
+  /* 👉 Reset: elimina hacks que rompían el ancho */
+  #abonosModal tbody,
+  #abonosModal tbody tr {
+  display: table-row;      /* vuelta a la normalidad */
+  }
+  
+  /* 👉 Wrapper scrollable */
+  #abonosModal .table-wrapper {
+  max-height: 55vh;        /* ajusta a tu gusto */
+  overflow-y: auto;
+  overflow-x: auto;        /* barra horizontal si hace falta */
+  }
+  
+  /* 👉 Tabla con columnas equilibradas */
+  #abonosModal table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  }
+  
+  /* 👉 Encabezado siempre visible */
+  #abonosModal thead th {
+  position: sticky;
+  top: 0;
+  background: #555;
+  color: #fff;
+  z-index: 2;
+  }
+  
+  /* 👉 Celdas: corte de palabras LAAARGAS */
+  #abonosModal th,
+  #abonosModal td {
+  padding: 8px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  }
+  
+  /* Opcional: anchos mínimos para ID y Referencia */
+  #abonosModal th:first-child,
+  #abonosModal td:first-child,
+  #abonosModal th:last-child,
+  #abonosModal td:last-child {
+  min-width: 140px;        /* ajusta a gusto */
+  }   
   </style>
 </head>
 <body>

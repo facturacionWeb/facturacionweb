@@ -89,7 +89,7 @@
         const saldoPendiente = f.paymentType === "Credito" ? f.saldo : 0;
         const pagado = f.total - saldoPendiente;
 
-        tbody.innerHTML += `
+        /*tbody.innerHTML += `
           <tr>
             <td>${nombreCliente}</td>
             <td>${f.consecutivo || 'N/A'}</td>
@@ -97,6 +97,16 @@
             <td>${f.total.toFixed(2)}</td>
             <td>${saldoPendiente.toFixed(2)}</td>
             <td>${pagado.toFixed(2)}</td>
+          </tr>
+        `;*/
+        tbody.innerHTML += `
+          <tr>
+            <td>${nombreCliente}</td>
+            <td>${f.consecutivo || 'N/A'}</td>
+            <td>${f.paymentType}</td>
+            <td>${new Intl.NumberFormat('es-NI').format(f.total.toFixed(2))}</td>
+            <td>${new Intl.NumberFormat('es-NI').format(saldoPendiente.toFixed(2))}</td>
+            <td>${new Intl.NumberFormat('es-NI').format(pagado.toFixed(2))}</td>
           </tr>
         `;
 

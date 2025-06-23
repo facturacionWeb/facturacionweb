@@ -390,7 +390,7 @@
           <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
           <td>${ab.reference || ''}</td>
         `;
-        //row.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'} | Abono Ref: ${ab.reference || 'N/A'}`;
+        row.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'} | Abono Ref: ${ab.reference || 'N/A'}`;
         tbody.appendChild(row);
       });
       document.getElementById('abonosModal').style.display = 'block';

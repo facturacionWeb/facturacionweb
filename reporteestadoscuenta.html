@@ -52,6 +52,13 @@
     #reportSection,#reportSection *{visibility:visible}
     #reportSection{position:absolute;left:0;top:0;width:100%}
   }
+
+  #clientInfo > p:nth-child(6){
+    font-size: 2em;
+    color: red;
+    background: cyan;
+  }
+    
   </style>
 </head>
 <body>
@@ -173,7 +180,8 @@ async function generateReport(clientId){
       tbody.appendChild(tr);
     }
     totalDebtElem=document.getElementById("totalDebt");
-    totalDebtElem.textContent=totalDebt.toFixed(2);
+    //totalDebtElem.textContent=totalDebt.toFixed(2);
+    totalDebtElem.textContent= new Intl.NumberFormat('es-NI').format(totalDebt.toFixed(2));
     document.getElementById("reportDate").textContent="Generado el: "+new Date().toLocaleString();
     reportSection.style.display="block";
   }catch(e){console.error(e);alert("Error generando reporte. 🔥")}

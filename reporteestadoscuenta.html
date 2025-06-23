@@ -236,9 +236,9 @@
           const invoiceId = docFact.id;
 
           // Omitir facturas pagadas (saldo 0)
-          if (parseFloat(invoiceData.saldo) === 0) {
+          /*if (parseFloat(invoiceData.saldo) === 0) {
             continue;
-          }
+          }*/
 
           // 4a) Consultar la subcolección "abonos" (real) para esta factura
           const abonosSnap = await docFact.ref.collection("abonos").get();

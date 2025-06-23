@@ -108,6 +108,58 @@
         width: 100%;
       }
     }
+    
+  /* 🛠️ Estilos para el modal y tabla scrollable */
+  #abonosModal th,
+  #abonosModal td {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  #abonosModal .modal-content {
+    overflow-x: auto;
+  }
+
+  #abonosModal table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  #abonosModal thead {
+    position: sticky;
+    top: 0;
+    background-color: #555;
+    color: white;
+    z-index: 1;
+  }
+
+  #abonosModal tbody {
+    display: block;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  #abonosModal tbody tr {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+  }
+
+  #abonosModal td,
+  #abonosModal th {
+    padding: 8px;
+    text-align: center;
+  }
+
+  /* Opcional: truncar visualmente y mostrar tooltip */
+  .truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+    
   </style>
 </head>
 <body>
@@ -338,7 +390,7 @@
           <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
           <td>${ab.reference || ''}</td>
         `;
-        row.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'}`;
+        row.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'} | Abono Ref: ${ab.reference || ''}`;
         tbody.appendChild(row);
       });
       document.getElementById('abonosModal').style.display = 'block';

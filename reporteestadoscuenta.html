@@ -4,93 +4,76 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Reporte de Estados de Cuenta 😎📊</title>
+
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <!-- Firebase Config -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  <!-- jQuery -->
+
+  <!-- jQuery + Select2 -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- Select2 CSS y JS -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
-    rel="stylesheet"
-  />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
   <style>
-    /* Estilos básicos */
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 20px;
-      padding: 20px;
-    }
-    .container {
-      max-width: 1000px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    h1, h2, h3 {
-      text-align: center;
-    }
-    label, select, button {
-      margin: 10px 0;
-      padding: 10px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-    table, th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
-      vertical-align: top;
-    }
-    th {
-      background-color: #333;
-      color: #fff;
-    }
-    /* Estilos para impresión: solo se imprime el reporte */
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      #reportSection, #reportSection * {
-        visibility: visible;
-      }
-      #reportSection {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-      }
-    }
+  /* ====== ESTILOS BASE ====== */
+  body{font-family:Arial, sans-serif;background:#f4f4f4;margin:20px;padding:20px}
+  .container{max-width:1000px;margin:0 auto;background:#fff;padding:20px;box-shadow:0 0 10px rgba(0,0,0,.1)}
+  h1,h2,h3{text-align:center}
+  label,select,button{margin:10px 0;padding:10px;width:100%;box-sizing:border-box}
+
+  table{width:100%;border-collapse:collapse;margin-top:20px}
+  th,td{border:1px solid #ccc;padding:10px;text-align:center;vertical-align:top}
+  th{background:#333;color:#fff}
+
+  /* ====== MODAL ====== */
+  .modal{display:none;position:fixed;z-index:100;left:0;top:0;width:100%;height:100%;overflow:auto;background:rgba(0,0,0,.5)}
+  .modal-content{background:#fff;margin:10% auto;padding:20px;width:90%;max-width:800px;max-height:80vh;position:relative}
+  .close{color:#aaa;float:right;font-size:28px;font-weight:bold;cursor:pointer}
+
+  /* ====== TABLA DE ABONOS ====== */
+  .table-wrapper{max-height:55vh;overflow-y:auto;overflow-x:auto}
+  #abonosModal table{width:100%;border-collapse:collapse;table-layout:auto}
+  #abonosModal thead th{position:sticky;top:0;background:#555;color:#fff;z-index:2}
+
+  #abonosModal th,#abonosModal td{
+    padding:8px;text-align:center;vertical-align:top;
+    overflow-wrap:anywhere;word-break:break-word;
+  }
+  /* anchos mínimos para que no se estrangulen */
+  #abonosModal th:nth-child(1),#abonosModal td:nth-child(1),
+  #abonosModal th:nth-child(5),#abonosModal td:nth-child(5){min-width:160px}
+  #abonosModal th:nth-child(2),#abonosModal td:nth-child(2){min-width:120px}
+
+  /* ====== IMPRESIÓN ====== */
+  @media print{
+    body *{visibility:hidden}
+    #reportSection,#reportSection *{visibility:visible}
+    #reportSection{position:absolute;left:0;top:0;width:100%}
+  }
+
+  #clientInfo > p:nth-child(6){
+    font-size: 2em;
+    color: red;
+    background: cyan;
+  }
+    
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Reporte de Estados de Cuenta 😎😎📊</h1>
+    <h1>Reporte de Estados de Cuenta 😎📊</h1>
 
-    <!-- Selector de Cliente -->
     <label for="clientSelect">Selecciona Cliente:</label>
     <select id="clientSelect"></select>
     <button id="generateReportBtn">Generar Reporte 💥</button>
 
-    <!-- Sección del Reporte -->
-    <div id="reportSection" style="margin-top:20px; display:none;">
-      <div id="reportHeader" style="text-align:center;">
-        <h2>Estado de Cuenta del Cliente</h2>
-        <p id="reportDate"></p>
-      </div>
+    <!-- ====== SECCIÓN REPORTE ====== -->
+    <div id="reportSection" style="display:none;margin-top:20px">
+      <div id="reportHeader"><h2>Estado de Cuenta del Cliente</h2><p id="reportDate"></p></div>
 
-      <!-- Información del Cliente -->
-      <div id="clientInfo" style="margin-bottom:20px;">
+      <div id="clientInfo" style="margin-bottom:20px">
         <h3>Información del Cliente</h3>
         <p><strong>Nombre de Cliente:</strong> <span id="clientName"></span></p>
         <p><strong>Nombre de la Tienda:</strong> <span id="storeName"></span></p>
@@ -99,212 +82,132 @@
         <p><strong>Deuda Total:</strong> C$<span id="totalDebt">0.00</span></p>
       </div>
 
-      <!-- Detalle del Estado de Cuenta -->
-      <div id="reportTableContainer">
-        <h3>Detalle del Estado de Cuenta</h3>
-        <table id="reportTable">
-          <thead>
-            <tr>
-              <th>No Factura</th>
-              <th>Moneda</th>
-              <th>Vendedor</th>
-              <th>Fecha Emisión</th>
-              <th>Monto Original</th>
-              <th>Monto Pagado</th>
-              <th>Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Aquí se llenan las facturas y sus abonos -->
-          </tbody>
-        </table>
-      </div>
+      <h3>Detalle del Estado de Cuenta</h3>
+      <table id="reportTable">
+        <thead>
+          <tr>
+            <th>No Factura</th><th>Moneda</th><th>Vendedor</th>
+            <th>Fecha Emisión</th><th>Monto Original</th><th>Monto Pagado</th><th>Balance</th>
+          </tr>
+        </thead><tbody></tbody>
+      </table>
 
-      <!-- Botón para Imprimir el Reporte -->
-      <button onclick="printReport()">Imprimir Reporte 🖨️</button>
+      <button onclick="window.print()">Imprimir Reporte 🖨️</button>
     </div>
   </div>
 
-  <script>
-    // Inicializar Firestore
-    var db = firebase.firestore();
+  <!-- ====== MODAL ABONOS ====== -->
+  <div id="abonosModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeAbonosModal()">&times;</span>
+      <h3 id="abonosModalTitle"></h3>
 
-    // Cargar los clientes en el selector
-    function loadClients() {
-      db.collection("clientes").get().then((querySnapshot) => {
-        var clientSelect = document.getElementById("clientSelect");
-        clientSelect.innerHTML = "";
-        querySnapshot.forEach((doc) => {
-          var data = doc.data();
-          var option = document.createElement("option");
-          option.value = doc.id;
-          option.textContent = data.nombreCliente + " - " + data.nombreTienda;
-          clientSelect.appendChild(option);
-        });
-        // Inicializamos Select2 para un look más cool 😎
-        $("#clientSelect").select2();
-      }).catch((error) => {
-        console.error("Error al cargar clientes: ", error);
-      });
-    }
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr><th>ID Abono</th><th>Fecha</th><th>Monto</th><th>Balance Pendiente</th><th>Referencia</th></tr>
+          </thead>
+          <tbody id="abonosModalBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-    // Escuchar el botón para generar reporte
-    document.getElementById("generateReportBtn").addEventListener("click", function(){
-      var clientId = document.getElementById("clientSelect").value;
-      if (!clientId) {
-        alert("¡Selecciona un cliente! 😅");
-        return;
-      }
-      generateReport(clientId);
+<script>
+/* ========= FIREBASE ========= */
+var db = firebase.firestore();
+
+/* ========= CARGA CLIENTES ========= */
+function loadClients(){
+  db.collection("clientes").get().then(snap=>{
+    const sel=document.getElementById("clientSelect"); sel.innerHTML="";
+    snap.forEach(doc=>{
+      const o=document.createElement("option");
+      o.value=doc.id; o.textContent=doc.data().nombreCliente+" - "+doc.data().nombreTienda;
+      sel.appendChild(o);
     });
+    $("#clientSelect").select2();
+  });
+}
 
-    // Función para generar el reporte de estados de cuenta
-    async function generateReport(clientId) {
-      try {
-        // 1) Obtener info del cliente
-        const clientDoc = await db.collection("clientes").doc(clientId).get();
-        if (clientDoc.exists) {
-          const clientData = clientDoc.data();
-          document.getElementById("clientName").textContent = clientData.nombreCliente || "N/A";
-          document.getElementById("storeName").textContent = clientData.nombreTienda || "N/A";
-          document.getElementById("clientAddress").textContent = clientData.direccion || "N/A";
-          document.getElementById("clientPhone").textContent = clientData.telefono || "N/A";
-        }
+/* ========= GENERAR REPORTE ========= */
+document.getElementById("generateReportBtn").onclick=()=>{
+  const id=document.getElementById("clientSelect").value;
+  if(!id){alert("¡Selecciona un cliente! 😅");return;}
+  generateReport(id);
+};
 
-        // 2) Buscar facturas de crédito no anuladas
-        const invoicesSnap = await db.collection("facturas")
-          .where("clientId", "==", clientId)
-          .where("paymentType", "==", "Credito")
-          .where("anulada", "==", false)
-          .get();
-
-        // 3) Limpiar tabla y resetear deuda total
-        const tbody = document.querySelector("#reportTable tbody");
-        tbody.innerHTML = "";
-        let totalDebt = 0;
-
-        // 4) Recorrer facturas
-        for (let docFact of invoicesSnap.docs) {
-          const invoiceData = docFact.data();
-          const invoiceId = docFact.id;
-
-          // Omitir facturas pagadas (saldo 0)
-          /*if (parseFloat(invoiceData.saldo) === 0) {
-            continue;
-          }*/
-
-          // 4a) Consultar la subcolección "abonos" (real) para esta factura
-          const abonosSnap = await docFact.ref.collection("abonos").get();
-          // AQUI: inyectamos docAbono.id en cada abono
-          let abonosArray = abonosSnap.docs.map((docAbono) => {
-            let abData = docAbono.data();
-            abData._docId = docAbono.id; // Guardamos el ID real del doc
-            return abData;
-          });
-
-          // 4b) Ordenar abonos por fecha (ascendente)
-          abonosArray.sort((a, b) => {
-            const dateA = (a.dateTime && a.dateTime.seconds) ? a.dateTime.seconds : 0;
-            const dateB = (b.dateTime && b.dateTime.seconds) ? b.dateTime.seconds : 0;
-            return dateA - dateB;
-          });
-
-          // 4c) Calcular "montoPagado" como la suma de los abonos
-          let montoPagado = abonosArray.reduce((acc, ab) => acc + parseFloat(ab.amount || 0), 0);
-
-          // Cálculo de saldo real
-          const saldoCalculado = parseFloat(invoiceData.total) - montoPagado;
-
-          // Acumular el saldo para la deuda total
-          totalDebt += saldoCalculado;
-
-          // Vendedor (si se tuviera)
-          const vendedor = invoiceData.vendedor ? invoiceData.vendedor : "N/A";
-
-          // Crear fila principal de la Factura
-          const invoiceRow = document.createElement("tr");
-          invoiceRow.innerHTML = `
-            <td>${invoiceId}</td>
-            <td>${invoiceData.currency}</td>
-            <td>${vendedor}</td>
-            <td>${invoiceData.fechaStr || "N/A"}</td>
-            <td>${parseFloat(invoiceData.total).toFixed(2)}</td>
-            <td>${montoPagado.toFixed(2)}</td>
-            <td>${saldoCalculado.toFixed(2)}</td>
-          `;
-          tbody.appendChild(invoiceRow);
-
-          // Crear subtabla para los abonos si existen
-          if (abonosArray.length > 0) {
-            const abonosRow = document.createElement("tr");
-            abonosRow.innerHTML = `
-              <td colspan="7" style="text-align: left;">
-                <table style="width: 100%; border-collapse: collapse;">
-                  <thead>
-                    <tr style="background-color: #555; color: #fff;">
-                      <th>ID Abono</th>
-                      <th>Fecha</th>
-                      <th>Monto</th>
-                      <th>Balance Pendiente</th>
-                      <th>Referencia</th>
-                    </tr>
-                  </thead>
-                  <tbody id="abonosTbody-${invoiceId}">
-                  </tbody>
-                </table>
-              </td>
-            `;
-            tbody.appendChild(abonosRow);
-
-            // Llenar la subtabla de abonos
-            const abonosTbody = document.getElementById(`abonosTbody-${invoiceId}`);
-            abonosArray.forEach((ab) => {
-              const abonoRow = document.createElement("tr");
-              let fechaAbonoStr = "";
-              if (ab.dateTime && ab.dateTime.seconds) {
-                const abonoDate = new Date(ab.dateTime.seconds * 1000);
-                fechaAbonoStr = abonoDate.toLocaleString();
-              }
-              // AQUI: mostramos _docId en la columna ID Abono
-              abonoRow.innerHTML = `
-                <td>${ab._docId || ""}</td>
-                <td>${fechaAbonoStr}</td>
-                <td>${parseFloat(ab.amount).toFixed(2)}</td>
-                <td>${parseFloat(ab.pendingBalance).toFixed(2)}</td>
-                <td>${ab.reference || ""}</td>
-              `;
-
-              abonoRow.title = `Método: ${ab.metodoPago || 'N/A'} | Banco: ${ab.banco || 'N/A'} | Ref: ${ab.referenciaBancaria || 'N/A'}`;
-              
-              abonosTbody.appendChild(abonoRow);
-            });
-          }
-        }
-
-        // 5) Actualizar la deuda total en el encabezado
-        document.getElementById("totalDebt").textContent = totalDebt.toFixed(2);
-
-        // 6) Mostrar fecha/hora de generación y la sección del reporte
-        var now = new Date();
-        document.getElementById("reportDate").textContent =
-          "Generado el: " + now.toLocaleString();
-        document.getElementById("reportSection").style.display = "block";
-
-      } catch (error) {
-        console.error("Error al generar reporte:", error);
-        alert("Ocurrió un error generando el reporte. Revisa la consola.");
-      }
+async function generateReport(clientId){
+  try{
+    /* Info cliente */
+    const cDoc=await db.collection("clientes").doc(clientId).get();
+    if(cDoc.exists){
+      const d=cDoc.data();
+      clientName.textContent=d.nombreCliente||"N/A";
+      storeName.textContent=d.nombreTienda||"N/A";
+      clientAddress.textContent=d.direccion||"N/A";
+      clientPhone.textContent=d.telefono||"N/A";
     }
+    /* Facturas */
+    const invSnap=await db.collection("facturas")
+      .where("clientId","==",clientId)
+      .where("paymentType","==","Credito")
+      .where("anulada","==",false).get();
 
-    // Función para imprimir solo la sección del reporte
-    function printReport() {
-      window.print();
+    const tbody=document.querySelector("#reportTable tbody");
+    tbody.innerHTML="";
+    let totalDebt=0;
+
+    for(const doc of invSnap.docs){
+      const inv=doc.data(), id=doc.id;
+      const abonosSnap=await doc.ref.collection("abonos").get();
+      const abonos=abonosSnap.docs.map(a=>({...a.data(),_docId:a.id}));
+
+      const montoPagado=abonos.reduce((s,a)=>s+parseFloat(a.amount||0),0);
+      const saldo=parseFloat(inv.total)-montoPagado;
+      totalDebt+=saldo;
+
+      const tr=document.createElement("tr");
+      tr.innerHTML=`
+        <td>${id}</td>
+        <td>${inv.currency||"N/A"}</td>
+        <td>${inv.vendedor||"N/A"}</td>
+        <td>${inv.fechaStr||"N/A"}</td>
+        <td>${(+inv.total).toFixed(2)}</td>
+        <td>${montoPagado.toFixed(2)}</td>
+        <td>${saldo.toFixed(2)}</td>`;
+      tr.onclick=()=>showAbonosModal(id,abonos);
+      tbody.appendChild(tr);
     }
+    totalDebtElem=document.getElementById("totalDebt");
+    //totalDebtElem.textContent=totalDebt.toFixed(2);
+    totalDebtElem.textContent= new Intl.NumberFormat('es-NI').format(totalDebt.toFixed(2));
+    document.getElementById("reportDate").textContent="Generado el: "+new Date().toLocaleString();
+    reportSection.style.display="block";
+  }catch(e){console.error(e);alert("Error generando reporte. 🔥")}
+}
 
-    // Inicializar la carga de clientes al cargar la página
-    window.onload = function() {
-      loadClients();
-    };
-  </script>
+/* ========= MODAL ========= */
+function showAbonosModal(factId,abonos){
+  abonosModalTitle.textContent="Abonos de la factura "+factId;
+  const body=abonosModalBody; body.innerHTML="";
+  abonos.forEach(a=>{
+    const date=a.dateTime?.seconds?new Date(a.dateTime.seconds*1000).toLocaleString():"";
+    body.insertAdjacentHTML("beforeend",`
+      <tr>
+        <td>${a._docId||""}</td>
+        <td>${date}</td>
+        <td>${(+a.amount).toFixed(2)}</td>
+        <td>${(+a.pendingBalance).toFixed(2)}</td>
+        <td>${a.reference||""}</td>
+      </tr>`);
+  });
+  abonosModal.style.display="block";
+}
+function closeAbonosModal(){abonosModal.style.display="none";}
+
+/* ========= INIT ========= */
+window.onload=loadClients;
+</script>
 </body>
 </html>

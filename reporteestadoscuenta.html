@@ -163,16 +163,16 @@ async function generateReport(clientId){
 
       /*****************************************/
       // Omitir facturas pagadas (saldo 0)
-      if (parseFloat(inv.saldo) === 0) {
+      /*if (parseFloat(inv.saldo) === 0) {
         continue;
-      }
+      }*/
       /*****************************************/
       
       const abonosSnap=await doc.ref.collection("abonos").get();
       const abonos=abonosSnap.docs.map(a=>({...a.data(),_docId:a.id}));
 
       const montoPagado=abonos.reduce((s,a)=>s+parseFloat(a.amount||0),0);
-      const saldo=parseFloat(inv.total)-montoPagado;
+      const saldo= inv.saldo;//parseFloat(inv.total)-montoPagado;
       totalDebt+=saldo;
 
       const tr=document.createElement("tr");

@@ -435,7 +435,8 @@
         const facturaSnap = await tx.get(facturaRef);
         if (!facturaSnap.exists) throw new Error('La factura no existe');
         const facturaData = facturaSnap.data();
-        const saldoActual = facturaData.saldo!==undefined ? facturaData.saldo : facturaData.total;
+        //const saldoActual = facturaData.saldo!==undefined ? facturaData.saldo : facturaData.total;
+        const saldoActual = Math.round((facturaData.saldo !== undefined ? facturaData.saldo : facturaData.total) * 100) / 100;
         if (saldoActual<=0) throw new Error('La factura ya está saldada');
         if (monto>saldoActual) {
           console.log("Monto:"  + monto + " Saldo Actual:" + saldoActual);

@@ -163,7 +163,7 @@ async function generateReport(clientId){
 
       /*****************************************/
       // Omitir facturas pagadas (saldo 0)
-      if (parseFloat(invoiceData.saldo) === 0) {
+      if (parseFloat(inv.saldo) === 0) {
         continue;
       }
       /*****************************************/

@@ -437,8 +437,10 @@
         const facturaData = facturaSnap.data();
         const saldoActual = facturaData.saldo!==undefined ? facturaData.saldo : facturaData.total;
         if (saldoActual<=0) throw new Error('La factura ya está saldada');
-        if (monto>saldoActual) throw new Error('El abono excede el saldo pendiente');
-
+        if (monto>saldoActual) {
+          console.log("Monto:"  + monto + " Saldo Actual:" + saldoActual);
+          throw new Error('El abono excede el saldo pendiente');
+        }
         // Preparar datos abono
         const nuevoSaldo = saldoActual - monto;
         const fecha = new Date();

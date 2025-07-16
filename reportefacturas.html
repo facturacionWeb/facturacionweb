@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>📊 Reporte de Facturas por Tipo y Periodo</title>
+  <!-- Para exportar a excel el total de facturas -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -30,6 +32,8 @@
     <input type="date" id="endDate">
 
     <button onclick="generarReporte()">Generar Reporte 📊</button>
+    <button onclick="exportarExcel()">Exportar a Excel 📥</button>
+
 
     <table id="reporteFacturas">
       <thead>
@@ -134,6 +138,75 @@
       document.getElementById('totalPendiente').textContent = new Intl.NumberFormat('es-NI').format(totalPendiente.toFixed(2)); //totalPendiente.toFixed(2);
       document.getElementById('totalPagado').textContent = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2)); //totalPagado.toFixed(2);
     }
+
+async function exportarExcel() {
+  const startInput = document.getElementById('startDate').value;
+  const endInput = document.getElementById('endDate').value;
+
+  if (!startInput || !endInput) {
+    alert('Por favor selecciona la fecha inicial y final para exportar.');
+    return;
+  }
+
+  const fechaInicio = new Date(startInput);
+  const fechaFin = new Date(endInput);
+  fechaFin.setHours(23, 59, 59, 999);
+
+  const snapshot = await db.collection("facturas")
+    .where("fecha", ">=", fechaInicio)
+    .where("fecha", "<=", fechaFin)
+    .where("anulada", "==", false)
+    .orderBy("fecha", "asc")
+    .get();
+
+  let facturasPorMes = {}; // Agrupamos por YYYY-MM
+
+  for (const doc of snapshot.docs) {
+    const f = doc.data();
+
+    let nombreCliente = "Cliente desconocido";
+    if (f.clientId) {
+      try {
+        const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
+        nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
+      } catch (e) {
+        nombreCliente = f.clientId;
+      }
+    }
+
+    const fecha = f.fecha.toDate();
+    const mesClave = `${fecha.getFullYear()}-${(fecha.getMonth() + 1).toString().padStart(2, '0')}`;
+
+    if (!facturasPorMes[mesClave]) facturasPorMes[mesClave] = [];
+
+    facturasPorMes[mesClave].push({
+      fechaFactura: fecha.toLocaleDateString('es-NI'),
+      cliente: nombreCliente,
+      total: f.total
+    });
+  }
+
+  let hoja = [["Fecha Factura", "Nombre del Cliente", "Total C$"]];
+  for (const mes in facturasPorMes) {
+    hoja.push([`Mes: ${mes}`, "", ""]);
+    let totalMes = 0;
+    for (const f of facturasPorMes[mes]) {
+      hoja.push([f.fechaFactura, f.cliente, f.total]);
+      totalMes += f.total;
+    }
+    hoja.push(["TOTAL MES", "", totalMes]);
+    hoja.push([]); // línea en blanco entre meses
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(hoja);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "ReporteFacturas");
+
+  const nombreArchivo = `Reporte_Facturas_${startInput}_a_${endInput}.xlsx`;
+  XLSX.writeFile(wb, nombreArchivo);
+}
+
+    
   </script>
 </body>
 </html>

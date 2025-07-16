@@ -85,7 +85,19 @@
 
       for (const doc of snapshot.docs) {
         const f = doc.data();
-        const cliente = await db.collection("clientes").doc(f.clientId).get();
+        //const cliente = await db.collection("clientes").doc(f.clientId).get();
+        let nombreCliente = "Cliente desconocido";
+        
+        if (f.clientId) {
+          try {
+            const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
+            nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
+          } catch (e) {
+            console.warn(`Error al obtener cliente con ID "${f.clientId}":`, e);
+            nombreCliente = f.clientId;
+          }
+        }
+
         const nombreCliente = cliente.exists ? cliente.data().nombreCliente : f.clientId;
 
         const saldoPendiente = f.paymentType === "Credito" ? f.saldo : 0;

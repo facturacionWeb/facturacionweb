@@ -59,9 +59,8 @@
 
     async function generarReporte() {
       const startInput = document.getElementById('startDate').value;
-      fechaInicio.setHours(0, 0, 0, 0); // incluir todo el día inicial
       const endInput = document.getElementById('endDate').value;
-      fechaFin.setHours(23, 59, 59, 999); // incluir todo el día final
+      
 
       if (!startInput || !endInput) {
         alert('Por favor selecciona la fecha inicial y la fecha final.');
@@ -69,8 +68,10 @@
       }
 
       const fechaInicio = new Date(startInput);
+      fechaInicio.setHours(0, 0, 0, 0); // incluir todo el día inicial
       const fechaFin = new Date(endInput);
-
+      fechaFin.setHours(23, 59, 59, 999); // incluir todo el día final
+      
       const snapshot = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
         .where("fecha", "<=", fechaFin)

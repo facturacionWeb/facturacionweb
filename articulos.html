@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestión de Artículos y Existencias (IMEI) 😎</title>
 
+  <!-- Para exportar a excel -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+
   <!-- Import Firebase SDK (v8 with namespaced API) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
@@ -131,6 +134,11 @@
         <!-- Las filas se cargarán dinámicamente -->
       </tbody>
     </table>
+
+    <button id="btnExportarInventario" onclick="exportarInventarioExcel()">Exportar Inventario a Excel 📤</button>
+    <div id="estadoExportacionInventario" style="margin-top:10px;font-weight:bold;color:#444;"></div>
+
+    
   </div>
 
   <script>
@@ -444,6 +452,75 @@
     window.onload = function() {
       loadArticles();
     };
+
+
+    async function exportarInventarioExcel() {
+      const btn = document.getElementById("btnExportarInventario");
+      const estado = document.getElementById("estadoExportacionInventario");
+    
+      btn.disabled = true;
+      btn.textContent = "Exportando... ⏳";
+      estado.textContent = "Generando archivo Excel de inventario...";
+      estado.style.color = "#444";
+    
+      try {
+        const articulosSnapshot = await db.collection("Articulos").get();
+        const imeisSnapshot = await db.collection("Articulos_X_IMEI").get();
+    
+        let inventario = {};
+    
+        articulosSnapshot.forEach((doc) => {
+          const art = doc.data();
+          const clave = `${art.marca} ${art.modelo}`;
+          inventario[clave] = {
+            cantidad: 0,
+            imeis: []
+          };
+        });
+    
+        imeisSnapshot.forEach((doc) => {
+          const i = doc.data();
+          const articulo = articulosSnapshot.docs.find(a => a.id === i.articleId);
+          if (articulo) {
+            const art = articulo.data();
+            const clave = `${art.marca} ${art.modelo}`;
+            if (!inventario[clave]) {
+              inventario[clave] = { cantidad: 0, imeis: [] };
+            }
+            inventario[clave].cantidad++;
+            inventario[clave].imeis.push(i.imei);
+          }
+        });
+    
+        let hoja = [["Marca Modelo", "Cantidad"]];
+        for (const key in inventario) {
+          hoja.push([key, inventario[key].cantidad]);
+          hoja.push(["IMEIS", ""]);
+          for (const imei of inventario[key].imeis) {
+            hoja.push([imei, ""]);
+          }
+          hoja.push([]); // línea en blanco entre grupos
+        }
+    
+        const ws = XLSX.utils.aoa_to_sheet(hoja);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "InventarioIMEI");
+    
+        XLSX.writeFile(wb, `Inventario_IMEI_${new Date().toISOString().slice(0,10)}.xlsx`);
+    
+        estado.textContent = "✔️ Inventario exportado con éxito.";
+        estado.style.color = "green";
+      } catch (err) {
+        console.error("Error al exportar inventario:", err);
+        estado.textContent = "❌ Error al generar el archivo Excel.";
+        estado.style.color = "red";
+      }
+    
+      btn.disabled = false;
+      btn.textContent = "Exportar Inventario a Excel 📤";
+    }
+
+    
   </script>
 </body>
 </html>

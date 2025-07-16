@@ -139,7 +139,7 @@
       document.getElementById('totalPagado').textContent = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2)); //totalPagado.toFixed(2);
     }
 
-    async function exportarExcel() {
+   /* async function exportarExcel() {
   const btn = document.getElementById("btnExportar");
   const estado = document.getElementById("estadoExportacion");
   const startInput = document.getElementById('startDate').value;
@@ -224,6 +224,101 @@
   }
 
   // 🔁 Restaurar el botón
+  btn.disabled = false;
+  btn.textContent = "Exportar a Excel 📥";
+}*/
+
+    async function exportarExcel() {
+  const btn = document.getElementById("btnExportar");
+  const estado = document.getElementById("estadoExportacion");
+  const startInput = document.getElementById('startDate').value;
+  const endInput = document.getElementById('endDate').value;
+
+  if (!startInput || !endInput) {
+    alert('Por favor selecciona la fecha inicial y final para exportar.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Exportando... ⏳";
+  estado.textContent = "Generando el archivo Excel, por favor espera...";
+  estado.style.color = "#333";
+
+  try {
+    const fechaInicio = new Date(startInput);
+    const fechaFin = new Date(endInput);
+    fechaFin.setHours(23, 59, 59, 999);
+
+    const snapshot = await db.collection("facturas")
+      .where("fecha", ">=", fechaInicio)
+      .where("fecha", "<=", fechaFin)
+      .where("anulada", "==", false)
+      .orderBy("fecha", "asc")
+      .get();
+
+    let facturasPorMes = {};
+
+    for (const doc of snapshot.docs) {
+      const f = doc.data();
+
+      let nombreCliente = "Cliente desconocido";
+      if (f.clientId) {
+        try {
+          const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
+          nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
+        } catch (e) {
+          nombreCliente = f.clientId;
+        }
+      }
+
+      const fecha = f.fecha.toDate();
+      const mesClave = `${fecha.getFullYear()}-${(fecha.getMonth() + 1).toString().padStart(2, '0')}`;
+
+      if (!facturasPorMes[mesClave]) facturasPorMes[mesClave] = [];
+
+      facturasPorMes[mesClave].push({
+        fechaFactura: fecha.toLocaleDateString('es-NI'),
+        cliente: nombreCliente,
+        consecutivo: f.consecutivo || 'N/A',
+        tipo: f.paymentType || 'N/D',
+        total: f.total || 0
+      });
+    }
+
+    let hoja = [["Fecha Factura", "Cliente", "Consecutivo", "Tipo Factura", "Monto C$"]];
+
+    for (const mes in facturasPorMes) {
+      hoja.push([`Mes: ${mes}`, "", "", "", ""]);
+      let totalMes = 0;
+      for (const f of facturasPorMes[mes]) {
+        hoja.push([
+          f.fechaFactura,
+          f.cliente,
+          f.consecutivo,
+          f.tipo,
+          f.total
+        ]);
+        totalMes += f.total;
+      }
+      hoja.push(["TOTAL MES", "", "", "", totalMes]);
+      hoja.push([]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(hoja);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ReporteFacturas");
+
+    const nombreArchivo = `Reporte_Facturas_${startInput}_a_${endInput}.xlsx`;
+    XLSX.writeFile(wb, nombreArchivo);
+
+    estado.textContent = "✔️ ¡Archivo Excel generado con éxito!";
+    estado.style.color = "green";
+  } catch (err) {
+    console.error(err);
+    estado.textContent = "❌ Error al generar el archivo. Revisá la consola.";
+    estado.style.color = "red";
+  }
+
   btn.disabled = false;
   btn.textContent = "Exportar a Excel 📥";
 }

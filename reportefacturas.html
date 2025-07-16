@@ -98,7 +98,7 @@
           }
         }
 
-        const nombreCliente = cliente.exists ? cliente.data().nombreCliente : f.clientId;
+        //const nombreCliente = cliente.exists ? cliente.data().nombreCliente : f.clientId;
 
         const saldoPendiente = f.paymentType === "Credito" ? f.saldo : 0;
         const pagado = f.total - saldoPendiente;

@@ -1413,6 +1413,7 @@
     window.onload = function() {
       loadClients();          // Para facturación
       loadInvoices();         // Para listado de facturas
+      $('#clientSelect').select2(); // 🪄 Activar Select2
     };
 
 
@@ -1442,7 +1443,7 @@
 
   const clientNameMap = {}; 
 
-  function loadClients() {
+  /*function loadClients() {
     db.collection("clientes").get().then((querySnapshot) => {
       querySnapshot.forEach((doc) => {
         const cliente = doc.data();
@@ -1455,8 +1456,22 @@
         document.getElementById("clientSelect").appendChild(option);
       });
     });
-  }
-  
+  }*/
+  function loadClients() {
+  db.collection("clientes").get().then((querySnapshot) => {
+    const select = document.getElementById("clientSelect");
+    select.innerHTML = '';
+    querySnapshot.forEach((doc) => {
+      const cliente = doc.data();
+      const option = document.createElement("option");
+      option.value = doc.id;
+      option.text = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
+      select.appendChild(option);
+    });
+    $('#clientSelect').select2(); // 🎯 Activar búsqueda después de llenar
+  });
+}
+
 
 
     

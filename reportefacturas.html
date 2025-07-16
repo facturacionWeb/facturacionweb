@@ -69,7 +69,7 @@
 
       const fechaInicio = new Date(startInput);
       const fechaFin = new Date(endInput);
-      
+      fechaFin.setHours(23, 59, 59, 999);
       
       const snapshot = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)

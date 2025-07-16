@@ -112,12 +112,12 @@
           </tr>
         `;
 
-        console.log(f.total);console.log(saldoPendiente);console.log(pagado);
+        
         totalMonto += f.total;
         totalPendiente += saldoPendiente;
         totalPagado += pagado;
       }
-
+      console.log(totalMonto);console.log(totalPendiente);console.log(totalPagado);
       document.getElementById('totalMonto').textContent = new Intl.NumberFormat('es-NI').format(totalMonto.toFixed(2));//totalMonto.toFixed(2);
       document.getElementById('totalPendiente').textContent = new Intl.NumberFormat('es-NI').format(totalPendiente.toFixed(2)); //totalPendiente.toFixed(2);
       document.getElementById('totalPagado').textContent = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2)); //totalPagado.toFixed(2);

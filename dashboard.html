@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📈 Dashboard de Ventas</title>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Estilos básicos -->
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:20px; }
+    .card { background:#fff; padding:15px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); margin:10px; flex:1; text-align:center; }
+    .flex { display:flex; flex-wrap:wrap; }
+    h1 { width:100%; text-align:center; }
+    #charts { width:100%; margin-top:30px; }
+  </style>
+</head>
+<body>
+  <h1>🚀 Dashboard de Ventas</h1>
+  
+  <!-- Selectores de periodo -->
+  <div class="flex">
+    <div class="card" style="flex:0 0 200px;">
+      <label>Desde:</label><br>
+      <input type="date" id="startDate">
+    </div>
+    <div class="card" style="flex:0 0 200px;">
+      <label>Hasta:</label><br>
+      <input type="date" id="endDate">
+    </div>
+    <div class="card" style="flex:0 0 150px; align-self:flex-end;">
+      <button onclick="generarDashboard()">Generar 📊</button>
+    </div>
+  </div>
+  
+  <!-- Métricas resumen -->
+  <div class="flex" id="metrics">
+    <div class="card"><strong>Total Ventas</strong><p id="totalSales">$0</p></div>
+    <div class="card"><strong># Ventas</strong><p id="countSales">0</p></div>
+    <div class="card"><strong>Ganancia</strong><p id="totalProfit">$0</p></div>
+  </div>
+  
+  <!-- Top 5 productos -->
+  <div class="card" style="margin-top:20px;">
+    <h2>🏆 Top 5 Productos</h2>
+    <canvas id="topProductsChart" height="200"></canvas>
+  </div>
+  
+  <!-- Ventas vs Ganancia por día -->
+  <div id="charts" class="flex">
+    <div class="card" style="width:100%;">
+      <h2>📅 Ventas y Ganancia Diaria</h2>
+      <canvas id="dailyChart" height="150"></canvas>
+    </div>
+  </div>
+  
+  <script>
+    // Inicializar Firebase (ajustá con tu config)
+    const firebaseConfig = { /* tu configuración aquí */ };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function generarDashboard() {
+      const startInput = document.getElementById('startDate').value;
+      const endInput   = document.getElementById('endDate').value;
+      if (!startInput || !endInput) {
+        alert('Elegí en rango de las fechas');
+        return;
+      }
+      // Prep fechas
+      const fechaInicio = new Date(startInput);
+      const fechaFin = new Date(endInput);
+      fechaFin.setHours(23,59,59,999);
+
+      // Query facturas por rango de fecha
+      const snapshot = await db.collection("facturas")
+        .where("fecha", ">=", fechaInicio)
+        .where("fecha", "<=", fechaFin)
+        .where("anulada", "==", false)
+        .get();  // :contentReference[oaicite:0]{index=0}
+
+      // Acumuladores
+      let totalSales = 0, countSales = 0, totalProfit = 0;
+      const prodCount = {};       // { productId: cantidad }
+      const daily = {};           // { 'YYYY-MM-DD': { ventas, profit } }
+
+      for (const doc of snapshot.docs) {
+        const inv = doc.data();
+        totalSales += inv.total;
+        countSales += 1;
+
+        // FechaStr para agrupar
+        const dayKey = inv.fechaStr; 
+
+        if (!daily[dayKey]) daily[dayKey] = { ventas:0, profit:0 };
+        daily[dayKey].ventas += inv.total;
+
+        // Recorremos items para top5 y profit
+        inv.items.forEach(item => {
+          // Top5: acumulamos cantidades
+          prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
+
+          // Profit: (precioVenta - costoCompra) * qty * (1 - discount/100)
+          // Asumimos que en la colección Articulos existe campo `costoCompra`
+          totalProfit += (item.price - (item.costoCompra||0)) * item.quantity * (1 - item.discount/100);
+          
+          // Profit diario
+          daily[dayKey].profit += (item.price - (item.costoCompra||0)) * item.quantity * (1 - item.discount/100);
+        });
+      }
+
+      // Mostrar métricas
+      document.getElementById('totalSales').innerText = `$${totalSales.toFixed(2)}`;
+      document.getElementById('countSales').innerText = countSales;
+      document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
+
+      // TOP 5 productos
+      const top5 = Object.entries(prodCount)
+        .sort((a,b)=> b[1]-a[1])
+        .slice(0,5);
+      const labelsP = [], dataP = [];
+      for (const [prodId, qty] of top5) {
+        labelsP.push(prodId);
+        dataP.push(qty);
+      }
+      renderChart('topProductsChart', {
+        type: 'bar',
+        data: { labels: labelsP, datasets:[{ label:'Unidades', data:dataP }] },
+        options:{ responsive:true }
+      });
+
+      // Ventas vs Ganancia diaria
+      const days = Object.keys(daily).sort();
+      const ventasArr = days.map(d=> daily[d].ventas);
+      const profitArr = days.map(d=> daily[d].profit);
+      renderChart('dailyChart', {
+        type: 'bar',
+        data: {
+          labels: days,
+          datasets: [
+            { label:'Ventas', data:ventasArr },
+            { label:'Ganancia', data:profitArr }
+          ]
+        },
+        options:{ responsive:true, scales:{ x:{ stacked:false }, y:{ beginAtZero:true } } }
+      });
+    }
+
+    // Helper para Chart.js
+    function renderChart(canvasId, cfg) {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+      if (window[canvasId+'_chart']) window[canvasId+'_chart'].destroy();
+      window[canvasId+'_chart'] = new Chart(ctx, cfg);
+    }
+  </script>
+</body>
+</html>

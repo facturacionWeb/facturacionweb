@@ -1,388 +1,178 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Facturas del Cliente</title>
-
-    <!-- Import Firebase SDK (v8 with namespaced API) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-
-    <!-- Import Firebase configuration -->
-    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        table, th, td {
-            border: 1px solid black;
-            padding: 10px;
-        }
-        th, td {
-            text-align: center;
-        }
-        .invoice-detail {
-            margin-top: 20px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Facturas del Cliente</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    .container { max-width: 1000px; margin: auto; background: #fff; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+    th { background-color: #333; color: #fff; }
+    .invoice-detail { margin-top: 30px; background: #f9f9f9; padding: 15px; border-radius: 8px; }
+    .invoice-header { text-align: left; border-bottom: 2px solid #000; margin-bottom: 20px; }
+    .invoice-header h2 { margin: 0; }
+    .details-table td, .items-table th, .items-table td { border: 1px solid #ddd; padding: 10px; }
+    .items-table th { background: #333; color: #fff; }
+  </style>
 </head>
 <body>
-    <a href="clientes.html">Volver a la Gestión de Clientes</a>
-    <div class="container">
-        <h1 id="clientNameHeading">Facturas del Cliente</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th># Factura Cliente</th>
-                    <th>Fecha y Hora</th>
-                    <th>Monto</th>
-                    <th>Tipo de Factura</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="invoiceTable">
-                <!-- Invoice rows will be populated here -->
-            </tbody>
-        </table>
+  <a href="clientes.html">Volver a la Gestión de Clientes</a>
+  <div class="container">
+    <h1 id="clientNameHeading">Facturas del Cliente</h1>
+    <table>
+      <thead>
+        <tr>
+          <th># Factura</th>
+          <th>Fecha y Hora</th>
+          <th>Monto</th>
+          <th>Tipo</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceTable"></tbody>
+    </table>
 
-        <!-- Div to display invoice details -->
-        <div id="invoiceDetail" class="invoice-detail">
-            <!-- Invoice details will be shown here -->
-        </div>
-    </div>
+    <div id="invoiceDetail" class="invoice-detail"></div>
+  </div>
 
-    <script>
-        // Initialize Firestore
-        const db = firebase.firestore();
+  <script>
+    const db = firebase.firestore();
+    const clientId = new URLSearchParams(window.location.search).get('clientId');
+    if (!clientId) {
+      alert("ID de cliente no proporcionado");
+      window.location.href = "clientes.html";
+    }
 
-        function formatDate(date) {
-            const options = {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-            };
-            const datePart = date.toLocaleDateString('en-CA', options); // 'YYYY-MM-DD'
-        
-            let hours = date.getHours();
-            const minutes = date.getMinutes();
-            const ampm = hours >= 12 ? 'pm' : 'am';
-            hours = hours % 12;
-            hours = hours ? hours : 12; // la hora '0' debe ser '12'
-        
-            const timePart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
-        
-            return `${datePart} ${timePart}`;
+    function formatDate(date) {
+      const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+      const datePart = date.toLocaleDateString('en-CA', options);
+      let hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'pm' : 'am';
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const timePart = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+      return `${datePart} ${timePart}`;
+    }
+
+    function getClientName() {
+      db.collection("clientes").doc(clientId).get().then(doc => {
+        if (doc.exists) {
+          const data = doc.data();
+          document.getElementById('clientNameHeading').innerText = `Facturas de ${data.nombreCliente}`;
+        } else {
+          alert("Cliente no encontrado");
+          window.location.href = "clientes.html";
         }
+      });
+    }
 
-        // Función para obtener el nombre del cliente
-        function getClientName() {
-            db.collection("clientes").doc(clientId).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const clientData = doc.data();
-                        const clientName = clientData.nombreCliente || 'Cliente Desconocido';
-                        // Actualizar el encabezado con el nombre del cliente
-                        document.getElementById('clientNameHeading').innerText = `Facturas de ${clientName}`;
-                    } else {
-                        alert("Cliente no encontrado");
-                        window.location.href = "clientes.html";
-                    }
-                })
-                .catch((error) => {
-                    console.error("Error al obtener el nombre del cliente:", error);
-                });
+    function loadInvoices() {
+      const invoiceTable = document.getElementById('invoiceTable');
+      invoiceTable.innerHTML = '<tr><td colspan="5">Cargando...</td></tr>';
+      db.collection("facturas")
+        .where("clientId", "==", clientId)
+        .orderBy("fecha", "desc")
+        .get()
+        .then(snapshot => {
+          invoiceTable.innerHTML = '';
+          if (snapshot.empty) {
+            invoiceTable.innerHTML = '<tr><td colspan="5">No hay facturas para este cliente.</td></tr>';
+            return;
+          }
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const date = data.fecha?.toDate ? formatDate(data.fecha.toDate()) : 'N/A';
+            invoiceTable.innerHTML += `<tr>
+              <td>${data.consecutivo || 'N/A'}</td>
+              <td>${date}</td>
+              <td>${data.total?.toFixed(2) || '0.00'}</td>
+              <td>${data.paymentType || 'N/A'}</td>
+              <td><button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button></td>
+            </tr>`;
+          });
+        })
+        .catch(err => {
+          console.error("Error cargando facturas:", err);
+          invoiceTable.innerHTML = '<tr><td colspan="5">Error al cargar.</td></tr>';
+        });
+    }
+
+    function showInvoiceDetail(invoiceId) {
+      const container = document.getElementById('invoiceDetail');
+      container.innerHTML = 'Cargando detalles...';
+
+      db.collection("facturas").doc(invoiceId).get().then(invoiceDoc => {
+        if (!invoiceDoc.exists) {
+          container.innerHTML = 'Factura no encontrada.';
+          return;
         }
+        const invoice = invoiceDoc.data();
+        db.collection("clientes").doc(invoice.clientId).get().then(clientDoc => {
+          const client = clientDoc.data();
+          const grouped = agruparItemsFactura(invoice.items || []);
 
+          let html = `<div class="invoice-header">
+            <h2>Factura - ${invoiceId}</h2>
+            <p><strong>Consecutivo:</strong> ${invoice.consecutivo}</p>
+            <p><strong>Ruta:</strong> ${invoice.route}</p>
+          </div>
+          <table class="details-table">
+            <tr><td><strong>Cliente:</strong> ${client?.nombreCliente}</td><td><strong>Teléfono:</strong> ${client?.telefono}</td></tr>
+            <tr><td><strong>Tienda:</strong> ${client?.nombreTienda}</td><td><strong>Dirección:</strong> ${client?.direccion}</td></tr>
+            <tr><td colspan="2"><strong>Pago:</strong> ${invoice.paymentMethod}</td></tr>
+          </table>
+          <table class="items-table">
+            <tr><th>Cantidad</th><th>Descripción</th><th>Precio</th><th>Desc</th><th>Total</th></tr>
+            ${grouped.map(item => `
+              <tr>
+                <td>${item.quantity}</td>
+                <td>${item.brand} ${item.model}<br><small>${item.imeis?.length ? 'IMEIs:<br>' + item.imeis.join('<br>') : ''}</small></td>
+                <td>${item.price.toFixed(2)}</td>
+                <td>${item.discount}%</td>
+                <td>${item.total.toFixed(2)}</td>
+              </tr>`).join('')}
+            <tr><td colspan="4" style="text-align:right;">Envío:</td><td>${invoice.shipping?.toFixed(2) || '0.00'}</td></tr>
+            <tr><td colspan="4" style="text-align:right;"><strong>Total:</strong></td><td><strong>${invoice.total.toFixed(2)}</strong></td></tr>
+          </table>`;
+          container.innerHTML = html;
+        });
+      }).catch(err => {
+        console.error("Error al obtener detalle:", err);
+        container.innerHTML = 'Error al cargar detalles.';
+      });
+    }
 
-        // Function to get URL parameters
-        function getUrlParam(param) {
-            const urlParams = new URLSearchParams(window.location.search);
-            return urlParams.get(param);
+    function agruparItemsFactura(items) {
+      const grupos = {};
+      items.forEach(item => {
+        const key = `${item.brand}||${item.model}||${item.price}||${item.discount}`;
+        if (!grupos[key]) {
+          grupos[key] = {
+            brand: item.brand,
+            model: item.model,
+            price: item.price,
+            discount: item.discount,
+            quantity: 0,
+            total: 0,
+            imeis: []
+          };
         }
+        grupos[key].quantity += item.quantity;
+        grupos[key].total += item.total;
+        if (item.imei) grupos[key].imeis.push(item.imei);
+      });
+      return Object.values(grupos);
+    }
 
-        const clientId = getUrlParam('clientId');
-
-        if (!clientId) {
-            alert("ID de cliente no proporcionado");
-            window.location.href = "clientes.html";
-        }
-
-        // Function to load invoices
-        /*function loadInvoices() {
-            db.collection("Facturas")
-                .where("ID_Firebase_Cliente", "==", clientId)
-                .where("Tipo_Factura", "==", "Credito")
-                .where("Cancelada", "==", 0)
-                .get()
-                .then((querySnapshot) => {
-                    const invoiceTable = document.getElementById('invoiceTable');
-                    invoiceTable.innerHTML = '';
-                    querySnapshot.forEach((doc) => {
-                        const invoice = doc.data();
-
-                        // Convertir y formatear la fecha y hora
-                        let formattedDate = 'N/A';
-                        if (invoice.Fecha_Hora_Factura) {
-                            const date = invoice.Fecha_Hora_Factura.toDate();
-                            formattedDate = formatDate(date);
-                        }
-                        
-                        const row = `<tr>
-                                        <td>${invoice['#Factura_Cliente'] || 'N/A'}</td>
-                                        <td>${formattedDate}</td>
-                                        <td>${invoice.Monto_Factura || 'N/A'}</td>
-                                        <td>${invoice.Tipo_Factura || 'N/A'}</td>
-                                        <td>
-                                            <button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button>
-                                        </td>
-                                     </tr>`;
-                        invoiceTable.innerHTML += row;
-                    });
-                })
-                .catch((error) => {
-                    console.error("Error al cargar las facturas: ", error);
-                });
-        }*/
-
-        /*function loadInvoices() {
-                const invoiceTable = document.getElementById('invoiceTable');
-                invoiceTable.innerHTML = '<tr><td colspan="5">Cargando facturas...</td></tr>';
-            
-                db.collection("Facturas")
-                    .where("clientId", "==", clientId)
-                    .where("paymentType", "==", "Credito")
-                    .where("anulada", "==", false)
-                    .get()
-                    .then((querySnapshot) => {
-                        invoiceTable.innerHTML = ''; // Limpiamos antes de agregar nuevas filas
-            
-                        if (querySnapshot.empty) {
-                            invoiceTable.innerHTML = `<tr><td colspan="5">No hay facturas disponibles para este cliente.</td></tr>`;
-                            return;
-                        }
-            
-                        querySnapshot.forEach((doc) => {
-                            const invoice = doc.data();
-            
-                            // Formatear la fecha
-                            let formattedDate = 'N/A';
-                            try {
-                                if (invoice.fecha && typeof invoice.fecha.toDate === "function") {
-                                    const date = invoice.fecha.toDate();
-                                    formattedDate = formatDate(date);
-                                } else if (invoice.fechaStr) {
-                                    formattedDate = invoice.fechaStr;
-                                }
-                            } catch (e) {
-                                console.error("Error al formatear la fecha:", e);
-                            }
-            
-                            // Construir la fila HTML
-                            const row = `<tr>
-                                            <td>${invoice.consecutivo || 'N/A'}</td>
-                                            <td>${formattedDate}</td>
-                                            <td>${invoice.total || 'N/A'}</td>
-                                            <td>${invoice.paymentType || 'N/A'}</td>
-                                            <td>
-                                                <button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button>
-                                            </td>
-                                        </tr>`;
-                            invoiceTable.innerHTML += row;
-                        });
-                    })
-                    .catch((error) => {
-                        console.error("Error al cargar las facturas: ", error);
-                        invoiceTable.innerHTML = `<tr><td colspan="5">Error al cargar las facturas.</td></tr>`;
-                    });
-            }*/
-
-        function loadInvoices() {
-                console.log("👉 Iniciando carga de facturas para clientId:", clientId);
-                
-                const invoiceTable = document.getElementById('invoiceTable');
-                invoiceTable.innerHTML = '<tr><td colspan="5">Cargando facturas...</td></tr>';
-            
-                db.collection("facturas")
-                    .where("clientId", "==", clientId)
-                    .where("paymentType", "==", "Credito")
-                    .where("anulada", "==", false)
-                    .get()
-                    .then((querySnapshot) => {
-                        console.log("✅ Consulta ejecutada. Documentos encontrados:", querySnapshot.size);
-            
-                        invoiceTable.innerHTML = '';
-            
-                        if (querySnapshot.empty) {
-                            console.warn("⚠️ No se encontraron facturas con esos filtros.");
-                            invoiceTable.innerHTML = `<tr><td colspan="5">No hay facturas disponibles para este cliente.</td></tr>`;
-                            return;
-                        }
-            
-                        querySnapshot.forEach((doc) => {
-                            const invoice = doc.data();
-                            console.log("🧾 Factura encontrada:", invoice);
-            
-                            // Formatear fecha
-                            let formattedDate = 'N/A';
-                            try {
-                                if (invoice.fecha && typeof invoice.fecha.toDate === "function") {
-                                    const date = invoice.fecha.toDate();
-                                    formattedDate = formatDate(date);
-                                    console.log("📅 Fecha formateada:", formattedDate);
-                                } else if (invoice.fechaStr) {
-                                    formattedDate = invoice.fechaStr;
-                                    console.log("📅 Fecha alternativa (fechaStr):", formattedDate);
-                                } else {
-                                    console.warn("⚠️ Fecha no encontrada en la factura.");
-                                }
-                            } catch (e) {
-                                console.error("❌ Error al convertir la fecha:", e);
-                            }
-            
-                            // Construir fila HTML
-                            const row = `<tr>
-                                            <td>${invoice.consecutivo || 'N/A'}</td>
-                                            <td>${formattedDate}</td>
-                                            <td>${invoice.total || 'N/A'}</td>
-                                            <td>${invoice.paymentType || 'N/A'}</td>
-                                            <td>
-                                                <button onclick="showInvoiceDetail('${doc.id}')">Ver Detalle</button>
-                                            </td>
-                                        </tr>`;
-                            invoiceTable.innerHTML += row;
-                        });
-                    })
-                    .catch((error) => {
-                        console.error("💥 Error al cargar las facturas:", error);
-                        invoiceTable.innerHTML = `<tr><td colspan="5">Error al cargar las facturas.</td></tr>`;
-                    });
-            }
-
-        // Function to show invoice detail
-        /*function showInvoiceDetail(invoiceId) {
-            const invoiceDetailDiv = document.getElementById('invoiceDetail');
-            invoiceDetailDiv.innerHTML = '<h2>Detalle de la Factura</h2>';
-
-            db.collection("Detalle_Factura")
-                .where("ID_Firebase_Factura", "==", invoiceId)
-                .get()
-                .then((querySnapshot) => {
-                    let total = 0;
-                    let detailTable = `<table>
-                                        <thead>
-                                            <tr>
-                                                <th>ID Artículo</th>
-                                                <th>Cantidad</th>
-                                                <th>Precio Venta</th>
-                                                <th>Precio Venta Real</th>
-                                                <th>Subtotal</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>`;
-
-                    querySnapshot.forEach((doc) => {
-                        const detail = doc.data();
-                        const subtotal = detail.Cantidad * detail.Precio_Venta_Real;
-                        total += subtotal;
-
-                        detailTable += `<tr>
-                                            <td>${detail.ID_Firebase_Articulo || 'N/A'}</td>
-                                            <td>${detail.Cantidad || 'N/A'}</td>
-                                            <td>${detail.Precio_Venta || 'N/A'}</td>
-                                            <td>${detail.Precio_Venta_Real || 'N/A'}</td>
-                                            <td>${subtotal.toFixed(2)}</td>
-                                        </tr>`;
-                    });
-
-                    detailTable += `</tbody></table>`;
-                    detailTable += `<h3>Total de la Factura: ${total.toFixed(2)}</h3>`;
-                    invoiceDetailDiv.innerHTML += detailTable;
-                })
-                .catch((error) => {
-                    console.error("Error al cargar el detalle de la factura: ", error);
-                });
-        }*/
-        // Función para mostrar el detalle de la factura
-        function showInvoiceDetail(invoiceId) {
-            const invoiceDetailDiv = document.getElementById('invoiceDetail');
-
-            // Primero, obtener los datos de la factura para obtener '#Factura_Cliente'
-            db.collection("Facturas").doc(invoiceId).get()
-                .then((doc) => {
-                    if (doc.exists) {
-                        const invoice = doc.data();
-                        const facturaCliente = invoice['#Factura_Cliente'] || 'N/A';
-
-                        // Actualizar el encabezado con el código de la factura
-                        invoiceDetailDiv.innerHTML = `<h2>Detalle de la Factura ${facturaCliente}</h2>`;
-
-                        // Ahora, obtener el detalle de la factura
-                        db.collection("Detalle_Factura")
-                            .where("ID_Firebase_Factura", "==", invoiceId)
-                            .get()
-                            .then((querySnapshot) => {
-                                let total = 0;
-                                let detailTable = `<table>
-                                                    <thead>
-                                                        <tr>
-                                                            <th>ID Artículo</th>
-                                                            <th>Cantidad</th>
-                                                            <th>Precio Venta</th>
-                                                            <th>Precio Venta Real</th>
-                                                            <th>Subtotal</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>`;
-
-                                querySnapshot.forEach((doc) => {
-                                    const detail = doc.data();
-                                    const subtotal = detail.Cantidad * detail.Precio_Venta_Real;
-                                    total += subtotal;
-
-                                    detailTable += `<tr>
-                                                        <td>${detail.ID_Firebase_Articulo || 'N/A'}</td>
-                                                        <td>${detail.Cantidad || 'N/A'}</td>
-                                                        <td>${detail.Precio_Venta || 'N/A'}</td>
-                                                        <td>${detail.Precio_Venta_Real || 'N/A'}</td>
-                                                        <td>${subtotal.toFixed(2)}</td>
-                                                    </tr>`;
-                                });
-
-                                detailTable += `</tbody></table>`;
-                                detailTable += `<h3>Total de la Factura: ${total.toFixed(2)}</h3>`;
-                                invoiceDetailDiv.innerHTML += detailTable;
-                            })
-                            .catch((error) => {
-                                console.error("Error al cargar el detalle de la factura: ", error);
-                                invoiceDetailDiv.innerHTML += '<p>Error al cargar el detalle de la factura.</p>';
-                            });
-                    } else {
-                        console.error("Factura no encontrada");
-                        invoiceDetailDiv.innerHTML = '<p>Factura no encontrada.</p>';
-                    }
-                })
-                .catch((error) => {
-                    console.error("Error al obtener la factura:", error);
-                    invoiceDetailDiv.innerHTML = '<p>Error al obtener la factura.</p>';
-                });
-        }
-
-        // Load invoices when the page loads
-        window.onload = function() {
-            getClientName(); // Obtener y mostrar el nombre del cliente
-            loadInvoices();
-        };
-    </script>
+    window.onload = function() {
+      getClientName();
+      loadInvoices();
+    };
+  </script>
 </body>
 </html>

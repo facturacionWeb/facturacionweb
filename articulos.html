@@ -163,6 +163,11 @@
       document.getElementById('modelo').value = '';
       document.getElementById('precioCompra').value = '';
       document.getElementById('precioVenta').value = '';
+
+        // ✨ Limpiar proveedor
+        document.getElementById('proveedorSelect').value = '';
+        $('#proveedorSelect').val(null).trigger('change'); // para Select2
+      
     }
 
     function addOrUpdateArticle() {

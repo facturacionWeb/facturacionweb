@@ -150,7 +150,7 @@
       const daily      = {};  // 'YYYY-MM-DD' → { ventas$, profit$ }
       const dailyCount = {};  // 'YYYY-MM-DD' → # facturas
 
-      snap.docs.forEach(doc => {
+      /*snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total;
         countSales++;
@@ -170,7 +170,44 @@
           totalProfit += profit;
           daily[day].profit += profit;
         });
+      });*/
+    snap.docs.forEach(doc => {
+      const inv = doc.data();
+      totalSales += inv.total;
+      countSales++;
+    
+      const day = inv.fechaStr;
+      if (!daily[day])      daily[day]      = { ventas:0, profit:0 };
+      if (!dailyCount[day]) dailyCount[day] = 0;
+      daily[day].ventas += inv.total;
+      dailyCount[day]++;
+    
+      // Recorro items para top5 y profit
+      inv.items.forEach(item => {
+        const costo = articleMap[item.articleId]?.costo || 0;
+        const descuento = item.discount || 0;
+        const gananciaUnit = (item.price - costo) * (1 - descuento / 100);
+        const gananciaTotal = gananciaUnit * item.quantity;
+    
+        // 🔥 LOGS DETALLE
+        console.log("==== ITEM ====");
+        console.log("Artículo:", articleMap[item.articleId]?.label || item.articleId);
+        console.log("Precio venta:", item.price);
+        console.log("Costo:", costo);
+        console.log("Descuento (%):", descuento);
+        console.log("Cantidad:", item.quantity);
+        console.log("Ganancia unidad:", gananciaUnit.toFixed(2));
+        console.log("Ganancia total item:", gananciaTotal.toFixed(2));
+        console.log("==================");
+    
+        totalProfit += gananciaTotal;
+        daily[day].profit += gananciaTotal;
+    
+        prodCount[item.articleId] = (prodCount[item.articleId] || 0) + item.quantity;
       });
+    });
+
+      
 
       // 5) Muestro métricas resumen
       document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;

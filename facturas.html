@@ -1463,6 +1463,8 @@
     select.innerHTML = '';
     querySnapshot.forEach((doc) => {
       const cliente = doc.data();
+      const fullName = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
+      clientNameMap[doc.id] = fullName;
       const option = document.createElement("option");
       option.value = doc.id;
       option.text = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;

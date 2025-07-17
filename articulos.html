@@ -5,21 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gestión de Artículos y Existencias (IMEI) 😎</title>
 
-  <!-- Estilo Select2 -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-  <!-- jQuery -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- Select2 -->
-  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-
-  <!-- Excel -->
+  <!-- Para exportar a excel -->
   <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 
+  <!-- Import Firebase SDK (v8 with namespaced API) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase Config -->
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -30,11 +24,15 @@
       margin: 0 auto;
       margin-bottom: 40px;
     }
-    input, button, select {
+    input[type="text"],
+    input[type="number"],
+    button,
+    select {
       margin: 10px 0;
       display: block;
       width: 100%;
       padding: 10px;
+      box-sizing: border-box;
     }
     table {
       width: 100%;
@@ -48,29 +46,36 @@
       padding: 8px;
       text-align: left;
     }
+    h1, h2, h3 {
+      text-align: center;
+    }
   </style>
 
+  <script>
+    // Script para cargar versión (opcional)
+    (function loadVersionScript() {
+      const versionScript = document.createElement('script');
+      versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+      document.head.appendChild(versionScript);
+    })();
+  </script>
 </head>
 <body>
   <h1>Gestión de Artículos y Existencias (IMEI) 📱💾</h1>
 
+  <!-- Sección de Artículos -->
   <div class="container" id="articlesSection">
     <h2>Gestión de Artículos</h2>
-
+    <!-- Formulario para Artículos -->
     <input type="text" id="articleId" placeholder="ID del Artículo" />
     <input type="text" id="marca" placeholder="Marca" />
     <input type="text" id="modelo" placeholder="Modelo" />
     <input type="number" id="precioCompra" placeholder="Precio de Compra" step="0.01" />
     <input type="number" id="precioVenta" placeholder="Precio de Venta" step="0.01" />
-
-    <!-- Select2 para proveedor -->
-    <select id="proveedorSelect" style="width: 100%;">
-      <option value="">Seleccione un proveedor</option>
-    </select>
-
     <button onclick="addOrUpdateArticle()">Agregar/Actualizar Artículo</button>
     <button onclick="clearArticleFields()">Limpiar Campos</button>
 
+    <!-- Tabla de Artículos -->
     <table>
       <thead>
         <tr>
@@ -79,89 +84,144 @@
           <th>Modelo</th>
           <th>Precio Compra</th>
           <th>Precio Venta</th>
-          <th>Proveedor</th>
           <th>Acciones</th>
         </tr>
       </thead>
-      <tbody id="articleTable"></tbody>
+      <tbody id="articleTable">
+        <!-- Las filas se cargarán dinámicamente -->
+      </tbody>
     </table>
   </div>
 
+  <!-- Sección de IMEI -->
+  <div class="container" id="imeiSection">
+    <h2>Gestión de Existencias (IMEI)</h2>
+    <!-- Selector para elegir un Artículo -->
+    <select id="articleSelector">
+      <option value="">Seleccione un Artículo</option>
+      <!-- Opciones cargadas dinámicamente -->
+    </select>
+    <!-- Formulario para agregar IMEI -->
+    <input type="text" id="imei" placeholder="IMEI" />
+    <button onclick="addIMEI()">Agregar IMEI</button>
+
+    <!-- Previsualización de IMEIs pendientes -->
+    <h3>Previsualización de IMEIs pendientes 📋</h3>
+    <table id="previewTable">
+      <thead>
+        <tr>
+          <th>IMEI</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Se llenará dinámicamente -->
+      </tbody>
+    </table>
+    <button onclick="savePendingIMEIs()">Guardar todos los IMEIs</button>
+
+    <!-- Tabla de IMEIs guardados -->
+    <h3>IMEIs Guardados en Firestore 💾</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID (Registro)</th>
+          <th>IMEI</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="imeiTable">
+        <!-- Las filas se cargarán dinámicamente -->
+      </tbody>
+    </table>
+
+    <button id="btnExportarInventario" onclick="exportarInventarioExcel()">Exportar Inventario a Excel 📤</button>
+    <div id="estadoExportacionInventario" style="margin-top:10px;font-weight:bold;color:#444;"></div>
+
+    
+  </div>
+
   <script>
+    // Inicializar Firestore
     const db = firebase.firestore();
 
+    // Arreglo para acumular los IMEIs pendientes
+    let pendingIMEIs = [];
+
+    /* =============================
+       Funciones para Artículos
+       ============================= */
     function clearArticleFields() {
       document.getElementById('articleId').value = '';
       document.getElementById('marca').value = '';
       document.getElementById('modelo').value = '';
       document.getElementById('precioCompra').value = '';
       document.getElementById('precioVenta').value = '';
-      document.getElementById('proveedorSelect').value = '';
-      $('#proveedorSelect').trigger('change');
     }
 
-    async function addOrUpdateArticle() {
+    function addOrUpdateArticle() {
       const id = document.getElementById('articleId').value.trim();
       const marca = document.getElementById('marca').value.trim();
       const modelo = document.getElementById('modelo').value.trim();
       const precioCompra = parseFloat(document.getElementById('precioCompra').value);
       const precioVenta = parseFloat(document.getElementById('precioVenta').value);
-      const proveedorId = document.getElementById('proveedorSelect').value;
 
-      if (!id || !marca || !modelo || isNaN(precioCompra) || isNaN(precioVenta)) {
-        alert("Todos los campos son obligatorios 😅");
+      if (!id) {
+        alert("El ID del artículo es requerido 😅");
+        return;
+      }
+      if (!marca || !modelo || isNaN(precioCompra) || isNaN(precioVenta)) {
+        alert("Por favor, complete todos los campos correctamente 😬");
         return;
       }
 
-      await db.collection("Articulos").doc(id).set({
+      // Guardar o actualizar el artículo en la colección "Articulos"
+      db.collection("Articulos").doc(id).set({
         id,
         marca,
         modelo,
         precioCompra,
-        precioVenta,
-        proveedorId
+        precioVenta
+      })
+      .then(() => {
+        alert("Artículo guardado con éxito 😎");
+        loadArticles();
+        clearArticleFields();
+      })
+      .catch((error) => {
+        console.error("Error al guardar el artículo: ", error);
       });
-
-      alert("Artículo guardado con éxito 😎");
-      loadArticles();
-      clearArticleFields();
     }
 
-    async function loadArticles() {
-      const articleTable = document.getElementById('articleTable');
-      articleTable.innerHTML = '';
+    function loadArticles() {
+      db.collection("Articulos").get().then((querySnapshot) => {
+        const articleTable = document.getElementById('articleTable');
+        const articleSelector = document.getElementById('articleSelector');
+        articleTable.innerHTML = '';
+        articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
 
-      const querySnapshot = await db.collection("Articulos").get();
-
-      for (const doc of querySnapshot.docs) {
-        const article = doc.data();
-        let proveedorNombre = "Sin proveedor";
-
-        if (article.proveedorId) {
-          try {
-            const proveedorDoc = await db.collection("proveedores").doc(article.proveedorId).get();
-            if (proveedorDoc.exists) {
-              proveedorNombre = proveedorDoc.data().nombreProveedor || "Desconocido";
-            }
-          } catch (e) {
-            console.warn("Error obteniendo proveedor:", e);
-          }
-        }
-
-        const row = `<tr>
-          <td>${article.id}</td>
-          <td>${article.marca}</td>
-          <td>${article.modelo}</td>
-          <td>${article.precioCompra}</td>
-          <td>${article.precioVenta}</td>
-          <td>${proveedorNombre}</td>
-          <td>
-            <button onclick="editArticle('${doc.id}')">Editar</button>
-            <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
-          </td>
-        </tr>`;
-        articleTable.innerHTML += row;
-      }
+        querySnapshot.forEach((doc) => {
+          const article = doc.data();
+          // Agregar fila a la tabla de artículos con botones para Editar y Eliminar
+          const row = `<tr>
+                        <td>${article.id}</td>
+                        <td>${article.marca}</td>
+                        <td>${article.modelo}</td>
+                        <td>${article.precioCompra}</td>
+                        <td>${article.precioVenta}</td>
+                        <td>
+                          <button onclick="editArticle('${doc.id}')">Editar</button>
+                          <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
+                        </td>
+                      </tr>`;
+          articleTable.innerHTML += row;
+          // Agregar opción al selector de artículos
+          const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
+          articleSelector.innerHTML += option;
+        });
+      }).catch((error) => {
+        console.error("Error al cargar los artículos: ", error);
+      });
     }
 
     function editArticle(id) {
@@ -173,39 +233,294 @@
           document.getElementById('modelo').value = article.modelo;
           document.getElementById('precioCompra').value = article.precioCompra;
           document.getElementById('precioVenta').value = article.precioVenta;
-          document.getElementById('proveedorSelect').value = article.proveedorId || '';
-          $('#proveedorSelect').trigger('change');
         }
+      }).catch((error) => {
+        console.error("Error al obtener el artículo: ", error);
       });
     }
 
+    // Función para eliminar un artículo solo si no tiene IMEIs asociados
+    /*function deleteArticle(id) {
+      // Verificar si hay IMEIs asociados al artículo
+      db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
+      .then((querySnapshot) => {
+        if (!querySnapshot.empty) {
+          alert("No se puede eliminar el artículo porque tiene IMEI asociados 😬");
+          return;
+        } else {
+          if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
+            db.collection("Articulos").doc(id).delete()
+            .then(() => {
+              alert("Artículo eliminado 😊");
+              loadArticles();
+            })
+            .catch((error) => {
+              console.error("Error al eliminar el artículo: ", error);
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error al verificar IMEIs asociados: ", error);
+      });
+    }*/
     function deleteArticle(id) {
-      if (confirm("¿Desea eliminar este artículo?")) {
-        db.collection("Articulos").doc(id).delete().then(() => {
-          alert("Artículo eliminado correctamente 😊");
-          loadArticles();
+      // Verificar si hay IMEIs asociados al artículo
+      db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
+      .then((querySnapshot) => {
+        if (!querySnapshot.empty) {
+          if (confirm("Este artículo tiene IMEIs asociados. Si lo borra, se eliminarán también todos los IMEIs asociados. ¿Está seguro?")) {
+            // Eliminar todos los IMEIs asociados
+            let deletePromises = [];
+            querySnapshot.forEach((doc) => {
+              deletePromises.push(db.collection("Articulos_X_IMEI").doc(doc.id).delete());
+            });
+            // Después eliminar el artículo
+            Promise.all(deletePromises).then(() => {
+              db.collection("Articulos").doc(id).delete()
+              .then(() => {
+                alert("Artículo e IMEIs eliminados correctamente 😊");
+                loadArticles();
+              })
+              .catch((error) => {
+                console.error("Error al eliminar el artículo: ", error);
+              });
+            }).catch((error) => {
+              console.error("Error al eliminar los IMEIs: ", error);
+            });
+          }
+        } else {
+          // Si no hay IMEIs, confirmar eliminación normal
+          if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
+            db.collection("Articulos").doc(id).delete()
+            .then(() => {
+              alert("Artículo eliminado 😊");
+              loadArticles();
+            })
+            .catch((error) => {
+              console.error("Error al eliminar el artículo: ", error);
+            });
+          }
+        }
+      })
+      .catch((error) => {
+        console.error("Error al verificar IMEIs asociados: ", error);
+      });
+    }
+
+
+    /* =============================
+       Funciones para IMEI
+       ============================= */
+    // Función para agregar IMEI a la lista pendiente (preview)
+    function addIMEI() {
+      const articleId = document.getElementById('articleSelector').value;
+      const imei = document.getElementById('imei').value.trim();
+      if (!articleId) {
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
+      }
+      if (!imei) {
+        alert("Debes ingresar un IMEI válido 😬");
+        return;
+      }
+      // Verificar si el IMEI ya está en la lista pendiente
+      if (pendingIMEIs.includes(imei)) {
+        alert("Este IMEI ya se encuentra en la lista pendiente 😬");
+        return;
+      }
+      // Agregar el IMEI al arreglo pendiente
+      pendingIMEIs.push(imei);
+      updatePreviewTable();
+      document.getElementById('imei').value = '';
+      document.getElementById('imei').focus();
+    }
+
+    // Actualiza la tabla de previsualización con los IMEIs pendientes
+    function updatePreviewTable() {
+      const previewTableBody = document.getElementById('previewTable').getElementsByTagName('tbody')[0];
+      previewTableBody.innerHTML = '';
+      pendingIMEIs.forEach((imei, index) => {
+        const row = `<tr>
+                       <td>${imei}</td>
+                       <td><button onclick="removePendingIMEI(${index})">Eliminar</button></td>
+                     </tr>`;
+        previewTableBody.innerHTML += row;
+      });
+    }
+
+    // Elimina un IMEI de la lista pendiente
+    function removePendingIMEI(index) {
+      pendingIMEIs.splice(index, 1);
+      updatePreviewTable();
+    }
+
+    // Guarda todos los IMEIs pendientes en Firestore
+    function savePendingIMEIs() {
+      const articleId = document.getElementById('articleSelector').value;
+      if (!articleId) {
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
+      }
+      if (pendingIMEIs.length === 0) {
+        alert("No hay IMEIs pendientes para guardar 😬");
+        return;
+      }
+      let promises = [];
+      // Iterar sobre cada IMEI pendiente
+      pendingIMEIs.forEach((imei) => {
+        // Verificar en Firestore si el IMEI ya existe
+        let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
+        .then((querySnapshot) => {
+          if (!querySnapshot.empty) {
+            console.log("El IMEI ya existe:", imei);
+            return Promise.resolve(null);
+          } else {
+            return db.collection("Articulos_X_IMEI").add({
+              articleId: articleId,
+              imei: imei
+            });
+          }
+        });
+        promises.push(promise);
+      });
+      Promise.all(promises)
+      .then(() => {
+        alert("Todos los IMEIs pendientes han sido guardados 👍");
+        pendingIMEIs = [];
+        updatePreviewTable();
+        loadIMEIs(articleId);
+      })
+      .catch((error) => {
+        console.error("Error al guardar los IMEIs: ", error);
+      });
+    }
+
+    // Función para cargar los IMEIs guardados en Firestore para un artículo dado
+    function loadIMEIs(articleId) {
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+      .then((querySnapshot) => {
+        const imeiTable = document.getElementById('imeiTable');
+        imeiTable.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const imeiData = doc.data();
+          const row = `<tr>
+                        <td>${doc.id}</td>
+                        <td>${imeiData.imei}</td>
+                        <td><button onclick="deleteIMEI('${doc.id}', '${articleId}')">Eliminar</button></td>
+                      </tr>`;
+          imeiTable.innerHTML += row;
+        });
+      })
+      .catch((error) => {
+        console.error("Error al cargar los IMEIs: ", error);
+      });
+    }
+
+    function deleteIMEI(docId, articleId) {
+      if (confirm("¿Está seguro de que desea eliminar este IMEI?")) {
+        db.collection("Articulos_X_IMEI").doc(docId).delete().then(() => {
+          alert("IMEI eliminado 😊");
+          loadIMEIs(articleId);
+        }).catch((error) => {
+          console.error("Error al eliminar el IMEI: ", error);
         });
       }
     }
 
-    function cargarProveedores() {
-      db.collection("proveedores").get().then((querySnapshot) => {
-        const select = document.getElementById("proveedorSelect");
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const option = document.createElement("option");
-          option.value = doc.id;
-          option.text = data.nombreProveedor;
-          select.appendChild(option);
+    // Evento para cargar los IMEIs guardados al seleccionar un artículo
+    document.getElementById('articleSelector').addEventListener('change', function() {
+      const articleId = this.value;
+      // Limpiar la previsualización cuando se cambia de artículo
+      pendingIMEIs = [];
+      updatePreviewTable();
+      if (articleId) {
+        loadIMEIs(articleId);
+      } else {
+        document.getElementById('imeiTable').innerHTML = '';
+      }
+    });
+
+    // Evento para permitir agregar IMEI con la tecla Enter
+    document.getElementById('imei').addEventListener('keyup', function(event) {
+      if (event.key === 'Enter') {
+        addIMEI();
+      }
+    });
+
+    // Cargar los artículos al iniciar la página
+    window.onload = function() {
+      loadArticles();
+    };
+
+
+    async function exportarInventarioExcel() {
+      const btn = document.getElementById("btnExportarInventario");
+      const estado = document.getElementById("estadoExportacionInventario");
+    
+      btn.disabled = true;
+      btn.textContent = "Exportando... ⏳";
+      estado.textContent = "Generando archivo Excel de inventario...";
+      estado.style.color = "#444";
+    
+      try {
+        const articulosSnapshot = await db.collection("Articulos").get();
+        const imeisSnapshot = await db.collection("Articulos_X_IMEI").get();
+    
+        let inventario = {};
+    
+        articulosSnapshot.forEach((doc) => {
+          const art = doc.data();
+          const clave = `${art.marca} ${art.modelo}`;
+          inventario[clave] = {
+            cantidad: 0,
+            imeis: []
+          };
         });
-      });
+    
+        imeisSnapshot.forEach((doc) => {
+          const i = doc.data();
+          const articulo = articulosSnapshot.docs.find(a => a.id === i.articleId);
+          if (articulo) {
+            const art = articulo.data();
+            const clave = `${art.marca} ${art.modelo}`;
+            if (!inventario[clave]) {
+              inventario[clave] = { cantidad: 0, imeis: [] };
+            }
+            inventario[clave].cantidad++;
+            inventario[clave].imeis.push(i.imei);
+          }
+        });
+    
+        let hoja = [["Marca Modelo", "Cantidad"]];
+        for (const key in inventario) {
+          hoja.push([key, inventario[key].cantidad]);
+          hoja.push(["IMEIS", ""]);
+          for (const imei of inventario[key].imeis) {
+            hoja.push([imei, ""]);
+          }
+          hoja.push([]); // línea en blanco entre grupos
+        }
+    
+        const ws = XLSX.utils.aoa_to_sheet(hoja);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "InventarioIMEI");
+    
+        XLSX.writeFile(wb, `Inventario_IMEI_${new Date().toISOString().slice(0,10)}.xlsx`);
+    
+        estado.textContent = "✔️ Inventario exportado con éxito.";
+        estado.style.color = "green";
+      } catch (err) {
+        console.error("Error al exportar inventario:", err);
+        estado.textContent = "❌ Error al generar el archivo Excel.";
+        estado.style.color = "red";
+      }
+    
+      btn.disabled = false;
+      btn.textContent = "Exportar Inventario a Excel 📤";
     }
 
-    $(document).ready(function () {
-      $('#proveedorSelect').select2();
-      cargarProveedores();
-      loadArticles();
-    });
+    
   </script>
 </body>
 </html>

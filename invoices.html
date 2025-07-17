@@ -213,7 +213,7 @@
                 const invoiceTable = document.getElementById('invoiceTable');
                 invoiceTable.innerHTML = '<tr><td colspan="5">Cargando facturas...</td></tr>';
             
-                db.collection("Facturas")
+                db.collection("facturas")
                     .where("clientId", "==", clientId)
                     .where("paymentType", "==", "Credito")
                     .where("anulada", "==", false)

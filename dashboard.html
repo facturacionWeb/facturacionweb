@@ -116,7 +116,7 @@
     const db = firebase.firestore();
 
     async function generarDashboard() {
-      // 1) Validar fechas
+      // 1) Fechas: parseo manual en zona local para cubrir TODO el día
       const start = document.getElementById('startDate').value;
       const end   = document.getElementById('endDate').value;
       if (!start || !end) return alert('Elige bien las fechas 😉');
@@ -126,81 +126,90 @@
       const fechaInicio = new Date(y1, m1 - 1, d1,  0,  0,  0,   0);
       const fechaFin    = new Date(y2, m2 - 1, d2, 23, 59, 59, 999);
 
-      // 2) Cargo Artículos para id → {label, costo}
+      // 2) Cargo Artículos para mapear id → {label, costo}
       const artSnap = await db.collection("Articulos").get();
       const articleMap = {};
       artSnap.docs.forEach(doc => {
         const a = doc.data();
-        articleMap[doc.id] = { label: `${a.marca} ${a.modelo}`, costo: a.precioCompra };
+        articleMap[doc.id] = {
+          label: `${a.marca} ${a.modelo}`,
+          costo: a.precioCompra
+        };
       });
 
-      // 3) Traigo facturas en rango
+      // 3) Traigo facturas dentro del rango
       const snap = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
         .where("fecha", "<=", fechaFin)
         .where("anulada", "==", false)
         .get();
 
-      // 4) Acumuladores
+      // 4) Variables y acumuladores
       let totalSales = 0, countSales = 0, totalProfit = 0;
-      const prodCount  = {};
-      const daily      = {};
-      const dailyCount = {};
+      const prodCount  = {};  // id → unidades vendidas
+      const daily      = {};  // 'YYYY-MM-DD' → { ventas$, profit$ }
+      const dailyCount = {};  // 'YYYY-MM-DD' → # facturas
 
       snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total;
         countSales++;
-        const day = inv.fechaStr;
 
+        const day = inv.fechaStr;  // asumo 'YYYY-MM-DD'
+        // Inicializaciones diarias
         if (!daily[day])      daily[day]      = { ventas:0, profit:0 };
         if (!dailyCount[day]) dailyCount[day] = 0;
         daily[day].ventas += inv.total;
         dailyCount[day]++;
 
+        // Recorro items para top5 y profit
         inv.items.forEach(item => {
-          const qty    = item.quantity;
-          const costo  = articleMap[item.articleId]?.costo || 0;
-          const disc   = (item.discount||0)/100;
-          const revenue    = item.price * qty * (1 - disc);
-          const totalCost  = costo * qty;
-          const profit     = revenue - totalCost;
-
+          prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
+          const costo = articleMap[item.articleId]?.costo || 0;
+          const profit = (item.price - costo) * item.quantity * (1 - (item.discount||0)/100);
           totalProfit += profit;
           daily[day].profit += profit;
-          prodCount[item.articleId] = (prodCount[item.articleId]||0) + qty;
         });
       });
 
-      // 5) Muestro resumen
+      // 5) Muestro métricas resumen
       document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;
       document.getElementById('countSales').innerText  = countSales;
       document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
 
-      // 6) Top 5 Productos
-      const top5 = Object.entries(prodCount).sort((a,b)=> b[1]-a[1]).slice(0,5);
+      // 6) Top 5 Productos
+      const top5 = Object.entries(prodCount)
+        .sort((a,b)=> b[1]-a[1])
+        .slice(0,5);
+      const labelsP = top5.map(([id]) => articleMap[id]?.label ?? id);
+      const dataP   = top5.map(([,qty])=> qty);
       renderChart('topProductsChart', {
         type:'bar',
-        data:{ labels: top5.map(([id])=> articleMap[id]?.label||id), datasets:[{ label:'Unidades', data: top5.map(([,q])=>q) }] },
+        data:{ labels: labelsP, datasets:[{ label:'Unidades', data: dataP }] },
         options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
       });
 
-      // 7) Ventas Diarias
+      // 7) Gráfica diaria: # Ventas, Ventas($) y Ganancia($)
       const days = Object.keys(daily).sort();
       renderChart('dailyChart', {
         type:'bar',
         data:{
           labels: days,
-          datasets: [
-            { label:'# Ventas', data: days.map(d=>dailyCount[d]) },
-            { label:'Ventas ($)', data: days.map(d=>daily[d].ventas) },
+          datasets:[
+            { label:'# Ventas',     data: days.map(d=>dailyCount[d]) },
+            { label:'Ventas ($)',   data: days.map(d=>daily[d].ventas) },
             { label:'Ganancia ($)', data: days.map(d=>daily[d].profit) }
           ]
         },
-        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          scales:{ y:{ beginAtZero:true } }
+        }
       });
     }
 
+    // Función helper para Chart.js
     function renderChart(id, cfg) {
       const ctx = document.getElementById(id).getContext('2d');
       if (window[id + '_chart']) window[id + '_chart'].destroy();

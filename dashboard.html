@@ -190,7 +190,7 @@
         const gananciaTotal = gananciaUnit * item.quantity;
     
         // 🔥 LOGS DETALLE
-        console.log("==== ITEM ====");
+        /*console.log("==== ITEM ====");
         console.log("Artículo:", articleMap[item.articleId]?.label || item.articleId);
         console.log("Precio venta:", item.price);
         console.log("Costo:", costo);
@@ -198,7 +198,15 @@
         console.log("Cantidad:", item.quantity);
         console.log("Ganancia unidad:", gananciaUnit.toFixed(2));
         console.log("Ganancia total item:", gananciaTotal.toFixed(2));
-        console.log("==================");
+        console.log("==================");*/
+          if (item.articleId === 'NOT20ULT128GBLAN') {
+            console.warn("📦 Artículo con costo 0 encontrado");
+            console.log("Factura ID:", doc.id);
+            console.log("Fecha:", inv.fechaStr);
+            console.log("Cliente:", inv.clienteNombre || 'Desconocido');
+            console.log("Total factura:", inv.total);
+            console.log("Item:", item);
+          }
     
         totalProfit += gananciaTotal;
         daily[day].profit += gananciaTotal;

@@ -5,75 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>📈 Dashboard de Ventas</title>
 
-  <!-- Firebase SDK -->
+  <!-- 1) Carga core de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- Tu config compartida -->
+  <!-- 2) Tu config: define firebaseConfig con projectId, apiKey, etc. -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-
-  <!-- Chart.js -->
+  <!-- 3) Inicializa si tu config no lo hace -->
+  <script>
+    if (!firebase.apps.length) {
+      // firebaseConfig debe venir de firebase-config.js
+      firebase.initializeApp(firebaseConfig);
+    }
+  </script>
+  <!-- 4) Módulo Firestore -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- 5) Chart.js para gráficas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <!-- Estilos básicos -->
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      width: 100%;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .flex {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    .flex { display: flex; flex-wrap: wrap; gap: 10px; }
     .card {
-      background: #fff;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      text-align: center;
-      flex: 1;
-      min-width: 180px;
-    }
-    .card h2 {
-      margin-top: 0;
-    }
-    #charts {
-      width: 100%;
-      margin-top: 30px;
+      background: #fff; padding: 15px; border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center;
+      flex: 1; min-width: 180px;
     }
     button {
-      background: #4CAF50;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 1em;
+      background: #4CAF50; color: #fff; border: none;
+      padding: 10px 15px; border-radius: 5px; cursor: pointer;
     }
-    button:hover {
-      background: #45a049;
-    }
+    button:hover { background: #45a049; }
   </style>
 </head>
-
 <body>
   <h1>🚀 Dashboard de Ventas</h1>
 
-  <!-- Filtros de Fecha -->
+  <!-- Filtros -->
   <div class="flex">
     <div class="card" style="flex:0 0 200px;">
-      <label for="startDate"><strong>Desde:</strong></label><br>
+      <label><strong>Desde:</strong></label><br>
       <input type="date" id="startDate">
     </div>
     <div class="card" style="flex:0 0 200px;">
-      <label for="endDate"><strong>Hasta:</strong></label><br>
+      <label><strong>Hasta:</strong></label><br>
       <input type="date" id="endDate">
     </div>
     <div class="card" style="flex:0 0 150px; align-self:flex-end;">
@@ -81,8 +56,8 @@
     </div>
   </div>
 
-  <!-- Métricas Resumen -->
-  <div class="flex" id="metrics" style="margin-top:20px;">
+  <!-- Resumen -->
+  <div class="flex" style="margin-top:20px;">
     <div class="card">
       <h2>Total Ventas</h2>
       <p id="totalSales">$0.00</p>
@@ -104,108 +79,90 @@
   </div>
 
   <!-- Ventas vs Ganancia Diaria -->
-  <div id="charts" class="flex">
+  <div class="flex" id="charts" style="margin-top:20px;">
     <div class="card" style="width:100%;">
       <h2>📅 Ventas y Ganancia Diaria</h2>
       <canvas id="dailyChart" height="150"></canvas>
     </div>
   </div>
 
-  <!-- Lógica JavaScript -->
   <script>
-    // Ya tienes firebase inicializado con firebase-config.js
-    const db = firebase.firestore();
+    const db = firebase.firestore(); // ¡Ya inicializado!
 
     async function generarDashboard() {
-      const startInput = document.getElementById('startDate').value;
-      const endInput   = document.getElementById('endDate').value;
-      if (!startInput || !endInput) {
-        return alert('¡Oye, elige bien las fechas! 😉');
-      }
+      const start = document.getElementById('startDate').value;
+      const end   = document.getElementById('endDate').value;
+      if (!start || !end) return alert('Elige bien las fechas 😉');
 
-      // Convertir a objetos Date y ajustar fin de día
-      const fechaInicio = new Date(startInput);
-      const fechaFin = new Date(endInput);
-      fechaFin.setHours(23,59,59,999);
+      const inicio = new Date(start);
+      const fin    = new Date(end);
+      fin.setHours(23,59,59,999);
 
-      // Obtener facturas válidas
-      const snapshot = await db.collection("facturas")
-        .where("fecha", ">=", fechaInicio)
-        .where("fecha", "<=", fechaFin)
+      const snap = await db.collection("facturas")
+        .where("fecha", ">=", inicio)
+        .where("fecha", "<=", fin)
         .where("anulada", "==", false)
         .get();
 
-      // Inicializar acumuladores
       let totalSales = 0, countSales = 0, totalProfit = 0;
-      const prodCount = {};   // { productId: cantidad }
-      const daily = {};       // { 'YYYY-MM-DD': { ventas, profit } }
+      const prodCount = {}, daily = {};
 
-      snapshot.docs.forEach(doc => {
+      snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total;
         countSales++;
-        const dayKey = inv.fechaStr;  // Asumimos que ya lo tienes en tu doc
+        const day = inv.fechaStr;
+        if (!daily[day]) daily[day] = { ventas:0, profit:0 };
+        daily[day].ventas += inv.total;
 
-        // Inicializar día
-        if (!daily[dayKey]) daily[dayKey] = { ventas:0, profit:0 };
-        daily[dayKey].ventas += inv.total;
-
-        // Recorrer items para top5 y profit
         inv.items.forEach(item => {
-          // Top 5: contar unidades
           prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
-
-          // Cálculo de ganancia por ítem
-          const costo = item.costoCompra || 0;
-          const profit = (item.price - costo) * item.quantity * (1 - (item.discount||0)/100);
-          totalProfit += profit;
-          daily[dayKey].profit += profit;
+          const cost = item.costoCompra||0;
+          const p = (item.price - cost) * item.quantity * (1 - (item.discount||0)/100);
+          totalProfit += p;
+          daily[day].profit += p;
         });
       });
 
-      // Mostrar métricas en pantalla
+      // Mostrar totales
       document.getElementById('totalSales').innerText = `$${totalSales.toFixed(2)}`;
       document.getElementById('countSales').innerText = countSales;
       document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
 
-      // Preparar y renderizar Top 5 Productos
+      // Top 5
       const top5 = Object.entries(prodCount)
-        .sort((a,b) => b[1] - a[1])
-        .slice(0,5);
+        .sort((a,b)=>b[1]-a[1]).slice(0,5);
       renderChart('topProductsChart', {
         type: 'bar',
         data: {
-          labels: top5.map(p => p[0]),
-          datasets: [{ label:'Unidades Vendidas', data: top5.map(p => p[1]) }]
+          labels: top5.map(t=>t[0]),
+          datasets:[{ label:'Unidades', data:top5.map(t=>t[1]) }]
         },
-        options: { responsive:true }
+        options:{ responsive:true }
       });
 
-      // Preparar y renderizar Ventas vs Ganancia Diaria
+      // Diario
       const días = Object.keys(daily).sort();
       renderChart('dailyChart', {
-        type: 'bar',
-        data: {
+        type:'bar',
+        data:{
           labels: días,
-          datasets: [
-            { label:'Ventas ($)', data: días.map(d => daily[d].ventas) },
-            { label:'Ganancia ($)', data: días.map(d => daily[d].profit) }
+          datasets:[
+            { label:'Ventas',    data:días.map(d=>daily[d].ventas) },
+            { label:'Ganancia',  data:días.map(d=>daily[d].profit) }
           ]
         },
-        options: {
+        options:{
           responsive:true,
-          scales: {
-            y: { beginAtZero:true }
-          }
+          scales:{ y:{ beginAtZero:true } }
         }
       });
     }
 
-    // Función auxiliar para Chart.js
-    function renderChart(id, cfg) {
+    function renderChart(id,cfg){
       const ctx = document.getElementById(id).getContext('2d');
-      if (window[id + '_chart']) window[id + '_chart'].destroy();
-      window[id + '_chart'] = new Chart(ctx, cfg);
+      if(window[id+'_chart']) window[id+'_chart'].destroy();
+      window[id+'_chart'] = new Chart(ctx,cfg);
     }
   </script>
 </body>

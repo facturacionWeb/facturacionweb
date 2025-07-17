@@ -54,7 +54,6 @@
     button:hover {
       background: #45a049;
     }
-    /* Contenedores de gráficos más contenidos */
     .chart-container {
       position: relative;
       max-width: 600px;
@@ -84,7 +83,7 @@
   <!-- Métricas Resumen -->
   <div class="flex" style="margin-top:20px;">
     <div class="card">
-      <h2>Total Ventas</h2>
+      <h2>Total Ventas ($)</h2>
       <p id="totalSales">$0.00</p>
     </div>
     <div class="card">
@@ -92,7 +91,7 @@
       <p id="countSales">0</p>
     </div>
     <div class="card">
-      <h2>Ganancia</h2>
+      <h2>Ganancia ($)</h2>
       <p id="totalProfit">$0.00</p>
     </div>
   </div>
@@ -105,9 +104,9 @@
     </div>
   </div>
 
-  <!-- Ventas vs Ganancia Diaria -->
+  <!-- Ventas vs Ganancia Diaria y # Ventas -->
   <div class="card" style="margin-top:20px;">
-    <h2>📅 Ventas y Ganancia Diaria</h2>
+    <h2>📅 Ventas Diarias</h2>
     <div class="chart-container">
       <canvas id="dailyChart"></canvas>
     </div>
@@ -117,16 +116,17 @@
     const db = firebase.firestore();
 
     async function generarDashboard() {
-      // Fechas
+      // 1) Fechas: parseo manual en zona local para cubrir TODO el día
       const start = document.getElementById('startDate').value;
       const end   = document.getElementById('endDate').value;
       if (!start || !end) return alert('Elige bien las fechas 😉');
 
-      const fechaInicio = new Date(start);
-      const fechaFin    = new Date(end);
-      fechaFin.setHours(23,59,59,999);
+      const [y1, m1, d1] = start.split('-').map(Number);
+      const [y2, m2, d2] = end.split('-').map(Number);
+      const fechaInicio = new Date(y1, m1 - 1, d1,  0,  0,  0,   0);
+      const fechaFin    = new Date(y2, m2 - 1, d2, 23, 59, 59, 999);
 
-      // 1) Cargo todos los Artículos para mapear id → { marca, modelo, precioCompra }
+      // 2) Cargo Artículos para mapear id → {label, costo}
       const artSnap = await db.collection("Articulos").get();
       const articleMap = {};
       artSnap.docs.forEach(doc => {
@@ -137,31 +137,34 @@
         };
       });
 
-      // 2) Traigo facturas
+      // 3) Traigo facturas dentro del rango
       const snap = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
         .where("fecha", "<=", fechaFin)
         .where("anulada", "==", false)
         .get();
 
-      // Acumuladores
+      // 4) Variables y acumuladores
       let totalSales = 0, countSales = 0, totalProfit = 0;
-      const prodCount = {};   // id → unidades vendidas
-      const daily = {};       // 'YYYY-MM-DD' → { ventas, profit }
+      const prodCount  = {};  // id → unidades vendidas
+      const daily      = {};  // 'YYYY-MM-DD' → { ventas$, profit$ }
+      const dailyCount = {};  // 'YYYY-MM-DD' → # facturas
 
       snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total;
         countSales++;
-        const day = inv.fechaStr;  // asumo que lo guardás igual
-        if (!daily[day]) daily[day] = { ventas:0, profit:0 };
+
+        const day = inv.fechaStr;  // asumo 'YYYY-MM-DD'
+        // Inicializaciones diarias
+        if (!daily[day])      daily[day]      = { ventas:0, profit:0 };
+        if (!dailyCount[day]) dailyCount[day] = 0;
         daily[day].ventas += inv.total;
+        dailyCount[day]++;
 
+        // Recorro items para top5 y profit
         inv.items.forEach(item => {
-          // Cuento unidades para el top5
           prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
-
-          // Calculo profit: precioVenta - precioCompra
           const costo = articleMap[item.articleId]?.costo || 0;
           const profit = (item.price - costo) * item.quantity * (1 - (item.discount||0)/100);
           totalProfit += profit;
@@ -169,40 +172,32 @@
         });
       });
 
-      // Muestro métricas
+      // 5) Muestro métricas resumen
       document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;
       document.getElementById('countSales').innerText  = countSales;
       document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
 
-      // Top 5: ordeno y corto a 5
+      // 6) Top 5 Productos
       const top5 = Object.entries(prodCount)
         .sort((a,b)=> b[1]-a[1])
         .slice(0,5);
-
-      // Labels con marca+modelo
-      const labelsP = top5.map(([id]) => 
-        articleMap[id]?.label ?? id
-      );
-      const dataP = top5.map(([,qty]) => qty);
-
+      const labelsP = top5.map(([id]) => articleMap[id]?.label ?? id);
+      const dataP   = top5.map(([,qty])=> qty);
       renderChart('topProductsChart', {
         type:'bar',
         data:{ labels: labelsP, datasets:[{ label:'Unidades', data: dataP }] },
-        options:{ 
-          responsive:true, 
-          maintainAspectRatio:false,
-          scales:{ y:{ beginAtZero:true } }
-        }
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
       });
 
-      // Gráfico diario
+      // 7) Gráfica diaria: # Ventas, Ventas($) y Ganancia($)
       const days = Object.keys(daily).sort();
       renderChart('dailyChart', {
         type:'bar',
         data:{
           labels: days,
           datasets:[
-            { label:'Ventas ($)', data: days.map(d=>daily[d].ventas) },
+            { label:'# Ventas',     data: days.map(d=>dailyCount[d]) },
+            { label:'Ventas ($)',   data: days.map(d=>daily[d].ventas) },
             { label:'Ganancia ($)', data: days.map(d=>daily[d].profit) }
           ]
         },
@@ -214,7 +209,7 @@
       });
     }
 
-    // Helper Chart.js
+    // Función helper para Chart.js
     function renderChart(id, cfg) {
       const ctx = document.getElementById(id).getContext('2d');
       if (window[id + '_chart']) window[id + '_chart'].destroy();

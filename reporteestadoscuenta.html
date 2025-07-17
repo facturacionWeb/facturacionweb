@@ -177,7 +177,7 @@ async function generateReport(clientId){
         <td>${montoPagado.toFixed(2)}</td>
         <td>${saldo.toFixed(2)}</td>`;*/
       // ===== Calcular días restantes =====
-      let diasCredito = 0;
+      /*let diasCredito = 0;
       const metodo = inv.paymentMethod || "";
       const match = metodo.match(/\d+/); // extrae número de días del texto
       if(match) diasCredito = parseInt(match[0]);
@@ -196,9 +196,42 @@ async function generateReport(clientId){
       tr.style.color = "white";
       }else if(diasRestantes <= 5){
       tr.style.backgroundColor = "#ffeb3b"; // amarillo
-      }
+      }*/
+      // ===== Calcular días restantes =====
+let diasCredito = 0;
+const metodo = inv.paymentMethod || "";
+const match = metodo.match(/\d+/); // extrae número de días del texto
+if (match) diasCredito = parseInt(match[0]);
+
+const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
+const hoy = new Date();
+const vencimiento = new Date(fechaEmision.getTime());
+vencimiento.setDate(vencimiento.getDate() + diasCredito);
+
+const diferenciaMs = vencimiento - hoy;
+const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+
+// ===== Determinar estado de la factura =====
+    let estado = "";
+    if (saldo <= 0) {
+      // ✅ Factura completamente pagada
+      tr.style.backgroundColor = "#4CAF50"; // verde
+      tr.style.color = "white";
+      estado = "–";
+    } else if (diasRestantes < 0) {
+      // 🔴 Vencida
+      tr.style.backgroundColor = "#f44336"; // rojo
+      tr.style.color = "white";
+      estado = "Vencida";
+    } else if (diasRestantes <= 5) {
+      // 🟡 A punto de vencerse
+      tr.style.backgroundColor = "#ffeb3b"; // amarillo
+      estado = diasRestantes;
+    } else {
+      estado = diasRestantes;
+    }
       
-      tr.innerHTML=`
+      /*tr.innerHTML=`
       <td>${id}</td>
       <td>${inv.currency||"N/A"}</td>
       <td>${inv.vendedor||"N/A"}</td>
@@ -207,7 +240,17 @@ async function generateReport(clientId){
       <td>${montoPagado.toFixed(2)}</td>
       <td>${saldo.toFixed(2)}</td>
       <td>${inv.paymentMethod || "N/A"}</td>
-      <td>${diasRestantes >= 0 ? diasRestantes : "Vencida"}</td>`;
+      <td>${diasRestantes >= 0 ? diasRestantes : "Vencida"}</td>`;*/
+      tr.innerHTML = `
+              <td>${id}</td>
+              <td>${inv.currency || "N/A"}</td>
+              <td>${inv.vendedor || "N/A"}</td>
+              <td>${inv.fechaStr || "N/A"}</td>
+              <td>${(+inv.total).toFixed(2)}</td>
+              <td>${montoPagado.toFixed(2)}</td>
+              <td>${saldo.toFixed(2)}</td>
+              <td>${inv.paymentMethod || "N/A"}</td>
+              <td>${estado}</td>`;
 
       
       tr.onclick=()=>showAbonosModal(id,abonos);

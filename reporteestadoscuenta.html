@@ -87,7 +87,7 @@
         <thead>
           <tr>
             <th>No Factura</th><th>Moneda</th><th>Vendedor</th>
-            <th>Fecha Emisión</th><th>Monto Original</th><th>Monto Pagado</th><th>Balance</th>
+            <th>Fecha Emisión</th><th>Monto Original</th><th>Monto Pagado</th><th>Balance</th><th>Crédito</th><th>Días Restantes</th>
           </tr>
         </thead><tbody></tbody>
       </table>
@@ -168,14 +168,48 @@ async function generateReport(clientId){
       totalDebt+=saldo;
 
       const tr=document.createElement("tr");
-      tr.innerHTML=`
+      /*tr.innerHTML=`
         <td>${id}</td>
         <td>${inv.currency||"N/A"}</td>
         <td>${inv.vendedor||"N/A"}</td>
         <td>${inv.fechaStr||"N/A"}</td>
         <td>${(+inv.total).toFixed(2)}</td>
         <td>${montoPagado.toFixed(2)}</td>
-        <td>${saldo.toFixed(2)}</td>`;
+        <td>${saldo.toFixed(2)}</td>`;*/
+      // ===== Calcular días restantes =====
+      let diasCredito = 0;
+      const metodo = inv.paymentMethod || "";
+      const match = metodo.match(/\d+/); // extrae número de días del texto
+      if(match) diasCredito = parseInt(match[0]);
+      
+      const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
+      const hoy = new Date();
+      const vencimiento = new Date(fechaEmision.getTime());
+      vencimiento.setDate(vencimiento.getDate() + diasCredito);
+      
+      const diferenciaMs = vencimiento - hoy;
+      const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+      
+      // ===== Colores de fila =====
+      if(diasRestantes < 0){
+      tr.style.backgroundColor = "#f44336"; // rojo
+      tr.style.color = "white";
+      }else if(diasRestantes <= 5){
+      tr.style.backgroundColor = "#ffeb3b"; // amarillo
+      }
+      
+      tr.innerHTML=`
+      <td>${id}</td>
+      <td>${inv.currency||"N/A"}</td>
+      <td>${inv.vendedor||"N/A"}</td>
+      <td>${inv.fechaStr||"N/A"}</td>
+      <td>${(+inv.total).toFixed(2)}</td>
+      <td>${montoPagado.toFixed(2)}</td>
+      <td>${saldo.toFixed(2)}</td>
+      <td>${inv.paymentMethod || "N/A"}</td>
+      <td>${diasRestantes >= 0 ? diasRestantes : "Vencida"}</td>`;
+
+      
       tr.onclick=()=>showAbonosModal(id,abonos);
       tbody.appendChild(tr);
     }

@@ -1144,7 +1144,7 @@
       printWindow.close();
     }
 
-  function printThermalFromModal() {
+  /*function printThermalFromModal() {
     try {
       const modal = document.getElementById('modalInvoiceContent');
       if (!modal) {
@@ -1201,7 +1201,78 @@
     } catch (e) {
       alert("Ocurrió un error al preparar la impresión móvil: " + e.message);
     }
-  }
+  }*/
+
+    function printThermalFromModal() {
+      try {
+        // 1) Contenedor del modal con la factura
+        const modal = document.getElementById('modalInvoiceContent');
+        if (!modal) {
+          alert("No se encontró el contenido del modal.");
+          return;
+        }
+    
+        const textParts = [];
+        // 2) Título centrado
+        textParts.push("[C]<b>Factura</b>\n");
+    
+        // 3) Detalles de cliente/factura (tabla .details-table)
+        modal.querySelectorAll('.details-table td').forEach(td => {
+          const labelElem = td.querySelector('strong');
+          if (labelElem) {
+            const key   = labelElem.innerText.trim().replace(':','');
+            const value = td.innerText.replace(labelElem.innerText, '').trim();
+            textParts.push(`[L]${key}: ${value}`);
+          }
+        });
+    
+        textParts.push("[C]==============================");
+    
+        // 4) Ítems: filtramos solo filas con 5 columnas (cantidad, descripción, precio, descuento, total)
+        const allRows = Array.from(modal.querySelectorAll('.items-table tr'));
+        const itemRows = allRows.filter(row => row.querySelectorAll('td').length === 5);
+    
+        itemRows.forEach(row => {
+          const [qtyTd, descTd, priceTd, discTd, totalTd] = row.querySelectorAll('td');
+          const qty      = qtyTd.innerText.trim();
+          const desc     = descTd.innerText.trim();
+          const price    = priceTd.innerText.trim();
+          const discount = discTd.innerText.trim();
+          const total    = totalTd.innerText.trim();
+    
+          textParts.push(`[L]${qty} x ${desc}`);
+          textParts.push(`[L]Precio: ${price}  Desc: ${discount}`);
+          textParts.push(`[L]Total: ${total}\n`);
+        });
+    
+        // 5) Línea final: Total a Pagar (fila con sólo 2 td y que incluye "Total a Pagar")
+        const totalRow = allRows.find(row => {
+          const tds = row.querySelectorAll('td');
+          return tds.length === 2 && tds[0].innerText.includes('Total a Pagar');
+        });
+        if (totalRow) {
+          const totalValue = totalRow.querySelectorAll('td')[1].innerText.trim();
+          textParts.push("[C]------------------------------");
+          textParts.push(`[C]<b>Total: ${totalValue}</b>`);
+          textParts.push("[C]==============================");
+        }
+    
+        // 6) Firma
+        textParts.push("\n[Firma del Cliente]\n\n\n");
+    
+        // 7) Unimos todo y mandamos a imprimir
+        const finalText = textParts.join("\n");
+        if (typeof AndroidBridge !== "undefined" && AndroidBridge.printTicket) {
+          AndroidBridge.printTicket(finalText);
+        } else {
+          alert("AndroidBridge no está disponible. ¿Estás en la app Android?");
+        }
+    
+      } catch (e) {
+        alert("Ocurrió un error al preparar la impresión móvil: " + e.message);
+      }
+    }
+
 
     
     function closeInvoiceModal() {

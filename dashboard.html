@@ -89,7 +89,7 @@
     const db = firebase.firestore();
 
     async function generarDashboard() {
-      // --- 1) Parseo de fechas en zona local
+      // 1️⃣ Parseo de fechas en local
       const start = document.getElementById('startDate').value;
       const end   = document.getElementById('endDate').value;
       if (!start || !end) return alert('Elige bien las fechas 😉');
@@ -98,7 +98,7 @@
       const fechaInicio = new Date(y1, m1-1, d1, 0,0,0,0);
       const fechaFin    = new Date(y2, m2-1, d2, 23,59,59,999);
 
-      // --- 2) Traer Artículos para mapeo de costo y etiqueta
+      // 2️⃣ Cargo colección Articulos
       const artSnap = await db.collection("Articulos").get();
       const articleMap = {};
       artSnap.docs.forEach(doc => {
@@ -109,14 +109,14 @@
         };
       });
 
-      // --- 3) Traer facturas válidas en rango
+      // 3️⃣ Traigo facturas activas en rango
       const snap = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
         .where("fecha", "<=", fechaFin)
         .where("anulada", "==", false)
         .get();
 
-      // --- 4) Inicializar acumuladores
+      // 4️⃣ Inicializo acumuladores
       let totalSales = 0,
           totalCost  = 0,
           countSales = 0;
@@ -130,45 +130,49 @@
         totalSales += inv.total;
         countSales++;
 
-        const day = inv.fechaStr; 
+        const day = inv.fechaStr;
         dailySales[day] = (dailySales[day]||0) + inv.total;
         dailyCount[day] = (dailyCount[day]||0) + 1;
         if (!dailyCost[day]) dailyCost[day] = 0;
 
         inv.items.forEach(item => {
-          // Top 5 unidades
+          // – Top 5 unidades
           prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
 
-          // Costo total (sin desconto)
-          const costo = articleMap[item.articleId]?.costo || 0;
-          const lineCost = costo * item.quantity;
+          // – Precio de compra: preferimos el que trae el item
+          const unitCost = 
+            (item.precioCompra ?? item.costo ?? item.purchasePrice)
+            || articleMap[item.articleId]?.costo 
+            || 0;
+
+          const lineCost = unitCost * item.quantity;
           totalCost += lineCost;
           dailyCost[day] += lineCost;
         });
       });
 
-      // --- 5) Calcular ganancia “a la Excel”
+      // 5️⃣ Ganancia “a la Excel”
       const totalProfit = totalSales - totalCost;
 
-      // --- 6) Renderizar métricas
+      // 6️⃣ Pinto las métricas
       document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;
       document.getElementById('countSales').innerText  = countSales;
       document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
 
-      // --- 7) Top 5 Productos
+      // 7️⃣ Top 5 Productos
       const top5 = Object.entries(prodCount)
         .sort((a,b)=> b[1]-a[1])
         .slice(0,5);
       renderChart('topProductsChart', {
         type:'bar',
         data:{
-          labels: top5.map(([id]) => articleMap[id]?.label ?? id),
-          datasets:[{ label:'Unidades', data: top5.map(([,qty])=> qty) }]
+          labels: top5.map(([id])=> articleMap[id]?.label ?? id),
+          datasets:[{ label:'Unidades', data: top5.map(([,q])=> q) }]
         },
         options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
       });
 
-      // --- 8) Gráfica diaria (#Ventas, Ventas$, Ganancia$)
+      // 8️⃣ Gráfica diaria (#Ventas, Ventas$, Ganancia$)
       const days = Object.keys(dailySales).sort();
       renderChart('dailyChart', {
         type:'bar',
@@ -179,7 +183,7 @@
             { label:'Ventas ($)',   data: days.map(d=>dailySales[d]) },
             { 
               label:'Ganancia ($)', 
-              data: days.map(d=> (dailySales[d] - dailyCost[d]) ) 
+              data: days.map(d=> dailySales[d] - dailyCost[d] )
             }
           ]
         },

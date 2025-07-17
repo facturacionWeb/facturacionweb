@@ -234,6 +234,8 @@
         <!-- Aquí se agregan las filas dinámicamente -->
       </tbody>
     </table>
+    <label for="shippingAmount">Monto de Envío:</label>
+    <input type="number" id="shippingAmount" value="0" min="0" step="0.01" onchange="recalculateInvoice()" />
     <h3>Total a Pagar: <span id="invoiceTotal">0.00</span></h3>
     <button id="createInvoiceBtn" onclick="createInvoice()">Crear Factura 💵</button>
 
@@ -581,8 +583,12 @@
         const totalCell = row.children[4];
         total += parseFloat(totalCell.textContent) || 0;
       });
-      invoiceTotal = total;
+      /*invoiceTotal = total;
+      document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);*/
+      const shipping = parseFloat(document.getElementById('shippingAmount').value) || 0;
+      invoiceTotal = total + shipping;
       document.getElementById('invoiceTotal').textContent = invoiceTotal.toFixed(2);
+
     }
 
     function generarConsecutivoFactura() {
@@ -611,6 +617,7 @@
       const clientId = document.getElementById('clientSelect').value;
       const route = document.getElementById('invoiceRoute').value;
       const currency = "N/A";//document.getElementById('currencySelect').value;
+      const shipping = parseFloat(document.getElementById('shippingAmount').value) || 0;
 
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;
@@ -684,6 +691,7 @@
         paymentType,
         paymentMethod,
         items,
+        shipping,
         total: invoiceTotal,
         fecha: now,
         fechaStr,
@@ -713,6 +721,7 @@
         loadInvoices();
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
+        document.getElementById('shippingAmount').value = "0";
       }).catch((error) => {
         
         creatingInvoice = false;
@@ -787,6 +796,10 @@
                   <td>${currencySymbol}${item.total.toFixed(2)}</td>
                 </tr>
               `).join('')}
+              <tr>
+                <td colspan="4" style="text-align: right;"><strong>Envío:</strong></td>
+                <td><strong>${currencySymbol}${(invoice.shipping || 0).toFixed(2)}</strong></td>
+              </tr>
               <tr>
                 <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
                 <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
@@ -1044,6 +1057,10 @@
                       <td>${currencySymbol}${item.total.toFixed(2)}</td>
                     </tr>
                   `).join('')}
+                  <tr>
+                    <td colspan="4" style="text-align: right;"><strong>Envío:</strong></td>
+                    <td><strong>${currencySymbol}${(invoice.shipping || 0).toFixed(2)}</strong></td>
+                  </tr>
                   <tr>
                     <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
                     <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>

@@ -5,67 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>🚀 Dashboard de Ventas</title>
 
-  <!-- 1) Core Firebase -->
+  <!-- Firebase Core -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-  <!-- 2) Tu config -->
+  <!-- Config -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  <!-- 3) Inicializa -->
   <script>
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   </script>
-  <!-- 4) Firestore -->
+  <!-- Firestore -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  <!-- 5) Chart.js -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .flex {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:20px; }
+    h1 { text-align:center; margin-bottom:20px; }
+    .flex { display:flex; flex-wrap:wrap; gap:10px; }
     .card {
-      background: #fff;
-      padding: 15px;
-      border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      text-align: center;
-      flex: 1;
-      min-width: 180px;
+      background:#fff; padding:15px; border-radius:8px;
+      box-shadow:0 2px 5px rgba(0,0,0,0.1); text-align:center; flex:1; min-width:180px;
     }
     button {
-      background: #4CAF50;
-      color: #fff;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
-      cursor: pointer;
+      background:#4CAF50; color:#fff; border:none; padding:10px 15px;
+      border-radius:5px; cursor:pointer;
     }
-    button:hover {
-      background: #45a049;
-    }
-    .chart-container {
-      position: relative;
-      max-width: 600px;
-      height: 300px;
-      margin: 0 auto;
-    }
+    button:hover { background:#45a049; }
+    .chart-container { position:relative; max-width:600px; height:300px; margin:0 auto; }
   </style>
 </head>
 <body>
   <h1>🚀 Dashboard de Ventas</h1>
 
-  <!-- Filtros de Fecha -->
+  <!-- Filtros -->
   <div class="flex">
     <div class="card" style="flex:0 0 200px;">
       <label><strong>Desde:</strong></label><br>
@@ -80,7 +51,7 @@
     </div>
   </div>
 
-  <!-- Métricas Resumen -->
+  <!-- Métricas -->
   <div class="flex" style="margin-top:20px;">
     <div class="card">
       <h2>Total Ventas ($)</h2>
@@ -96,7 +67,7 @@
     </div>
   </div>
 
-  <!-- Top 5 Productos -->
+  <!-- Top 5 -->
   <div class="card" style="margin-top:20px;">
     <h2>🏆 Top 5 Productos</h2>
     <div class="chart-container">
@@ -104,7 +75,7 @@
     </div>
   </div>
 
-  <!-- Ventas vs Ganancia Diaria y # Ventas -->
+  <!-- Ventas Diarias -->
   <div class="card" style="margin-top:20px;">
     <h2>📅 Ventas Diarias</h2>
     <div class="chart-container">
@@ -115,126 +86,109 @@
   <script>
     const db = firebase.firestore();
 
+    function obtenerLabelProducto(item) {
+      if (item.brand || item.model) return `${item.brand||''} ${item.model||''}`.trim();
+      if (item.descripcion) return item.descripcion;
+      return item.articleId || 'SIN_ID';
+    }
+
     async function generarDashboard() {
-      // 1) Fechas: parseo manual en zona local para cubrir TODO el día
       const start = document.getElementById('startDate').value;
       const end   = document.getElementById('endDate').value;
-      if (!start || !end) return alert('Elige bien las fechas 😉');
+      if (!start || !end) return alert('Elegí ambas fechas 😉');
 
-      const [y1, m1, d1] = start.split('-').map(Number);
-      const [y2, m2, d2] = end.split('-').map(Number);
-      const fechaInicio = new Date(y1, m1 - 1, d1,  0,  0,  0,   0);
-      const fechaFin    = new Date(y2, m2 - 1, d2, 23, 59, 59, 999);
+      const [y1,m1,d1] = start.split('-').map(Number);
+      const [y2,m2,d2] = end.split('-').map(Number);
+      const fechaInicio = new Date(y1, m1 - 1, d1, 0,0,0,0);
+      const fechaFin    = new Date(y2, m2 - 1, d2, 23,59,59,999);
 
-      // 2) Cargo Artículos para mapear id → {label, costo}
-      const artSnap = await db.collection("Articulos").get();
-      const articleMap = {};
-      artSnap.docs.forEach(doc => {
-        const a = doc.data();
-        articleMap[doc.id] = {
-          label: `${a.marca} ${a.modelo}`,
-          costo: a.precioCompra
-        };
-      });
-
-      // 3) Traigo facturas dentro del rango
       const snap = await db.collection("facturas")
         .where("fecha", ">=", fechaInicio)
         .where("fecha", "<=", fechaFin)
         .where("anulada", "==", false)
         .get();
 
-      // 4) Variables y acumuladores
-      let totalSales = 0, countSales = 0, totalProfit = 0;
-      const prodCount  = {};  // id → unidades vendidas
-      const daily      = {};  // 'YYYY-MM-DD' → { ventas$, profit$ }
-      const dailyCount = {};  // 'YYYY-MM-DD' → # facturas
+      let totalSales = 0;
+      let countSales = 0;
+      let totalProfit = 0;
 
-      /*snap.docs.forEach(doc => {
+      const productStats = {};
+      const daily = {};
+      const dailyCount = {};
+
+      snap.docs.forEach(doc => {
         const inv = doc.data();
-        totalSales += inv.total;
+        totalSales += inv.total || 0;
         countSales++;
 
-        const day = inv.fechaStr;  // asumo 'YYYY-MM-DD'
-        // Inicializaciones diarias
+        const day = inv.fechaStr || (
+          inv.fecha && inv.fecha.toDate
+            ? inv.fecha.toDate().toISOString().slice(0,10)
+            : 'SIN_FECHA'
+        );
+
         if (!daily[day])      daily[day]      = { ventas:0, profit:0 };
         if (!dailyCount[day]) dailyCount[day] = 0;
-        daily[day].ventas += inv.total;
+        daily[day].ventas += inv.total || 0;
         dailyCount[day]++;
 
-        // Recorro items para top5 y profit
+        if (!Array.isArray(inv.items)) {
+          console.warn("⚠ Factura sin items o items no array:", doc.id);
+          return;
+        }
+
         inv.items.forEach(item => {
-          prodCount[item.articleId] = (prodCount[item.articleId]||0) + item.quantity;
-          const costo = articleMap[item.articleId]?.costo || 0;
-          const profit = (item.price - costo) * item.quantity * (1 - (item.discount||0)/100);
-          totalProfit += profit;
-          daily[day].profit += profit;
-        });
-      });*/
-    snap.docs.forEach(doc => {
-      const inv = doc.data();
-      totalSales += inv.total;
-      countSales++;
-    
-      const day = inv.fechaStr;
-      if (!daily[day])      daily[day]      = { ventas:0, profit:0 };
-      if (!dailyCount[day]) dailyCount[day] = 0;
-      daily[day].ventas += inv.total;
-      dailyCount[day]++;
-    
-      // Recorro items para top5 y profit
-      inv.items.forEach(item => {
-        const costo = articleMap[item.articleId]?.costo || 0;
-        const descuento = item.discount || 0;
-        const gananciaUnit = (item.price - costo) * (1 - descuento / 100);
-        const gananciaTotal = gananciaUnit * item.quantity;
-    
-        // 🔥 LOGS DETALLE
-        /*console.log("==== ITEM ====");
-        console.log("Artículo:", articleMap[item.articleId]?.label || item.articleId);
-        console.log("Precio venta:", item.price);
-        console.log("Costo:", costo);
-        console.log("Descuento (%):", descuento);
-        console.log("Cantidad:", item.quantity);
-        console.log("Ganancia unidad:", gananciaUnit.toFixed(2));
-        console.log("Ganancia total item:", gananciaTotal.toFixed(2));
-        console.log("==================");*/
-          if (item.articleId === 'NOT20ULT128GBLAN') {
-            console.warn("📦 Artículo con costo 0 encontrado");
-            console.log("Factura ID:", doc.id);
-            console.log("Fecha:", inv.fechaStr);
-            console.log("Cliente:", inv.clienteNombre || 'Desconocido');
-            console.log("Total factura:", inv.total);
-            console.log("Item:", item);
+          const costo = Number(item.costo_compra) || 0; // 👈 directo al campo asegurado
+          const descuento = Number(item.discount || 0);
+          const price = Number(item.price || 0);
+          const qty = Number(item.quantity || 0);
+
+          if (costo === 0 && price > 0) {
+            console.warn("💸 Item con costo_compra = 0 (revisar):",
+              { factura: doc.id, articleId: item.articleId, price, qty, item });
           }
-    
-        totalProfit += gananciaTotal;
-        daily[day].profit += gananciaTotal;
-    
-        prodCount[item.articleId] = (prodCount[item.articleId] || 0) + item.quantity;
+
+          const gananciaUnit = (price - costo) * (1 - descuento/100);
+          const gananciaTotal = gananciaUnit * qty;
+
+          totalProfit += gananciaTotal;
+          daily[day].profit += gananciaTotal;
+
+          const key = item.articleId || `${item.brand||''}-${item.model||''}` || 'SIN_ID';
+          if (!productStats[key]) {
+            productStats[key] = {
+              qty: 0,
+              label: obtenerLabelProducto(item)
+            };
+          }
+          productStats[key].qty += qty;
+        });
       });
-    });
 
-      
-
-      // 5) Muestro métricas resumen
       document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;
       document.getElementById('countSales').innerText  = countSales;
       document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;
 
-      // 6) Top 5 Productos
-      const top5 = Object.entries(prodCount)
-        .sort((a,b)=> b[1]-a[1])
+      const top5 = Object.entries(productStats)
+        .sort((a,b)=> b[1].qty - a[1].qty)
         .slice(0,5);
-      const labelsP = top5.map(([id]) => articleMap[id]?.label ?? id);
-      const dataP   = top5.map(([,qty])=> qty);
+
+      const labelsP = top5.map(([,v]) => v.label);
+      const dataP   = top5.map(([,v]) => v.qty);
+
       renderChart('topProductsChart', {
         type:'bar',
-        data:{ labels: labelsP, datasets:[{ label:'Unidades', data: dataP }] },
-        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+        data:{
+          labels: labelsP,
+          datasets:[{ label:'Unidades', data: dataP }]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          scales:{ y:{ beginAtZero:true } }
+        }
       });
 
-      // 7) Gráfica diaria: # Ventas, Ventas($) y Ganancia($)
       const days = Object.keys(daily).sort();
       renderChart('dailyChart', {
         type:'bar',
@@ -254,7 +208,6 @@
       });
     }
 
-    // Función helper para Chart.js
     function renderChart(id, cfg) {
       const ctx = document.getElementById(id).getContext('2d');
       if (window[id + '_chart']) window[id + '_chart'].destroy();

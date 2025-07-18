@@ -382,7 +382,8 @@
             precioVenta: articleData.precioVenta || 0,
             imeiDocId: doc.id,
             discount: 0,
-            total: parseFloat(articleData.precioVenta || 0)
+            total: parseFloat(articleData.precioVenta || 0),
+            costo_compra: articleData.precioCompra || 0
           };
           // Agregar al arreglo y actualizar tabla de previsualización
           invoicePreviewItems.push(newItem);
@@ -671,7 +672,8 @@
           quantity,
           price,
           discount,
-          total
+          total,
+          costo_compra: parsedValue.costo_compra || 0 
         });
       });
 

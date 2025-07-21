@@ -191,5 +191,9 @@
       loadUsers();
     };
   </script>
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('usuarios');  
+  </script>
 </body>
 </html>

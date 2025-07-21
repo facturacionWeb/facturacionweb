@@ -146,5 +146,9 @@
       document.getElementById('facturaResultado').innerHTML = html;
     }
   </script>
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('buscar');  
+  </script>
 </body>
 </html>

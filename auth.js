@@ -4,8 +4,8 @@ export function requireAccess(pageKey){
 
   console.log("👤 Usuario cargado:", u);
   console.log("🔑 Página requerida:", pageKey);
-  console.log("📄 Páginas permitidas:", u.allowedPages);
-  console.log("✔ ¿Incluye la página?", u.allowedPages.includes(pageKey));
+  console.log("📄 Páginas permitidas:", !u.allowedPages);
+  console.log("✔ ¿Incluye la página?", !u.allowedPages.includes(pageKey));
   
   if(!u){alert('Debe iniciar sesión');return redirect();}
   if(!u.allowedPages.includes(pageKey)){alert('Sin permiso');return redirect();}

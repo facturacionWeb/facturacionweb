@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>🔑 Login – Portal de Administración</title>
+  <title>🔑 Login – Portal de Administración</title>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -12,66 +12,68 @@
 
   <style>
     body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-    .container{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.2);text-align:center;max-width:400px;width:100%}
+    .container{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.2);text-align:center;max-width:420px;width:100%}
     input{width:calc(100% - 20px);padding:10px;margin:10px 0;border:1px solid #ccc;border-radius:5px}
-    button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:5px;background:#5a9bd5;color:#fff;font-size:16px;cursor:pointer;gap:8px;display:flex;align-items:center;justify-content:center;transition:.3s}
+    button{width:100%;padding:12px;margin:6px 0;border:none;border-radius:5px;background:#5a9bd5;color:#fff;font-size:15px;cursor:pointer;gap:8px;display:flex;align-items:center;justify-content:center;transition:.3s}
     button:hover{background:#4a89c7}
     .logout-btn{background:#dc3545} .logout-btn:hover{background:#a71d2a}
+    #userInfo{font-size:.9rem;margin-bottom:10px;padding:8px;background:#eef;border-radius:6px}
   </style>
 </head>
 <body>
-  <!-- 🆕 Campo de usuario añadido -->
+  <!-- LOGIN -->
   <div id="loginContainer" class="container">
     <h1>🔑 Iniciar Sesión</h1>
-    <input id="username" type="text" placeholder="Usuario" />      <!-- 🆕 -->
-    <input id="userPassword" type="password" placeholder="Contraseña" /> <!-- 🆕 -->
-    <button onclick="login()">🔓 Entrar</button>                   <!-- 🆕 función -->
+    <input id="username" type="text" placeholder="Usuario" />
+    <input id="userPassword" type="password" placeholder="Contraseña" />
+    <button onclick="login()">🔓 Entrar</button>
   </div>
 
-  <!-- Panel principal (se muestra tras login) -->
+  <!-- PANEL -->
   <div id="adminPanel" class="container" style="display:none;">
     <h1>📌 Menú Principal</h1>
-    <button onclick="goTo('usuarios.html')">👤 Usuarios</button>
-    <button onclick="goTo('clientes.html')">👥 Clientes</button>
-    <button onclick="goTo('proveedores.html')">🏢 Proveedores</button>
-    <button onclick="goTo('articulos.html')">📦 Artículos</button>
-    <button onclick="goTo('facturas.html')">🧾 Facturar</button>
-    <button onclick="goTo('abonar.html')">💰 Abonar</button>
-    <button onclick="goTo('notascredito.html')">📝 Notas de Crédito</button>
-    <button onclick="goTo('cargamasivaimei.html')">📲 Carga IMEI</button>
-    <button onclick="goTo('reportearticulos.html')">📊 Rep. Artículos</button>
-    <button onclick="goTo('reportearticulosxruta.html')">🚛 Rep. Ruta</button>
-    <button onclick="goTo('reporteestadoscuenta.html')">👤🧾 Estado Cuenta</button>
-    <button onclick="goTo('reportefacturas.html')">🧾 Rep. Facturas</button>
-    <button onclick="goTo('buscar.html')">🔍 Buscar Item</button>
-    <button onclick="goTo('dashboard.html')">🚀 Dashboard</button>
+    <div id="userInfo"></div>
+
+    <!-- Cada botón ahora tiene data-page con la key que usas en allowedPages -->
+    <button data-page="usuarios" onclick="goTo('usuarios.html')">👤 Usuarios</button>
+    <button data-page="clientes" onclick="goTo('clientes.html')">👥 Clientes</button>
+    <button data-page="proveedores" onclick="goTo('proveedores.html')">🏢 Proveedores</button>
+    <button data-page="articulos" onclick="goTo('articulos.html')">📦 Artículos</button>
+    <button data-page="facturas" onclick="goTo('facturas.html')">🧾 Facturar</button>
+    <button data-page="abonar" onclick="goTo('abonar.html')">💰 Abonar</button>
+    <button data-page="notascredito" onclick="goTo('notascredito.html')">📝 Notas de Crédito</button>
+    <button data-page="cargamasivaimei" onclick="goTo('cargamasivaimei.html')">📲 Carga IMEI</button>
+    <button data-page="reportearticulos" onclick="goTo('reportearticulos.html')">📊 Rep. Artículos</button>
+    <button data-page="reportearticulosxruta" onclick="goTo('reportearticulosxruta.html')">🚛 Rep. Ruta</button>
+    <button data-page="reporteestadoscuenta" onclick="goTo('reporteestadoscuenta.html')">👤🧾 Estado Cuenta</button>
+    <button data-page="reportefacturas" onclick="goTo('reportefacturas.html')">🧾 Rep. Facturas</button>
+    <button data-page="buscar" onclick="goTo('buscar.html')">🔍 Buscar Item</button>
+    <button data-page="dashboard" onclick="goTo('dashboard.html')">🚀 Dashboard</button>
     <button class="logout-btn" onclick="logout()">🚪 Salir</button>
   </div>
 
   <script>
     const db = firebase.firestore();
 
-    // ---------- Sesión al recargar ----------
     window.onload = () => {
       const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
       if (current) showPanel();
     };
 
-    // ---------- LOGIN UNIVERSAL ----------
     function login(){
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('userPassword').value.trim();
-      if(!username||!password) return alert('Faltan datos 🤔');
+      if(!username || !password) return alert('Faltan datos 🤔');
 
       db.collection('users').doc(username).get()
         .then(doc=>{
           if(!doc.exists) return alert('Usuario no encontrado 😢');
           const data = doc.data();
-          if(data.password!==password) return alert('Contraseña incorrecta 😬');
+          if(data.password !== password) return alert('Contraseña incorrecta 😬');
 
-          // 🆕 Guardamos permisos
-          sessionStorage.setItem('currentUser',JSON.stringify({
+          sessionStorage.setItem('currentUser', JSON.stringify({
             username,
+            fullName: data.fullName || '',          // 👈 guardamos fullName
             allowedPages: data.allowedPages || []
           }));
           showPanel();
@@ -80,18 +82,31 @@
     }
 
     function showPanel(){
+      const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+      if(!current){ return; }
+
       loginContainer.style.display='none';
       adminPanel.style.display='block';
+
+      // Mostrar info de usuario
+      userInfo.textContent = `${current.fullName || '(Sin nombre)'} (${current.username})`;
+
+      // Ocultar botones no autorizados
+      const allowed = current.allowedPages || [];
+      document.querySelectorAll('#adminPanel button[data-page]').forEach(btn=>{
+        const key = btn.getAttribute('data-page');
+        if(!allowed.includes(key)){
+          btn.style.display='none';
+        }
+      });
     }
 
-    // ---------- SALIR ----------
     function logout(){
       sessionStorage.removeItem('currentUser');
       location.reload();
     }
 
-    // ---------- Navegación ----------
-    function goTo(page){window.location.href=page;}
+    function goTo(page){ window.location.href = page; }
   </script>
 </body>
 </html>

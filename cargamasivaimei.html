@@ -276,5 +276,11 @@
     // Asignamos la función al botón de "Guardar todos los IMEIs"
     document.getElementById("saveAllBtn").addEventListener("click", saveAllIMEIs);
   </script>
+
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('cargamasivaimei');  
+  </script>  
+  
 </body>
 </html>

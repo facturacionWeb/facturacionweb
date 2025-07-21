@@ -167,14 +167,12 @@
     }
 
     window.onload = () => {
-      const auth = sessionStorage.getItem('isAuthenticated');
-      if (!auth) {
-        alert("Debe autenticarse primero");
-        window.location.href = "index.html";
-      } else {
-        cargarClientes();
-      }
+       cargarClientes();
     };
   </script>
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('abonar');  
+  </script>  
 </body>
 </html>

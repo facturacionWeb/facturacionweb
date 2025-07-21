@@ -144,7 +144,7 @@
           return;
         }
 
-        inv.items.forEach(item => {
+        /*inv.items.forEach(item => {
           const costo = Number(item.costo_compra) || 0; // 👈 directo al campo asegurado
           const descuento = Number(item.discount || 0);
           const price = Number(item.price || 0);
@@ -169,7 +169,46 @@
             };
           }
           productStats[key].qty += qty;
+        });*/
+        inv.items.forEach(item => {
+        const costo = Number(item.costo_compra) || 0;
+        const descuento = Number(item.discount || 0);
+        const price = Number(item.price || 0);
+        const qty = Number(item.quantity || 0);
+        
+        if (costo === 0 && price > 0) {
+        console.warn("💸 Item con costo_compra = 0 (revisar):", {
+        factura: doc.id, articleId: item.articleId, price, qty, item
         });
+        }
+        
+        const gananciaUnit = (price - costo) * (1 - descuento / 100);
+        const gananciaTotal = gananciaUnit * qty;
+        
+        console.log(`📄 Factura: ${doc.id}`);
+        console.log(`🛒 Artículo: ${item.articleId || 'SIN_ID'}`);
+        console.log(`   - Precio venta: $${price}`);
+        console.log(`   - Costo compra: $${costo}`);
+        console.log(`   - Descuento: ${descuento}%`);
+        console.log(`   - Cantidad: ${qty}`);
+        console.log(`   - Ganancia unit: $${gananciaUnit.toFixed(2)}`);
+        console.log(`   - Ganancia total: $${gananciaTotal.toFixed(2)}`);
+        
+        totalProfit += gananciaTotal;
+        console.log(`💰 Ganancia acumulada: $${totalProfit.toFixed(2)}\n`);
+        
+        daily[day].profit += gananciaTotal;
+        
+        const key = item.articleId || `${item.brand || ''}-${item.model || ''}` || 'SIN_ID';
+        if (!productStats[key]) {
+        productStats[key] = {
+        qty: 0,
+        label: obtenerLabelProducto(item)
+        };
+        }
+        productStats[key].qty += qty;
+        });
+
       });
 
       const formatter = new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD' });

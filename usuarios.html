@@ -1,69 +1,33 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Gestión de Usuarios</title>
 
-  <!-- Import Firebase SDK (v8 with namespaced API) -->
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-  
-  <!-- Import Firebase configuration -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  
+
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    input, button, label, select {
-      margin: 10px 0;
-      display: block;
-      width: calc(100% - 20px);
-      padding: 10px;
-      box-sizing: border-box;
-    }
-    .password-container {
-      position: relative;
-      width: calc(100% - 20px);
-    }
-    .password-container input {
-      width: 100%;
-      padding-right: 40px;
-    }
-    .toggle-password {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    table, th, td {
-      border: 1px solid black;
-      padding: 10px;
-      text-align: left;
-    }
-    th, td {
-      text-align: center;
-    }
+    body{font-family:Arial;padding:20px}
+    .container{max-width:800px;margin:0 auto}
+    input,button,label,select{margin:10px 0;display:block;width:calc(100% - 20px);padding:10px;box-sizing:border-box}
+    .password-container{position:relative;width:calc(100% - 20px)}
+    .password-container input{width:100%;padding-right:40px}
+    .toggle-password{position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer}
+    table{width:100%;border-collapse:collapse}
+    table,th,td{border:1px solid #000;padding:10px;text-align:center}
   </style>
 </head>
 <body>
   <a href="index.html">Volver a la Página Principal</a>
-  
+
   <div class="container">
     <h1>Gestión de Usuarios</h1>
 
-    <!-- Formulario para crear o actualizar un usuario -->
+    <!-- Formulario -->
     <input type="text" id="username" placeholder="Username" />
     <div class="password-container">
       <input type="password" id="password" placeholder="Password" />
@@ -71,155 +35,122 @@
     </div>
     <input type="text" id="fullName" placeholder="Nombre Completo" />
     <select id="location">
-      <option value="TODOS">TODOS</option>
-      <option value="SIN RUTA">SIN RUTA</option>
-      <option value="1">1</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="5">5</option>
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="8">8</option>
-      <option value="9">9</option>
+      <option value="TODOS">TODOS</option><option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+      <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+      <option value="7">7</option><option value="8">8</option><option value="9">9</option>
       <option value="10">10</option>
     </select>
+
+    <!-- 🆕 Lista de permisos -->
+    <label>Permisos de acceso:</label>
+    <div id="pageList"></div>                <!-- 🆕 -->
+
     <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
     <button onclick="clearFields()">Limpiar Campos</button>
 
-    <!-- Tabla para mostrar los usuarios existentes -->
+    <!-- Tabla -->
     <h2>Usuarios Existentes</h2>
     <table>
-      <thead>
-        <tr>
-          <th>Username</th>
-          <th>Nombre Completo</th>
-          <th>Ubicación</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="userTable">
-        <!-- Las filas de usuarios se generarán aquí -->
-      </tbody>
+      <thead><tr><th>Username</th><th>Nombre Completo</th><th>Ubicación</th><th>Acciones</th></tr></thead>
+      <tbody id="userTable"></tbody>
     </table>
   </div>
 
   <script>
-    // Asegúrate de que firebase-config.js incluya firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    function togglePassword() {
-      const passwordInput = document.getElementById('password');
-      passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
-    }
+    // ---------- Páginas disponibles ----------
+    const PAGES=[
+      {key:'usuarios',label:'Administrar Usuarios'},
+      {key:'clientes',label:'Administrar Clientes'},
+      {key:'proveedores',label:'Administrar Proveedores'},
+      {key:'articulos',label:'Administrar Artículos'},
+      {key:'facturas',label:'Facturar'},
+      {key:'abonar',label:'Abonar'},
+      {key:'notascredito',label:'Notas de Crédito'},
+      {key:'cargamasivaimei',label:'Carga IMEIs x Ruta'},
+      {key:'reportearticulos',label:'Reporte Artículos'},
+      {key:'reportearticulosxruta',label:'Reporte por Ruta'},
+      {key:'reporteestadoscuenta',label:'Estado de Cuenta'},
+      {key:'reportefacturas',label:'Reporte Facturas'},
+      {key:'buscar',label:'Buscar Item'},
+      {key:'dashboard',label:'Dashboard Ventas'}
+    ];
 
-    function clearFields() {
-      document.getElementById('username').value = '';
-      document.getElementById('password').value = '';
-      document.getElementById('fullName').value = '';
-      document.getElementById('location').value = 'TODOS';
-    }
-
-    function addOrUpdateUser() {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
-      const fullName = document.getElementById('fullName').value.trim();
-      const location = document.getElementById('location').value;
-
-      if (username) {
-        db.collection("users").doc(username).set({
-          username: username,
-          password: password,
-          fullName: fullName,
-          location: location
-        }).then(() => {
-          alert("Usuario agregado o actualizado con éxito 😊");
-          loadUsers();
-          clearFields();
-        }).catch((error) => {
-          console.error("Error al agregar o actualizar el usuario: ", error);
-        });
-      } else {
-        alert("El nombre de usuario es requerido ⚠️");
-      }
-    }
-
-    // Función para cargar y mostrar todos los usuarios
-    function loadUsers() {
-      db.collection("users").get().then((querySnapshot) => {
-        const userTable = document.getElementById('userTable');
-        userTable.innerHTML = ""; // Limpia la tabla
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-
-          // Crear fila para cada usuario
-          const row = document.createElement('tr');
-
-          // Celda para username
-          const usernameCell = document.createElement('td');
-          usernameCell.textContent = data.username;
-          row.appendChild(usernameCell);
-
-          // Celda para nombre completo
-          const fullNameCell = document.createElement('td');
-          fullNameCell.textContent = data.fullName;
-          row.appendChild(fullNameCell);
-
-          // Celda para ubicación
-          const locationCell = document.createElement('td');
-          locationCell.textContent = data.location;
-          row.appendChild(locationCell);
-
-          // Celda de acciones
-          const actionsCell = document.createElement('td');
-
-          // Botón para eliminar usuario
-          const deleteBtn = document.createElement('button');
-          deleteBtn.textContent = "Eliminar";
-          deleteBtn.onclick = function() {
-            deleteUser(data.username);
-          };
-          actionsCell.appendChild(deleteBtn);
-
-          // Botón para editar usuario
-          const editBtn = document.createElement('button');
-          editBtn.textContent = "Editar";
-          editBtn.onclick = function() {
-            fillFormForEdit(data);
-          };
-          actionsCell.appendChild(editBtn);
-
-          row.appendChild(actionsCell);
-          userTable.appendChild(row);
-        });
-      }).catch((error) => {
-        console.error("Error al cargar los usuarios: ", error);
+    // ---------- Render checkboxes ----------
+    function renderPageCheckboxes(){
+      const wrap=document.getElementById('pageList');
+      wrap.innerHTML='';
+      PAGES.forEach(p=>{
+        wrap.innerHTML+=`
+          <label style="display:inline-block;margin-right:10px;">
+            <input type="checkbox" value="${p.key}"/> ${p.label}
+          </label>`;
       });
     }
 
-    // Función para eliminar un usuario
-    function deleteUser(username) {
-      db.collection("users").doc(username).delete().then(() => {
-        alert("Usuario eliminado exitosamente 🚀");
-        loadUsers();
-      }).catch((error) => {
-        console.error("Error eliminando el usuario: ", error);
+    // ---------- Utils ----------
+    function getSelectedPages(){
+      return Array.from(document.querySelectorAll('#pageList input:checked')).map(cb=>cb.value);
+    }
+    function setSelectedPages(arr){
+      document.querySelectorAll('#pageList input').forEach(cb=>cb.checked=arr.includes(cb.value));
+    }
+
+    // ---------- Form helpers ----------
+    function togglePassword(){const inp=password;inp.type=inp.type==='password'?'text':'password';}
+    function clearFields(){
+      username.value='';password.value='';fullName.value='';location.value='TODOS';
+      setSelectedPages([]);
+    }
+
+    // ---------- CRUD ----------
+    function addOrUpdateUser(){
+      const data={
+        username: username.value.trim(),
+        password: password.value.trim(),
+        fullName: fullName.value.trim(),
+        location: location.value,
+        allowedPages: getSelectedPages()            // 🆕
+      };
+      if(!data.username) return alert('Username requerido ⚠️');
+
+      db.collection('users').doc(data.username).set(data)  // 🆕 ahora guarda allowedPages
+        .then(()=>{alert('Guardado ✅');loadUsers();clearFields();})
+        .catch(e=>console.error('Err',e));
+    }
+
+    function deleteUser(user){
+      db.collection('users').doc(user).delete()
+        .then(()=>{alert('Eliminado');loadUsers();})
+        .catch(e=>console.error(e));
+    }
+
+    function fillFormForEdit(d){
+      username.value=d.username;password.value=d.password;
+      fullName.value=d.fullName;location.value=d.location;
+      setSelectedPages(d.allowedPages||[]);           // 🆕
+    }
+
+    // ---------- Cargar y pintar ----------
+    function loadUsers(){
+      db.collection('users').get().then(q=>{
+        const tbody=userTable;tbody.innerHTML='';
+        q.forEach(doc=>{
+          const d=doc.data();
+          tbody.innerHTML+=`<tr>
+            <td>${d.username}</td><td>${d.fullName||''}</td><td>${d.location}</td>
+            <td>
+              <button onclick="deleteUser('${d.username}')">Eliminar</button>
+              <button onclick="fillFormForEdit(${JSON.stringify(d).replace(/"/g,'&quot;')})">Editar</button>
+            </td></tr>`;
+        });
       });
     }
 
-    // Función para llenar el formulario con los datos del usuario (modo edición)
-    function fillFormForEdit(data) {
-      document.getElementById('username').value = data.username;
-      document.getElementById('password').value = data.password;
-      document.getElementById('fullName').value = data.fullName;
-      document.getElementById('location').value = data.location;
-    }
-
-    // Cargar usuarios al iniciar la página
-    window.onload = function() {
-      loadUsers();
-    };
+    // ---------- Init ----------
+    window.onload=()=>{renderPageCheckboxes();loadUsers();}
   </script>
 </body>
 </html>

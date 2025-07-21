@@ -74,6 +74,8 @@
     // ---------- Firebase ----------
     const db = firebase.firestore();
 
+    let originalUsername = null;
+
     // ---------- Catálogo de páginas ----------
     const PAGES = [
       {key:'usuarios',label:'Administrar Usuarios'},
@@ -121,6 +123,7 @@
 
     // ---------- Limpiar formulario ----------
     function clearFields(){
+      originalUsername = null;
       username.value = '';
       password.value = '';
       fullName.value = '';
@@ -129,7 +132,7 @@
     }
 
     // ---------- Alta / edición ----------
-    function addOrUpdateUser(){
+    /*function addOrUpdateUser(){
       const data = {
         username : username.value.trim(),
         password : password.value.trim(),
@@ -145,7 +148,46 @@
       db.collection('users').doc(data.username).set(data)
         .then(()=>{ alert('Usuario guardado ✅'); loadUsers(); clearFields(); })
         .catch(err=>console.error('Error al guardar',err));
-    }
+    }*/
+    function addOrUpdateUser(){
+        const newUsername = username.value.trim();
+        if(!newUsername) return alert('Username requerido ⚠️');
+      
+        const data = {
+          username: newUsername,
+          password: password.value.trim(),
+          fullName: fullName.value.trim(),
+          userLocation: document.getElementById('userLocation').value,
+          allowedPages: getSelectedPages()
+        };
+      
+        // Crear o actualizar
+        if(originalUsername && originalUsername !== newUsername){
+          // rename
+          const batch = db.batch();
+          const oldRef = db.collection('users').doc(originalUsername);
+          const newRef = db.collection('users').doc(newUsername);
+          batch.set(newRef, data);
+          batch.delete(oldRef);
+          batch.commit()
+            .then(()=>{
+              alert('Usuario renombrado ✅');
+              clearFields();
+              loadUsers();
+            })
+            .catch(err=>console.error('Error al renombrar', err));
+        } else {
+          // alta o update normal
+          db.collection('users').doc(newUsername).set(data)
+            .then(()=>{
+              alert('Usuario guardado ✅');
+              clearFields();
+              loadUsers();
+            })
+            .catch(err=>console.error('Error al guardar', err));
+        }
+      }
+
 
     // ---------- Eliminar ----------
     function deleteUser(user){
@@ -157,6 +199,7 @@
 
     // ---------- Llenar form para editar ----------
     function fillFormForEdit(d){
+      originalUsername = d.username; // guardar original
       username.value   = d.username;
       password.value   = d.password;
       fullName.value   = d.fullName || '';

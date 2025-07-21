@@ -1568,6 +1568,11 @@
 
     
   </script>
+
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('facturas');  
+  </script>
   
   <!-- Modal para ver el detalle de una factura -->
   <div id="invoiceModal" class="modal">

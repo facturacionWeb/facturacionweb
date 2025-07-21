@@ -222,7 +222,7 @@
 
   /*********************** CARGA INICIAL *************************/
   window.onload = () => {
-    verificarAuth();
+
     cargarClientes();
 
     // Eventos
@@ -244,14 +244,6 @@
     document.getElementById('btnCancelar').addEventListener('click', limpiarFormulario);
     document.getElementById('btnImprimir').addEventListener('click', imprimirRecibo);
   };
-
-  function verificarAuth() {
-    const auth = sessionStorage.getItem('isAuthenticated');
-    if (!auth) {
-      alert('Debe autenticarse primero');
-      window.location.href = 'index.html';
-    }
-  }
 
   /*********************** CLIENTES *************************/
   function cargarClientes() {
@@ -776,5 +768,11 @@ return `
 }
   
 </script>
+
+<script type="module">
+  import {requireAccess} from './auth.js';
+  requireAccess('abonar');  
+</script>  
+  
 </body>
 </html>

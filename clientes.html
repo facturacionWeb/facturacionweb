@@ -48,6 +48,12 @@
             document.head.appendChild(versionScript);
         })();
     </script>
+    
+    <script type="module">
+        import {requireAccess} from './auth.js';
+        requireAccess('usuarios');  
+    </script>
+
 </head>
 <body>
     <a href="index.html">Volver a la Página Principal</a>

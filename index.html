@@ -1,221 +1,97 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inicio de Sesión - Portal de Administración</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>🔑 Login – Portal de Administración</title>
 
-    <!-- Import Firebase SDK (v8 with namespaced API) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
 
-    <!-- Import Firebase configuration -->
-    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-    
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            text-align: center;
-            max-width: 400px;
-            width: 100%;
-        }
-        h1 {
-            color: #333;
-        }
-        input {
-            width: calc(100% - 20px);
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border: none;
-            border-radius: 5px;
-            background-color: #5a9bd5;
-            color: white;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        button:hover {
-            background-color: #4a89c7;
-        }
-        .logout-btn {
-            background-color: #dc3545;
-        }
-        .logout-btn:hover {
-            background-color: #a71d2a;
-        }
-        .footer {
-            margin-top: 20px;
-            font-size: 14px;
-            color: #666;
-        }
-    </style>
-    <script>
-    // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
-    /*(function loadVersionScript() {
-        const versionScript = document.createElement('script');
-        versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-        document.head.appendChild(versionScript);
-    })();*/
-    </script>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .container{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.2);text-align:center;max-width:400px;width:100%}
+    input{width:calc(100% - 20px);padding:10px;margin:10px 0;border:1px solid #ccc;border-radius:5px}
+    button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:5px;background:#5a9bd5;color:#fff;font-size:16px;cursor:pointer;gap:8px;display:flex;align-items:center;justify-content:center;transition:.3s}
+    button:hover{background:#4a89c7}
+    .logout-btn{background:#dc3545} .logout-btn:hover{background:#a71d2a}
+  </style>
 </head>
 <body>
-    <div id="loginContainer" class="container" style="display:none;">
-        <h1>🔑 Inicio de Sesión</h1>
-        <input type="password" id="adminPassword" placeholder="Contraseña de Administrador" />
-        <button onclick="verifyPassword()">🔓 Ingresar</button>
-    </div>
+  <!-- 🆕 Campo de usuario añadido -->
+  <div id="loginContainer" class="container">
+    <h1>🔑 Iniciar Sesión</h1>
+    <input id="username" type="text" placeholder="Usuario" />      <!-- 🆕 -->
+    <input id="userPassword" type="password" placeholder="Contraseña" /> <!-- 🆕 -->
+    <button onclick="login()">🔓 Entrar</button>                   <!-- 🆕 función -->
+  </div>
 
-    <div id="adminPanel" class="container" style="display:none;">
-        <h1>📌 Administración</h1>
-        <button onclick="goToUserManagement()">👤 Administrar Usuarios</button>
-        <button onclick="goToClientesManagement()">👥 Administrar Clientes</button>
-        <button onclick="goToProveedoresManagement()">🏢 Administrar Proveedores</button>
-        <button onclick="goToItemsManagement()">📦 Administrar Artículos</button>
-        <button onclick="goToFacturasManagement()">🧾 Facturar </button>
-        <button onclick="goToAbonar()">💰 Abonar</button>
-        <button onclick="goToNotasCredito()">📝 Nota de Crédito</button>
-        <button onclick="goToCargaMasivaIMEI_X_Ruta()">📲 Carga Masiva IMEI</button>
-        <button onclick="goToItemsReport()">📊 Reporte de Artículos</button>
-        <button onclick="goToItemsXRutaReport()">🚛 Reporte por Ruta</button>
-        <button onclick="goToEstadoCuentaReport()">👤🧾 Reporte Estado Cuenta por Cliente</button>
-        <button onclick="goToReporteFacturas()">🧾Reporte Facturas</button>
-        <button onclick="goToBuscar()">🔍 Buscar Item en Factura</button>
-        <button onclick="goToDashboard()">🚀 Dashboard de Ventas</button>
-        <button class="logout-btn" onclick="logout()">🚪 Cerrar Sesión</button>
-        <div class="footer">
-            <p>&copy; 2025 Galaxia Cell. Todos los derechos reservados.</p>
-        </div>
-    </div>
+  <!-- Panel principal (se muestra tras login) -->
+  <div id="adminPanel" class="container" style="display:none;">
+    <h1>📌 Menú Principal</h1>
+    <button onclick="goTo('usuarios.html')">👤 Usuarios</button>
+    <button onclick="goTo('clientes.html')">👥 Clientes</button>
+    <button onclick="goTo('proveedores.html')">🏢 Proveedores</button>
+    <button onclick="goTo('articulos.html')">📦 Artículos</button>
+    <button onclick="goTo('facturas.html')">🧾 Facturar</button>
+    <button onclick="goTo('abonar.html')">💰 Abonar</button>
+    <button onclick="goTo('notascredito.html')">📝 Notas de Crédito</button>
+    <button onclick="goTo('cargamasivaimei.html')">📲 Carga IMEI</button>
+    <button onclick="goTo('reportearticulos.html')">📊 Rep. Artículos</button>
+    <button onclick="goTo('reportearticulosxruta.html')">🚛 Rep. Ruta</button>
+    <button onclick="goTo('reporteestadoscuenta.html')">👤🧾 Estado Cuenta</button>
+    <button onclick="goTo('reportefacturas.html')">🧾 Rep. Facturas</button>
+    <button onclick="goTo('buscar.html')">🔍 Buscar Item</button>
+    <button onclick="goTo('dashboard.html')">🚀 Dashboard</button>
+    <button class="logout-btn" onclick="logout()">🚪 Salir</button>
+  </div>
 
-    <script>
+  <script>
+    const db = firebase.firestore();
 
-        const db = firebase.firestore();
+    // ---------- Sesión al recargar ----------
+    window.onload = () => {
+      const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+      if (current) showPanel();
+    };
 
-        // Check if the user is already authenticated
-        window.onload = function() {
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (isAuthenticated) {
-                document.getElementById('loginContainer').style.display = 'none';
-                document.getElementById('adminPanel').style.display = 'block';
-            } else {
-                document.getElementById('loginContainer').style.display = 'block';
-            }
-        };
+    // ---------- LOGIN UNIVERSAL ----------
+    function login(){
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('userPassword').value.trim();
+      if(!username||!password) return alert('Faltan datos 🤔');
 
-        // Function to verify admin password
-        function verifyPassword() {
-            const password = document.getElementById('adminPassword').value.trim();
-            db.collection("users").doc("Administrador").get().then((doc) => {
-                if (doc.exists) {
-                    const adminData = doc.data();
-                    if (adminData.password === password) {
-                        sessionStorage.setItem('isAuthenticated', true);
-                        document.getElementById('loginContainer').style.display = 'none';
-                        document.getElementById('adminPanel').style.display = 'block';
-                    } else {
-                        alert("Contraseña incorrecta");
-                    }
-                } else {
-                    alert("No se encontró el usuario Administrador");
-                }
-            }).catch((error) => {
-                console.error("Error al verificar la contraseña: ", error);
-            });
-        }
+      db.collection('users').doc(username).get()
+        .then(doc=>{
+          if(!doc.exists) return alert('Usuario no encontrado 😢');
+          const data = doc.data();
+          if(data.password!==password) return alert('Contraseña incorrecta 😬');
 
-        // Function to navigate to user management page
-        function goToUserManagement() {
-            window.location.href = "usuarios.html";
-        }
+          // 🆕 Guardamos permisos
+          sessionStorage.setItem('currentUser',JSON.stringify({
+            username,
+            allowedPages: data.allowedPages || []
+          }));
+          showPanel();
+        })
+        .catch(e=>console.error('Error login',e));
+    }
 
-        function goToClientesManagement() {
-            window.location.href = "clientes.html";
-        }
+    function showPanel(){
+      loginContainer.style.display='none';
+      adminPanel.style.display='block';
+    }
 
-        function goToProveedoresManagement() {
-            window.location.href = "proveedores.html";
-        }
+    // ---------- SALIR ----------
+    function logout(){
+      sessionStorage.removeItem('currentUser');
+      location.reload();
+    }
 
-        function goToFacturasManagement(){
-            window.location.href = "facturas.html";
-        }
-
-        function goToAbonar(){
-            window.location.href = "abonar.html";
-        }
-
-        function goToNotasCredito() {
-            window.location.href = "notascredito.html";
-        }
-
-
-        function goToItemsManagement(){
-            window.location.href = "articulos.html";
-        }
-
-        function goToItemsReport(){
-            window.location.href = "reportearticulos.html";
-        }
-
-        function goToItemsXRutaReport(){
-            window.location.href = "reportearticulosxruta.html";
-        }
-
-        function goToCargaMasivaIMEI_X_Ruta(){
-            window.location.href = "cargamasivaimei.html";
-        }
-
-        function goToEstadoCuentaReport(){
-            window.location.href = "reporteestadoscuenta.html";
-        }
-
-        function goToReporteFacturas(){
-            window.location.href="reportefacturas.html";
-        }
- 
-        function goToBuscar(){
-             window.location.href="buscar.html"; 
-        }
-
-        function goToDashboard(){
-             window.location.href="dashboard.html"; 
-        }
-
-        // Function to log out
-        function logout() {
-            sessionStorage.removeItem('isAuthenticated');
-            document.getElementById('adminPanel').style.display = 'none';
-            document.getElementById('loginContainer').style.display = 'block';
-        }
-
-        function sendToPrinter() {
-            const text = "[C]¡Hola desde la Web!\n[L]Total: $5.00\n";
-            AndroidBridge.printTicket(text);
-        }
-      
-    </script>  
+    // ---------- Navegación ----------
+    function goTo(page){window.location.href=page;}
+  </script>
 </body>
 </html>

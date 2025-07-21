@@ -1,6 +1,6 @@
 export function requireAccess(pageKey){
 
-  const u = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+  const u = JSON.parse(sessionStorage.getItem('currentUser') || null);
 
   console.log("👤 Usuario cargado:", u);
   console.log("🔑 Página requerida:", pageKey);

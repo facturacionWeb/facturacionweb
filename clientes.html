@@ -49,10 +49,26 @@
         })();
     </script>
     
-    <script type="module">
+    <!--<script type="module">
         import {requireAccess} from './auth.js';
         requireAccess('clientes');  
-    </script>
+    </script>-->
+        <script type="module">
+            
+            import { requireAccess } from './auth.js';
+            
+            const accessOK = requireAccess('clientes');   // 👈 true si todo bien
+            
+            if (accessOK) {
+                // Espera al DOM y luego carga clientes
+                window.addEventListener('DOMContentLoaded', () => {
+                  // `loadClients` está más abajo, ya existirá cuando se dispare el evento
+                  loadClients();
+            });
+                
+            }
+        </script>
+
 
 </head>
 <body>
@@ -207,7 +223,7 @@
                 loadClients();
             }*/
             
-            loadClients();
+            //loadClients();
             
         };
     </script>

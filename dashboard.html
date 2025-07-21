@@ -267,5 +267,9 @@
       window[id + '_chart'] = new Chart(ctx, cfg);
     }
   </script>
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('dashboard');  
+  </script>
 </body>
 </html>

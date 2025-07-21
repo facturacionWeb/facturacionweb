@@ -185,13 +185,14 @@
         // Load suppliers when the page loads
         window.onload = function() {
             // Check if the user is already authenticated
-            const isAuthenticated = sessionStorage.getItem('isAuthenticated');
+            /*const isAuthenticated = sessionStorage.getItem('isAuthenticated');
             if (!isAuthenticated) {
                 alert("Debe autenticarse primero");
                 window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
             }else{
                 loadProveedores();
-            }   
+            }*/
+            loadProveedores();
         };
     </script>
     <script type="module">

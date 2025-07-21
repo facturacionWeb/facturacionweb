@@ -286,5 +286,9 @@ function closeAbonosModal(){abonosModal.style.display="none";}
 /* ========= INIT ========= */
 window.onload=loadClients;
 </script>
+<script type="module">
+  import {requireAccess} from './auth.js';
+  requireAccess('reporteestadoscuenta'); 
+</script>
 </body>
 </html>

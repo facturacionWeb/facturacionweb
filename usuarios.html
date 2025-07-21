@@ -8,60 +8,74 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Tu archivo de configuración -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
 
   <style>
-    body{font-family:Arial;padding:20px}
-    .container{max-width:800px;margin:0 auto}
-    input,button,label,select{margin:10px 0;display:block;width:calc(100% - 20px);padding:10px;box-sizing:border-box}
-    .password-container{position:relative;width:calc(100% - 20px)}
-    .password-container input{width:100%;padding-right:40px}
+    body{font-family:Arial,Helvetica,sans-serif;padding:20px;background:#f4f4f4}
+    .container{max-width:900px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.15)}
+    input,select,button{margin:10px 0;padding:10px;width:100%;box-sizing:border-box;border:1px solid #ccc;border-radius:6px;font-size:14px}
+    label{font-weight:bold;margin-top:15px;display:block}
+    .password-container{position:relative}
+    .password-container input{padding-right:40px}
     .toggle-password{position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer}
-    table{width:100%;border-collapse:collapse}
-    table,th,td{border:1px solid #000;padding:10px;text-align:center}
+    button{background:#5a9bd5;color:#fff;border:none;cursor:pointer;transition:.3s}
+    button:hover{background:#4a89c7}
+    table{width:100%;border-collapse:collapse;margin-top:20px}
+    th,td{border:1px solid #ccc;padding:8px;text-align:center}
+    th{background:#e9e9e9}
+    .actions button{width:auto;margin:0 3px;padding:6px 10px;font-size:12px}
+    .delete-btn{background:#dc3545} .delete-btn:hover{background:#b02a37}
   </style>
 </head>
 <body>
-  <a href="index.html">Volver a la Página Principal</a>
+  <a href="index.html">← Volver al Menú Principal</a>
 
   <div class="container">
-    <h1>Gestión de Usuarios</h1>
+    <h1>👤 Gestión de Usuarios</h1>
 
-    <!-- Formulario -->
+    <!-- ======== Formulario ======== -->
     <input type="text" id="username" placeholder="Username" />
+
     <div class="password-container">
       <input type="password" id="password" placeholder="Password" />
       <span class="toggle-password" onclick="togglePassword()">👁️</span>
     </div>
+
     <input type="text" id="fullName" placeholder="Nombre Completo" />
-    <select id="location">
-      <option value="TODOS">TODOS</option><option value="SIN RUTA">SIN RUTA</option>
+
+    <!-- 🆕 FIX: id = userLocation -->
+    <select id="userLocation">
+      <option value="TODOS">TODOS</option>
+      <option value="SIN RUTA">SIN RUTA</option>
       <option value="1">1</option><option value="2">2</option><option value="3">3</option>
       <option value="4">4</option><option value="5">5</option><option value="6">6</option>
       <option value="7">7</option><option value="8">8</option><option value="9">9</option>
       <option value="10">10</option>
     </select>
 
-    <!-- 🆕 Lista de permisos -->
     <label>Permisos de acceso:</label>
-    <div id="pageList"></div>                <!-- 🆕 -->
+    <div id="pageList"></div>
 
-    <button onclick="addOrUpdateUser()">Agregar/Actualizar Usuario</button>
-    <button onclick="clearFields()">Limpiar Campos</button>
+    <button onclick="addOrUpdateUser()">💾 Agregar / Actualizar</button>
+    <button onclick="clearFields()">🧹 Limpiar Campos</button>
 
-    <!-- Tabla -->
+    <!-- ======== Tabla ======== -->
     <h2>Usuarios Existentes</h2>
     <table>
-      <thead><tr><th>Username</th><th>Nombre Completo</th><th>Ubicación</th><th>Acciones</th></tr></thead>
+      <thead>
+        <tr><th>Username</th><th>Nombre</th><th>Ubicación</th><th>Acciones</th></tr>
+      </thead>
       <tbody id="userTable"></tbody>
     </table>
   </div>
 
   <script>
+    // ---------- Firebase ----------
     const db = firebase.firestore();
 
-    // ---------- Páginas disponibles ----------
-    const PAGES=[
+    // ---------- Catálogo de páginas ----------
+    const PAGES = [
       {key:'usuarios',label:'Administrar Usuarios'},
       {key:'clientes',label:'Administrar Clientes'},
       {key:'proveedores',label:'Administrar Proveedores'},
@@ -78,79 +92,104 @@
       {key:'dashboard',label:'Dashboard Ventas'}
     ];
 
-    // ---------- Render checkboxes ----------
+    // ---------- Renderizar checkboxes ----------
     function renderPageCheckboxes(){
-      const wrap=document.getElementById('pageList');
-      wrap.innerHTML='';
+      const wrap = document.getElementById('pageList');
+      wrap.innerHTML = '';
       PAGES.forEach(p=>{
-        wrap.innerHTML+=`
-          <label style="display:inline-block;margin-right:10px;">
-            <input type="checkbox" value="${p.key}"/> ${p.label}
+        wrap.innerHTML += `
+          <label style="display:inline-block;margin:5px 10px 5px 0;">
+            <input type="checkbox" value="${p.key}"> ${p.label}
           </label>`;
       });
     }
 
-    // ---------- Utils ----------
-    function getSelectedPages(){
-      return Array.from(document.querySelectorAll('#pageList input:checked')).map(cb=>cb.value);
-    }
-    function setSelectedPages(arr){
-      document.querySelectorAll('#pageList input').forEach(cb=>cb.checked=arr.includes(cb.value));
+    // Helpers permisos
+    const getSelectedPages = () =>
+      Array.from(document.querySelectorAll('#pageList input:checked'))
+           .map(cb => cb.value);
+
+    const setSelectedPages = pages =>
+      document.querySelectorAll('#pageList input')
+              .forEach(cb => cb.checked = pages.includes(cb.value));
+
+    // ---------- Mostrar / ocultar password ----------
+    function togglePassword(){
+      const field = document.getElementById('password');
+      field.type = field.type === 'password' ? 'text' : 'password';
     }
 
-    // ---------- Form helpers ----------
-    function togglePassword(){const inp=password;inp.type=inp.type==='password'?'text':'password';}
+    // ---------- Limpiar formulario ----------
     function clearFields(){
-      username.value='';password.value='';fullName.value='';location.value='TODOS';
+      username.value = '';
+      password.value = '';
+      fullName.value = '';
+      document.getElementById('userLocation').value = 'TODOS';  // 🆕 FIX
       setSelectedPages([]);
     }
 
-    // ---------- CRUD ----------
+    // ---------- Alta / edición ----------
     function addOrUpdateUser(){
-      const data={
-        username: username.value.trim(),
-        password: password.value.trim(),
-        fullName: fullName.value.trim(),
-        location: location.value,
-        allowedPages: getSelectedPages()            // 🆕
+      const data = {
+        username : username.value.trim(),
+        password : password.value.trim(),
+        fullName : fullName.value.trim(),
+        userLocation : document.getElementById('userLocation').value,  // 🆕 FIX
+        allowedPages : getSelectedPages()
       };
       if(!data.username) return alert('Username requerido ⚠️');
 
-      db.collection('users').doc(data.username).set(data)  // 🆕 ahora guarda allowedPages
-        .then(()=>{alert('Guardado ✅');loadUsers();clearFields();})
-        .catch(e=>console.error('Err',e));
+      // 🔒 Elimina cualquier undefined por si acaso
+      Object.keys(data).forEach(k => data[k] === undefined && delete data[k]);
+
+      db.collection('users').doc(data.username).set(data)
+        .then(()=>{ alert('Usuario guardado ✅'); loadUsers(); clearFields(); })
+        .catch(err=>console.error('Error al guardar',err));
     }
 
+    // ---------- Eliminar ----------
     function deleteUser(user){
+      if(!confirm(`¿Eliminar al usuario ${user}?`)) return;
       db.collection('users').doc(user).delete()
-        .then(()=>{alert('Eliminado');loadUsers();})
-        .catch(e=>console.error(e));
+        .then(()=>{ alert('Eliminado'); loadUsers(); })
+        .catch(err=>console.error(err));
     }
 
+    // ---------- Llenar form para editar ----------
     function fillFormForEdit(d){
-      username.value=d.username;password.value=d.password;
-      fullName.value=d.fullName;location.value=d.location;
-      setSelectedPages(d.allowedPages||[]);           // 🆕
+      username.value   = d.username;
+      password.value   = d.password;
+      fullName.value   = d.fullName || '';
+      document.getElementById('userLocation').value = d.userLocation || 'TODOS';  // 🆕 FIX
+      setSelectedPages(d.allowedPages || []);
     }
 
-    // ---------- Cargar y pintar ----------
+    // ---------- Cargar tabla ----------
     function loadUsers(){
       db.collection('users').get().then(q=>{
-        const tbody=userTable;tbody.innerHTML='';
+        const tbody = document.getElementById('userTable');
+        tbody.innerHTML = '';
         q.forEach(doc=>{
-          const d=doc.data();
-          tbody.innerHTML+=`<tr>
-            <td>${d.username}</td><td>${d.fullName||''}</td><td>${d.location}</td>
-            <td>
-              <button onclick="deleteUser('${d.username}')">Eliminar</button>
-              <button onclick="fillFormForEdit(${JSON.stringify(d).replace(/"/g,'&quot;')})">Editar</button>
-            </td></tr>`;
+          const d = doc.data();
+          tbody.innerHTML += `
+            <tr>
+              <td>${d.username}</td>
+              <td>${d.fullName || ''}</td>
+              <td>${d.userLocation || ''}</td>
+              <td class="actions">
+                <button class="delete-btn" onclick="deleteUser('${d.username}')">🗑️</button>
+                <button onclick="fillFormForEdit(${JSON.stringify(d).replace(/"/g,'&quot;')})">✏️</button>
+              </td>
+            </tr>`;
         });
       });
     }
 
     // ---------- Init ----------
-    window.onload=()=>{renderPageCheckboxes();loadUsers();}
+    window.onload = () => {
+      renderPageCheckboxes();
+      loadUsers();
+    };
   </script>
 </body>
 </html>

@@ -210,6 +210,10 @@
       loadReport();
     }
   </script>
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('reportearticulosxruta');  
+  </script>
 </head>
 <body>
   <h1>Reporte Artículos con Filtro de Ruta</h1>

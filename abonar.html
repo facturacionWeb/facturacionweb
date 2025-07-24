@@ -187,6 +187,7 @@
       <tr>
         <th>Fecha/Hora</th>
         <th>Factura</th>
+        <th>Usuario</th>
         <th>Método</th>
         <th>Monto (C$)</th>
         <th>Saldo Pendiente</th>
@@ -508,7 +509,8 @@
     div.innerHTML = `
       <h3 style="text-align:center;">Recibo de Abono</h3>
       <p><strong>Fecha:</strong> ${fechaStr}</p>
-      <p><strong>Ruta:</strong> ${ruta}</p>
+      <!--<p><strong>Ruta:</strong> ${ruta}</p>-->
+      <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
       <p><strong>Factura #:</strong> ${facturaId}</p>
       <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
       <hr>
@@ -597,6 +599,7 @@ function cargarHistorialAbonos() {
               ${facturaId}
             </button>
           </td>
+          <td>${(a.usuario && (a.usuario.fullName || a.usuario.username)) || 'Administrador'}</td>
           <td>${a.metodoPago}</td>
           <td>C$${a.amount.toFixed(2)}</td>
           <td>C$${a.pendingBalance.toFixed(2)}</td>

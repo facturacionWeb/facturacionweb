@@ -397,6 +397,13 @@
     }
   
   async function registrarAbono() {
+
+    const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+    if (!currentUser) {
+      alert('Sesión expirada. Iniciá de nuevo.');
+      return window.location.href = 'index.html';
+    }
+    
     const clienteId = document.getElementById('clienteSelect').value;
     const facturaId = document.getElementById('facturaSelect').value;
     const monto = parseFloat(document.getElementById('montoAbono').value);
@@ -448,7 +455,11 @@
           banco: banco,
           referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
           notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null,
-          reference: generateReference()
+          reference: generateReference(),
+          usuario: {
+            username: currentUser.username,
+            fullName: currentUser.fullName
+          }
         };
 
         // Actualizar factura

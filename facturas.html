@@ -609,6 +609,12 @@
     // Crear factura y guardar en Firestore (eliminando IMEIs usados)
     function createInvoice() {
 
+      const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+      if (!currentUser) {
+          alert('Sesión expirada, volvé a iniciar.');
+          window.location.href='index.html'; 
+      }
+
       if (creatingInvoice) return; // 🛑 Bloqueo si ya está en proceso
       creatingInvoice = true;
       const btn = document.getElementById("createInvoiceBtn");
@@ -699,7 +705,11 @@
         fechaStr,
         anulada: false,
         consecutivo: consecutivo,
-        saldo: invoiceTotal // <-- Aquí almacenamos el saldo inicial
+        saldo: invoiceTotal,
+        usuario: {
+          username: currentUser.username,
+          fullName: currentUser.fullName
+        }
       };
 
       db.collection("facturas").add(invoice).then((docRef) => {
@@ -746,7 +756,7 @@
           <div style="flex: 1; text-align: left; padding-left: 20px;">
             <h2 style="margin: 0 0 5px 0;">Factura - ${invoiceId}</h2>
             <p style="margin: 5px 0;"><strong>Consecutivo:</strong> ${consecutivo || 'N/A'}</p>
-            <p style="margin: 5px 0;"><strong>Ruta de la Factura:</strong> ${ruta || 'N/A'}</p>
+            <p style="margin: 5px 0;"><!--<strong>Ruta de la Factura:</strong> ${ruta || 'N/A'}--><strong>Atendido por:</strong><br>${invoice.usuario?.fullName || invoice.usuario?.username || 'N/A'}</p>
           </div>
         </div>
       `;

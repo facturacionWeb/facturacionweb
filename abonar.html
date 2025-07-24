@@ -485,7 +485,8 @@
         metodo,
         banco,
         referenciaBancaria,
-        notaCreditoId
+        notaCreditoId,
+        currentUser
       });
 
       limpiarFormulario(false);
@@ -498,7 +499,7 @@
   }
 
   /*********************** RECIBO *************************/
-  function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId }) {
+  function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
     const div = document.getElementById('recibo');
     const fechaStr = fecha.toLocaleString();
 

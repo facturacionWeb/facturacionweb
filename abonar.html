@@ -506,12 +506,11 @@
     let metodoTxt = metodo;
     if (metodo==='Transferencia') metodoTxt += ` (${banco} #${referenciaBancaria})`;
     if (metodo==='NotaCredito') metodoTxt += ` (NC: ${notaCreditoId})`;
-
+    console.log("👤 currentUser:", currentUser);
     div.innerHTML = `
       <h3 style="text-align:center;">Recibo de Abono</h3>
       <p><strong>Fecha:</strong> ${fechaStr}</p>
-      <!--<p><strong>Ruta:</strong> ${ruta}</p>-->
-      <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
+      <p><strong>Ruta:</strong> ${ruta}</p>
       <p><strong>Factura #:</strong> ${facturaId}</p>
       <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
       <hr>

@@ -745,7 +745,7 @@
       });
     }
 
-    function renderInvoiceHeader(invoiceId, consecutivo, ruta) {
+    function renderInvoiceHeader(invoiceId, consecutivo, ruta, usuario) {
       return `
         <div style="display: flex; align-items: center; justify-content: flex-start; margin-bottom: 20px;">
           <div style="flex: 0 0 130px;">
@@ -756,7 +756,7 @@
           <div style="flex: 1; text-align: left; padding-left: 20px;">
             <h2 style="margin: 0 0 5px 0;">Factura - ${invoiceId}</h2>
             <p style="margin: 5px 0;"><strong>Consecutivo:</strong> ${consecutivo || 'N/A'}</p>
-            <p style="margin: 5px 0;"><!--<strong>Ruta de la Factura:</strong> ${ruta || 'N/A'}--><strong>Atendido por:</strong><br>${invoice.usuario?.fullName || invoice.usuario?.username || 'N/A'}</p>
+            <p style="margin: 5px 0;"><!--<strong>Ruta de la Factura:</strong> ${ruta || 'N/A'}--><strong>Atendido por:</strong><br>${usuario?.fullName || usuario?.username || 'N/A'}</p>
           </div>
         </div>
       `;
@@ -769,8 +769,9 @@
         const client = doc.data();
         window.__currentInvoiceItems = invoice.items; 
         let currencySymbol = invoice.currency === 'CORD' ? 'C$' : '$';
+        const nombreUsuario = invoice.usuario || "Administrador";
         const invoiceHTML = `
-          ${renderInvoiceHeader(invoiceId, invoice.consecutivo, invoice.route)}
+          ${renderInvoiceHeader(invoiceId, invoice.consecutivo, invoice.route, nombreUsuario)}
           <div class="invoice-body">
             <table class="details-table">
               <tr>
@@ -1028,9 +1029,10 @@
                 <p class="route"><strong>Ruta de la Factura:</strong> ${invoice.route}</p>
                 </div>
             */
+            const nombreUsuario = invoice.usuario || "Administrador";
             const invoiceHTML = `
             
-             ${renderInvoiceHeader(invoiceId, invoice.consecutivo, invoice.route)}
+             ${renderInvoiceHeader(invoiceId, invoice.consecutivo, invoice.route,nombreUsuario)}
 
               <div class="invoice-body">
                 <table class="details-table">

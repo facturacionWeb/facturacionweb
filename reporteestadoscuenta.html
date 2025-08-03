@@ -58,6 +58,33 @@
     color: red;
     background: cyan;
   }
+
+   @media print {
+    /* Oculta todo menos el reporte */
+    body * {
+      visibility: hidden;
+    }
+  
+    #reportSection, #reportSection * {
+      visibility: visible;
+    }
+  
+    #reportSection {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+    }
+  
+    /* 🔥 Reset colores para impresión */
+    #reportSection tr,
+    #reportSection td,
+    #reportSection th {
+      background-color: transparent !important;
+      color: black !important;
+    }
+  }
+   
   </style>
 </head>
 <body>

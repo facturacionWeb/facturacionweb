@@ -58,7 +58,6 @@
     color: red;
     background: cyan;
   }
-    
   </style>
 </head>
 <body>
@@ -123,7 +122,9 @@ function loadClients(){
     const sel=document.getElementById("clientSelect"); sel.innerHTML="";
     snap.forEach(doc=>{
       const o=document.createElement("option");
-      o.value=doc.id; o.textContent=doc.data().nombreCliente+" - "+doc.data().nombreTienda;
+      const d = doc.data();
+      o.value=doc.id; 
+      o.textContent=(d.nombreCliente||"") + " - " + (d.nombreTienda||"");
       sel.appendChild(o);
     });
     $("#clientSelect").select2();
@@ -137,9 +138,24 @@ document.getElementById("generateReportBtn").onclick=()=>{
   generateReport(id);
 };
 
+function getDiasRestantes(inv){
+  let diasCredito = 0;
+  const metodo = inv.paymentMethod || "";
+  const match = metodo.match(/\d+/);
+  if (match) diasCredito = parseInt(match[0]);
+
+  const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
+  const hoy = new Date();
+  const vencimiento = new Date(fechaEmision.getTime());
+  vencimiento.setDate(vencimiento.getDate() + diasCredito);
+
+  const diferenciaMs = vencimiento - hoy;
+  return Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+}
+
 async function generateReport(clientId){
   try{
-    /* Info cliente */
+    // ===== Info cliente =====
     const cDoc=await db.collection("clientes").doc(clientId).get();
     if(cDoc.exists){
       const d=cDoc.data();
@@ -148,120 +164,109 @@ async function generateReport(clientId){
       clientAddress.textContent=d.direccion||"N/A";
       clientPhone.textContent=d.telefono||"N/A";
     }
-    /* Facturas */
+
+    // ===== Facturas de crédito no anuladas =====
     const invSnap=await db.collection("facturas")
       .where("clientId","==",clientId)
       .where("paymentType","==","Credito")
-      .where("anulada","==",false).get();
+      .where("anulada","==",false)
+      .get();
 
+    // ===== Procesar facturas en paralelo =====
+    const items = await Promise.all(invSnap.docs.map(async (doc)=>{
+      const inv = doc.data();
+      const id = doc.id;
+
+      // Traer abonos
+      const abonosSnap = await doc.ref.collection("abonos").get();
+      const abonos = abonosSnap.docs.map(a=>({...a.data(), _docId:a.id}));
+
+      // Cálculos
+      const montoPagado = abonos.reduce((s,a)=>s + parseFloat(a.amount||0), 0);
+      const total = parseFloat(inv.total||0);
+      const saldo = total - montoPagado;
+      const diasRestantes = getDiasRestantes(inv);
+      const isPaid = saldo <= 0.000001; // tolerancia flotante
+
+      // Estado visual/texto
+      let estadoTexto = "–";
+      if(!isPaid){
+        estadoTexto = (diasRestantes < 0) ? "Vencida" : diasRestantes;
+      }
+
+      return {
+        id, inv, abonos, montoPagado, saldo, diasRestantes, isPaid, 
+        estadoTexto
+      };
+    }));
+
+    // ===== ORDENAMIENTO =====
+    // 1) No canceladas primero (saldo > 0), 2) entre no canceladas:
+    //    - vencidas/today primero (más cercanas a hoy primero), luego por días restantes,
+    // 3) canceladas al final.
+    items.sort((a,b)=>{
+      if (a.isPaid !== b.isPaid) return a.isPaid ? 1 : -1; // no pagadas arriba
+
+      if (a.isPaid && b.isPaid) return 0; // ambas pagadas: da igual el orden
+
+      // Ambas no pagadas: priorizar vencidas/today (<=0), luego menor "distancia a hoy"
+      const aOver = a.diasRestantes <= 0 ? 0 : 1;
+      const bOver = b.diasRestantes <= 0 ? 0 : 1;
+      if (aOver !== bOver) return aOver - bOver;
+
+      const aKey = a.diasRestantes <= 0 ? Math.abs(a.diasRestantes) : a.diasRestantes;
+      const bKey = b.diasRestantes <= 0 ? Math.abs(b.diasRestantes) : b.diasRestantes;
+      return aKey - bKey;
+    });
+
+    // ===== Render =====
     const tbody=document.querySelector("#reportTable tbody");
     tbody.innerHTML="";
     let totalDebt=0;
 
-    for(const doc of invSnap.docs){
-      const inv=doc.data(), id=doc.id;
-      const abonosSnap=await doc.ref.collection("abonos").get();
-      const abonos=abonosSnap.docs.map(a=>({...a.data(),_docId:a.id}));
-
-      const montoPagado=abonos.reduce((s,a)=>s+parseFloat(a.amount||0),0);
-      const saldo=parseFloat(inv.total)-montoPagado;
-      totalDebt+=saldo;
-
+    items.forEach(row=>{
       const tr=document.createElement("tr");
-      /*tr.innerHTML=`
-        <td>${id}</td>
-        <td>${inv.currency||"N/A"}</td>
-        <td>${inv.vendedor||"N/A"}</td>
-        <td>${inv.fechaStr||"N/A"}</td>
-        <td>${(+inv.total).toFixed(2)}</td>
-        <td>${montoPagado.toFixed(2)}</td>
-        <td>${saldo.toFixed(2)}</td>`;*/
-      // ===== Calcular días restantes =====
-      /*let diasCredito = 0;
-      const metodo = inv.paymentMethod || "";
-      const match = metodo.match(/\d+/); // extrae número de días del texto
-      if(match) diasCredito = parseInt(match[0]);
-      
-      const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
-      const hoy = new Date();
-      const vencimiento = new Date(fechaEmision.getTime());
-      vencimiento.setDate(vencimiento.getDate() + diasCredito);
-      
-      const diferenciaMs = vencimiento - hoy;
-      const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
-      
-      // ===== Colores de fila =====
-      if(diasRestantes < 0){
-      tr.style.backgroundColor = "#f44336"; // rojo
-      tr.style.color = "white";
-      }else if(diasRestantes <= 5){
-      tr.style.backgroundColor = "#ffeb3b"; // amarillo
-      }*/
-      // ===== Calcular días restantes =====
-let diasCredito = 0;
-const metodo = inv.paymentMethod || "";
-const match = metodo.match(/\d+/); // extrae número de días del texto
-if (match) diasCredito = parseInt(match[0]);
 
-const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
-const hoy = new Date();
-const vencimiento = new Date(fechaEmision.getTime());
-vencimiento.setDate(vencimiento.getDate() + diasCredito);
+      // Colores por estado
+      if (row.isPaid){
+        tr.style.backgroundColor = "#4CAF50"; // verde
+        tr.style.color = "white";
+      } else if (row.diasRestantes < 0){
+        tr.style.backgroundColor = "#f44336"; // rojo
+        tr.style.color = "white";
+      } else if (row.diasRestantes <= 5){
+        tr.style.backgroundColor = "#ffeb3b"; // amarillo
+      }
 
-const diferenciaMs = vencimiento - hoy;
-const diasRestantes = Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+      // Suma deuda (solo saldo > 0)
+      if (!row.isPaid) totalDebt += row.saldo;
 
-// ===== Determinar estado de la factura =====
-    let estado = "";
-    if (saldo <= 0) {
-      // ✅ Factura completamente pagada
-      tr.style.backgroundColor = "#4CAF50"; // verde
-      tr.style.color = "white";
-      estado = "–";
-    } else if (diasRestantes < 0) {
-      // 🔴 Vencida
-      tr.style.backgroundColor = "#f44336"; // rojo
-      tr.style.color = "white";
-      estado = "Vencida";
-    } else if (diasRestantes <= 5) {
-      // 🟡 A punto de vencerse
-      tr.style.backgroundColor = "#ffeb3b"; // amarillo
-      estado = diasRestantes;
-    } else {
-      estado = diasRestantes;
-    }
-      
-      /*tr.innerHTML=`
-      <td>${id}</td>
-      <td>${inv.currency||"N/A"}</td>
-      <td>${inv.vendedor||"N/A"}</td>
-      <td>${inv.fechaStr||"N/A"}</td>
-      <td>${(+inv.total).toFixed(2)}</td>
-      <td>${montoPagado.toFixed(2)}</td>
-      <td>${saldo.toFixed(2)}</td>
-      <td>${inv.paymentMethod || "N/A"}</td>
-      <td>${diasRestantes >= 0 ? diasRestantes : "Vencida"}</td>`;*/
       tr.innerHTML = `
-              <td>${id}</td>
-              <td>${inv.currency || "N/A"}</td>
-              <td>${inv.vendedor || "N/A"}</td>
-              <td>${inv.fechaStr || "N/A"}</td>
-              <td>${(+inv.total).toFixed(2)}</td>
-              <td>${montoPagado.toFixed(2)}</td>
-              <td>${saldo.toFixed(2)}</td>
-              <td>${inv.paymentMethod || "N/A"}</td>
-              <td>${estado}</td>`;
+        <td>${row.id}</td>
+        <td>${row.inv.currency || "N/A"}</td>
+        <td>${row.inv.vendedor || "N/A"}</td>
+        <td>${row.inv.fechaStr || "N/A"}</td>
+        <td>${(+row.inv.total).toFixed(2)}</td>
+        <td>${row.montoPagado.toFixed(2)}</td>
+        <td>${row.saldo.toFixed(2)}</td>
+        <td>${row.inv.paymentMethod || "N/A"}</td>
+        <td>${row.estadoTexto}</td>
+      `;
 
-      
-      tr.onclick=()=>showAbonosModal(id,abonos);
+      tr.onclick=()=>showAbonosModal(row.id,row.abonos);
       tbody.appendChild(tr);
-    }
-    totalDebtElem=document.getElementById("totalDebt");
-    //totalDebtElem.textContent=totalDebt.toFixed(2);
-    totalDebtElem.textContent= new Intl.NumberFormat('es-NI').format(totalDebt.toFixed(2));
+    });
+
+    const totalDebtElem=document.getElementById("totalDebt");
+    totalDebtElem.textContent= new Intl.NumberFormat('es-NI', {minimumFractionDigits:2, maximumFractionDigits:2})
+      .format(totalDebt);
+
     document.getElementById("reportDate").textContent="Generado el: "+new Date().toLocaleString();
     reportSection.style.display="block";
-  }catch(e){console.error(e);alert("Error generando reporte. 🔥")}
+  }catch(e){
+    console.error(e);
+    alert("Error generando reporte. 🔥");
+  }
 }
 
 /* ========= MODAL ========= */
@@ -286,6 +291,7 @@ function closeAbonosModal(){abonosModal.style.display="none";}
 /* ========= INIT ========= */
 window.onload=loadClients;
 </script>
+
 <script type="module">
   import {requireAccess} from './auth.js';
   requireAccess('reporteestadoscuenta'); 

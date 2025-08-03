@@ -49,6 +49,15 @@
     h1, h2, h3 {
       text-align: center;
     }
+
+  #modalProveedor {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999; /* suficiente para estar encima del dropdown */
+  }
+  
   </style>
 
   <script>
@@ -62,7 +71,7 @@
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
-  <h1>Gestión de Artículos y Existencias (IMEI) 📱💾</h1>
+  <h1>Gestión de Artículos y Existencias (IMEI) 💾📱💾</h1>
 
   <!-- Sección de Artículos -->
   <div class="container" id="articlesSection">
@@ -419,7 +428,7 @@
     }
 
     // Guarda todos los IMEIs pendientes en Firestore
-    function savePendingIMEIs() {
+    /*function savePendingIMEIs() {
       const articleId = document.getElementById('articleSelector').value;
       if (!articleId) {
         alert("Debes seleccionar un artículo primero 😅");
@@ -457,7 +466,86 @@
       .catch((error) => {
         console.error("Error al guardar los IMEIs: ", error);
       });
-    }
+    }*/
+    
+      function savePendingIMEIs() {
+          if (pendingIMEIs.length === 0) {
+          alert("No hay IMEIs pendientes para guardar 😬");
+          return;
+          }
+          
+          // Mostrar modal para seleccionar proveedor
+          cargarProveedoresEnModal();
+          document.getElementById("modalProveedor").style.display = "flex";
+      }
+
+      function cargarProveedoresEnModal() {
+        const select = document.getElementById("modalProveedorSelect");
+        select.innerHTML = '<option value="">Seleccione un proveedor</option>';
+        db.collection("proveedores").get().then((snapshot) => {
+          snapshot.forEach((doc) => {
+            const opt = document.createElement("option");
+            opt.value = doc.id;
+            opt.textContent = doc.data().nombreProveedor;
+            select.appendChild(opt);
+          });
+      
+          // Inicializar Select2 dentro del modal
+          $('#modalProveedorSelect').select2({
+            dropdownParent: $('#modalProveedor')
+          });
+        });
+      }
+
+      
+      function cerrarModalProveedor() {
+      document.getElementById("modalProveedor").style.display = "none";
+      }
+      
+      function confirmarGuardadoIMEIs() {
+      const proveedorId = document.getElementById("modalProveedorSelect").value;
+      const articleId = document.getElementById("articleSelector").value;
+      
+      if (!articleId) {
+      alert("Debes seleccionar un artículo primero 😅");
+      return;
+      }
+      
+      if (!proveedorId) {
+      alert("Selecciona un proveedor válido 😬");
+      return;
+      }
+      
+      let promises = [];
+      pendingIMEIs.forEach((imei) => {
+      let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
+        .then((querySnapshot) => {
+          if (!querySnapshot.empty) {
+            console.log("El IMEI ya existe:", imei);
+            return Promise.resolve(null);
+          } else {
+            return db.collection("Articulos_X_IMEI").add({
+              articleId,
+              imei,
+              proveedorId
+            });
+          }
+        });
+      promises.push(promise);
+      });
+      
+      Promise.all(promises)
+      .then(() => {
+        alert("Todos los IMEIs se guardaron exitosamente 🎉");
+        pendingIMEIs = [];
+        updatePreviewTable();
+        cerrarModalProveedor();
+        loadIMEIs(articleId);
+      })
+      .catch((err) => {
+        console.error("Error al guardar IMEIs:", err);
+      });
+      }
 
     // Función para cargar los IMEIs guardados en Firestore para un artículo dado
     function loadIMEIs(articleId) {
@@ -605,5 +693,17 @@
     import {requireAccess} from './auth.js';
     requireAccess('articulos');  
   </script>
+
+    <!-- Modal de selección de proveedor -->
+  <div id="modalProveedor" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+    background-color:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
+    <div style="background:white; padding:20px; border-radius:8px; max-width:400px; width:100%;">
+      <h3>Selecciona un proveedor</h3>
+      <select id="modalProveedorSelect" style="width:100%; padding:10px; margin-top:10px;"></select>
+      <button onclick="confirmarGuardadoIMEIs()" style="margin-top:15px;">Confirmar y Guardar</button>
+      <button onclick="cerrarModalProveedor()" style="margin-top:10px;">Cancelar</button>
+    </div>
+  </div>
+
 </body>
 </html>

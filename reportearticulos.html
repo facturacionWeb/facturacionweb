@@ -201,7 +201,7 @@
     }
 
     // Función para mostrar el modal con el listado de IMEI de un artículo
-    function showIMEIModal(articleId) {
+    /*function showIMEIModal(articleId) {
       document.getElementById('modalArticleId').innerText = articleId;
       document.getElementById('imeiList').innerHTML = '';
       
@@ -222,7 +222,46 @@
         .catch((error) => {
           console.error("Error al cargar los IMEI: ", error);
         });
+    }*/
+    function showIMEIModal(articleId) {
+      document.getElementById('modalArticleId').innerText = articleId;
+      document.getElementById('imeiList').innerHTML = '';
+    
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+        .then(async (querySnapshot) => {
+          if (querySnapshot.empty) {
+            document.getElementById('imeiList').innerHTML = '<li>No hay IMEI registrados 😬</li>';
+          } else {
+            for (const doc of querySnapshot.docs) {
+              const data = doc.data();
+              const imei = data.imei;
+              const proveedorId = data.proveedorId;
+    
+              let proveedorNombre = "N/D";
+              if (proveedorId) {
+                try {
+                  const provDoc = await db.collection("proveedores").doc(proveedorId).get();
+                  if (provDoc.exists) {
+                    proveedorNombre = provDoc.data().nombreProveedor || "Desconocido";
+                  }
+                } catch (err) {
+                  console.warn("Error obteniendo proveedor:", err);
+                }
+              }
+    
+              const li = document.createElement('li');
+              li.textContent = `IMEI: ${imei} - Proveedor: ${proveedorNombre}`;
+              document.getElementById('imeiList').appendChild(li);
+            }
+          }
+    
+          document.getElementById('imeiModal').style.display = 'block';
+        })
+        .catch((error) => {
+          console.error("Error al cargar los IMEI: ", error);
+        });
     }
+
 
     // Función para cerrar el modal
     function closeModal() {
@@ -242,7 +281,7 @@
   </script>
 </head>
 <body>
-  <h1>Reporte de Artículos</h1>
+  <h1>:: Reporte de Artículos ::</h1>
   <button onclick="loadReport()">Cargar Reporte</button>
   
   <table>

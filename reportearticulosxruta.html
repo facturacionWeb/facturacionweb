@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Reporte Artículos con Filtro de Ruta 📊</title>
+  <title>Reporte Artículos con Filtro de Ruta</title>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -43,7 +43,7 @@
     th{background:var(--b1)}
     .clickable{cursor:pointer; color:var(--link); text-decoration:underline}
 
-    /* Modal (mismo patrón que tu reporte de artículos) */
+    /* Modal */
     .modal{display:none; position:fixed; z-index:99; inset:0; background-color:rgba(0,0,0,0.5)}
     .modal-content{
       background-color:#fff; margin:10% auto; padding:20px; border:1px solid #888;
@@ -75,9 +75,8 @@
       document.getElementById(tabId).classList.add('active');
     }
 
-    // Carga todo y renderiza ambas vistas
+    // Carga y render de ambas vistas
     async function loadReport(){
-      // Limpiar tablas
       document.getElementById('tbody-imeis').innerHTML = '';
       document.getElementById('tbody-articles').innerHTML = '';
       document.getElementById('tfoot-articles').innerHTML = '';
@@ -179,7 +178,7 @@
       });
     }
 
-    // Guardar/eliminar ruta (igual que tu lógica original)
+    // Guardar/eliminar ruta
     async function saveRuta(docId, imeiValue){
       const selectElement = document.getElementById("rutaSelect_" + docId);
       const selectedRoute = selectElement.value;
@@ -202,10 +201,14 @@
       }
     }
 
-    // Vista 2: agregada por Artículo (filtrando por ruta)
+    // Vista 2: agregada por Artículo (y Ruta cuando el filtro es TODOS)
     function renderArticlesTable(filterValue){
-      // Conteo de IMEIs por artículo según filtro de ruta
-      const counts = {}; // articleId -> count
+      /*
+        counts:
+          - Si filterValue === 'TODOS' => agrupar por (articleId, ruta)
+          - Si no => agrupar solo por articleId y setear ruta = filterValue (o SIN RUTA)
+      */
+      const counts = {}; // key -> { articleId, ruta, count }
       gIMEIList.forEach(imeiData=>{
         const {docId, articleId} = imeiData;
         if (!articleId) return;
@@ -215,21 +218,32 @@
 
         if (filterValue !== "TODOS" && filterValue !== assignedRoute) return;
 
-        counts[articleId] = (counts[articleId] || 0) + 1;
+        let key, rutaForRow;
+        if (filterValue === "TODOS"){
+          rutaForRow = assignedRoute;
+          key = `${articleId}||${rutaForRow}`;
+        }else{
+          rutaForRow = filterValue; // el filtro activo
+          key = `${articleId}||${rutaForRow}`;
+        }
+
+        if (!counts[key]) counts[key] = { articleId, ruta: rutaForRow, count: 0 };
+        counts[key].count += 1;
       });
 
       // Arreglo de filas con precios y total
       let rows = [];
-      Object.keys(counts).forEach(articleId=>{
+      Object.keys(counts).forEach(key=>{
+        const { articleId, ruta, count } = counts[key];
         const a = gArticlesDict[articleId] || {};
         const precioCompra = parseFloat(a.precioCompra) || 0;
         const precioVenta  = parseFloat(a.precioVenta)  || 0;
-        const count = counts[articleId] || 0;
         const total = precioCompra * count;
         rows.push({
           id: articleId,
           marca: a.marca || '',
           modelo: a.modelo || '',
+          ruta: ruta,
           precioCompra, precioVenta, count, total
         });
       });
@@ -259,9 +273,10 @@
           <td>${r.id}</td>
           <td>${r.marca}</td>
           <td>${r.modelo}</td>
+          <td>${r.ruta}</td>
           <td>${r.precioCompra}</td>
           <td>${r.precioVenta}</td>
-          <td class="clickable" onclick="showIMEIModal('${r.id}')">${r.count}</td>
+          <td class="clickable" onclick="showIMEIModal('${r.id}','${r.ruta}')">${r.count}</td>
           <td>${r.total.toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
@@ -270,10 +285,12 @@
       const trf = document.createElement('tr');
       trf.className = 'total-row';
       trf.innerHTML = `
-        <td colspan="6" style="text-align:right">Total General:</td>
+        <td colspan="7" style="text-align:right">Total General:</td>
         <td>${grand.toFixed(2)}</td>
       `;
       tfoot.appendChild(trf);
+
+      updateSortIndicators();
     }
 
     // Sort handlers para vista 2
@@ -284,12 +301,11 @@
         currentSortColumn = column;
         currentSortDirection = 'asc';
       }
-      // Re-render con el filtro actual
       renderArticlesTable(document.getElementById('filterRoute').value);
       updateSortIndicators();
     }
     function updateSortIndicators(){
-      const cols = ['marca','modelo','precioCompra','precioVenta','count'];
+      const cols = ['marca','modelo','ruta','precioCompra','precioVenta','count'];
       cols.forEach(col=>{
         const span = document.getElementById('sort-' + col);
         if (!span) return;
@@ -297,11 +313,13 @@
       });
     }
 
-    // Modal: lista los IMEIs del artículo, filtrado por ruta actual, incluyendo proveedor (como en tu otra página)
-    async function showIMEIModal(articleId){
-      const currentFilter = document.getElementById('filterRoute').value;
+    // Modal: lista IMEIs del artículo, filtrado por ruta indicada (si viene), o por el filtro actual
+    async function showIMEIModal(articleId, rutaParam=null){
+      // Si viene la ruta del renglón (TODOS), usamos esa; si no, usamos el filtro actual
+      const rutaFiltro = rutaParam ?? document.getElementById('filterRoute').value;
 
       document.getElementById('modalArticleId').textContent = articleId;
+      document.getElementById('modalRuta').textContent = `Ruta: ${rutaFiltro}`;
       const ul = document.getElementById('imeiList');
       ul.innerHTML = '';
 
@@ -310,7 +328,6 @@
         if (qs.empty){
           ul.innerHTML = '<li class="muted">No hay IMEI registrados 😬</li>';
         }else{
-          // Recolectar y filtrar por ruta usando gRutaDict
           for (const doc of qs.docs){
             const data = doc.data();
             const docId = doc.id;
@@ -319,7 +336,9 @@
 
             let assignedRoute = gRutaDict[docId];
             if (assignedRoute === undefined) assignedRoute = "SIN RUTA";
-            if (currentFilter !== "TODOS" && currentFilter !== assignedRoute) continue;
+
+            // Filtrar por la ruta del renglón/actual
+            if (rutaFiltro !== "TODOS" && rutaFiltro !== assignedRoute) continue;
 
             // Nombre de proveedor (N/D si no hay)
             let proveedorNombre = "N/D";
@@ -338,7 +357,7 @@
           }
 
           if (!ul.children.length){
-            ul.innerHTML = '<li class="muted">No hay IMEIs para el filtro de ruta aplicado.</li>';
+            ul.innerHTML = '<li class="muted">No hay IMEIs para la ruta aplicada.</li>';
           }
         }
         document.getElementById('imeiModal').style.display = 'block';
@@ -413,6 +432,7 @@
           <th>ID del Artículo</th>
           <th style="cursor:pointer" onclick="sortTable('marca')">Marca <span id="sort-marca"></span></th>
           <th style="cursor:pointer" onclick="sortTable('modelo')">Modelo <span id="sort-modelo"></span></th>
+          <th style="cursor:pointer" onclick="sortTable('ruta')">Ruta <span id="sort-ruta"></span></th>
           <th style="cursor:pointer" onclick="sortTable('precioCompra')">Precio Compra <span id="sort-precioCompra"></span></th>
           <th style="cursor:pointer" onclick="sortTable('precioVenta')">Precio Venta <span id="sort-precioVenta"></span></th>
           <th style="cursor:pointer" onclick="sortTable('count')">Cantidad de IMEI <span id="sort-count"></span></th>
@@ -428,8 +448,9 @@
   <div id="imeiModal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeModal()">&times;</span>
-      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
-      <ul id="imeiList"></ul>
+      <h2>IMEIs del artículo <span id="modalArticleId"></span></h2>
+      <div class="muted" id="modalRuta" style="margin-top:-6px;"></div>
+      <ul id="imeiList" style="margin-top:12px;"></ul>
     </div>
   </div>
 </body>

@@ -3,28 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔍🔍 Buscar IMEI en Facturas</title>
+  <title>🔍 Buscar IMEI en Facturas 🔍</title>
+
+  <!-- Firebase SDK v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <!-- Config de Firebase -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-    .container { max-width: 900px; background: #fff; margin: auto; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .container { max-width: 980px; background: #fff; margin: auto; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
-    .invoice-body, .details-table, .items-table {
-      width: 100%; border-collapse: collapse; margin-top: 20px;
-    }
-    .details-table td, .items-table td, .items-table th {
-      border: 1px solid #ccc; padding: 8px; text-align: left;
-    }
+    .invoice-body, .details-table, .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .details-table td, .items-table td, .items-table th { border: 1px solid #ccc; padding: 8px; text-align: left; }
     .items-table th { background-color: #333; color: white; }
     .invoice-header h2 { margin: 0; }
     .signature { margin-top: 30px; text-align: center; }
+    small { color:#333 }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔍🔍 Buscar Factura por IMEI</h1>
+    <h1>🔍 Buscar Factura por IMEI</h1>
     <input type="text" id="imeiInput" placeholder="Ingresa el IMEI a buscar" />
     <button onclick="buscarFacturaPorIMEI()">Buscar IMEI 📲</button>
     <div id="facturaResultado"></div>
@@ -51,22 +52,63 @@
         const group = map.get(key);
         group.quantity += item.quantity;
         group.total += item.total;
-        group.imeis.push(item.imei);
+        if (item.imei) group.imeis.push(item.imei);
       });
       return Array.from(map.values());
+    }
+
+    // Obtiene un diccionario { IMEI: NombreProveedor || "N/D" }
+    async function obtenerProveedorPorIMEIs(imeis) {
+      const unicos = Array.from(new Set(imeis.filter(Boolean)));
+      const imeiToProvId = {};
+      const imeiToProvName = {};
+      if (unicos.length === 0) return imeiToProvName;
+
+      // Firestore 'in' admite hasta 10 valores; hacemos chunks de 10
+      for (let i = 0; i < unicos.length; i += 10) {
+        const chunk = unicos.slice(i, i + 10);
+        const snap = await db.collection("Articulos_X_IMEI")
+          .where("imei", "in", chunk)
+          .get();
+        snap.forEach(doc => {
+          const d = doc.data();
+          imeiToProvId[d.imei] = d.proveedorId || null;
+        });
+      }
+
+      // Resolvemos proveedorId -> nombreProveedor (cache simple)
+      const provIds = Array.from(new Set(Object.values(imeiToProvId).filter(Boolean)));
+      const provIdToName = {};
+      for (const pid of provIds) {
+        try {
+          const pdoc = await db.collection("proveedores").doc(pid).get();
+          provIdToName[pid] = pdoc.exists ? (pdoc.data().nombreProveedor || "N/D") : "N/D";
+        } catch (e) {
+          provIdToName[pid] = "N/D";
+        }
+      }
+
+      // Construimos el mapa final IMEI -> NombreProveedor/N/D
+      unicos.forEach(i => {
+        const pid = imeiToProvId[i];
+        imeiToProvName[i] = pid ? (provIdToName[pid] || "N/D") : "N/D";
+      });
+
+      return imeiToProvName;
     }
 
     async function buscarFacturaPorIMEI() {
       const imei = document.getElementById('imeiInput').value.trim();
       if (!imei) return alert('Debés ingresar un IMEI válido 😅');
 
+      // Buscamos entre facturas no anuladas
       const snapshot = await db.collection("facturas").where("anulada", "==", false).get();
       let facturaEncontrada = null;
       let facturaId = null;
 
       for (const doc of snapshot.docs) {
         const data = doc.data();
-        const item = data.items.find(i => i.imei === imei);
+        const item = (data.items || []).find(i => i.imei === imei);
         if (item) {
           facturaEncontrada = data;
           facturaId = doc.id;
@@ -75,22 +117,32 @@
       }
 
       if (!facturaEncontrada) {
-        document.getElementById('facturaResultado').innerHTML = `<p style="color:red;">No se encontró ninguna factura con ese IMEI 😢</p>`;
+        document.getElementById('facturaResultado').innerHTML =
+          `<p style="color:red;">No se encontró ninguna factura con ese IMEI 😢</p>`;
         return;
       }
 
+      // Cliente
       const clientDoc = await db.collection("clientes").doc(facturaEncontrada.clientId).get();
       const cliente = clientDoc.exists ? clientDoc.data() : {};
-      const symbol = facturaEncontrada.currency === 'CORD' ? 'C$' : '$';
-      const fecha = facturaEncontrada.fecha?.toDate ? facturaEncontrada.fecha.toDate() : new Date(facturaEncontrada.fecha);
 
-      const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items);
+      // Moneda & Fecha
+      const symbol = facturaEncontrada.currency === 'CORD' ? 'C$' : '$';
+      const fecha = facturaEncontrada.fecha?.toDate ? facturaEncontrada.fecha.toDate()
+                                                    : new Date(facturaEncontrada.fecha);
+
+      // Agrupamos items
+      const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items || []);
+
+      // Recolectamos todos los IMEIs de la factura para resolver proveedores
+      const todosIMEIs = itemsAgrupados.flatMap(g => g.imeis);
+      const proveedoresPorIMEI = await obtenerProveedorPorIMEIs(todosIMEIs);
 
       const html = `
         <div class="invoice-header">
           <h2>Factura - ${facturaId}</h2>
-          <p><strong>Consecutivo:</strong> ${facturaEncontrada.consecutivo}</p>
-          <p><strong>Ruta:</strong> ${facturaEncontrada.route}</p>
+          <p><strong>Consecutivo:</strong> ${facturaEncontrada.consecutivo || ''}</p>
+          <p><strong>Ruta:</strong> ${facturaEncontrada.route || ''}</p>
         </div>
         <div class="invoice-body">
           <table class="details-table">
@@ -104,7 +156,7 @@
             </tr>
             <tr>
               <td><strong>Teléfono:</strong><br>${cliente.telefono || ''}</td>
-              <td><strong>Pago:</strong><br>${facturaEncontrada.paymentMethod}</td>
+              <td><strong>Pago:</strong><br>${facturaEncontrada.paymentMethod || ''}</td>
             </tr>
           </table>
 
@@ -122,17 +174,20 @@
                 <td>
                   ${item.brand} ${item.model}<br>
                   <small>
-                    ${item.imeis.length > 0 ? 'IMEIs:<br>' + item.imeis.map(i => `- ${i}`).join('<br>') : ''}
+                    ${item.imeis.length > 0
+                      ? 'IMEIs (Proveedor):<br>' +
+                        item.imeis.map(i => `- ${i} — ${proveedoresPorIMEI[i] || 'N/D'}`).join('<br>')
+                      : ''}
                   </small>
                 </td>
-                <td>${symbol}${item.price.toFixed(2)}</td>
-                <td>${item.discount}%</td>
-                <td>${symbol}${item.total.toFixed(2)}</td>
+                <td>${symbol}${Number(item.price || 0).toFixed(2)}</td>
+                <td>${Number(item.discount || 0)}%</td>
+                <td>${symbol}${Number(item.total || 0).toFixed(2)}</td>
               </tr>
             `).join('')}
             <tr>
               <td colspan="4" style="text-align:right;"><strong>Total a Pagar:</strong></td>
-              <td><strong>${symbol}${facturaEncontrada.total.toFixed(2)}</strong></td>
+              <td><strong>${symbol}${Number(facturaEncontrada.total || 0).toFixed(2)}</strong></td>
             </tr>
           </table>
 
@@ -146,9 +201,10 @@
       document.getElementById('facturaResultado').innerHTML = html;
     }
   </script>
+
   <script type="module">
     import {requireAccess} from './auth.js';
-    requireAccess('buscar');  
+    requireAccess('buscar');
   </script>
 </body>
 </html>

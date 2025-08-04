@@ -3,254 +3,434 @@
 <head>
   <meta charset="UTF-8">
   <title>Reporte Artículos con Filtro de Ruta 📊</title>
-  
+
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
   <!-- Tu configuración de Firebase -->
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-  
+
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
+    :root{
+      --b1:#f2f2f2;
+      --c1:#222;
+      --c2:#555;
+      --tab:#e9eef7;
+      --tabActive:#cfe0ff;
+      --link:#0a58ca;
     }
-    h1 {
-      text-align: center;
+    *{box-sizing:border-box}
+    body{font-family:Arial, sans-serif; padding:20px; color:var(--c1)}
+    h1{text-align:center; margin-top:0}
+
+    /* Filtro */
+    .toolbar{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px}
+    label{font-weight:bold}
+    select{padding:6px 8px}
+
+    /* Tabs */
+    .tabs{display:flex; gap:8px; margin-top:10px; margin-bottom:6px; flex-wrap:wrap}
+    .tab-btn{
+      border:1px solid #ccc; background:var(--tab); padding:8px 12px; cursor:pointer; border-radius:8px;
     }
-    label {
-      font-weight: bold;
-      margin-right: 10px;
+    .tab-btn.active{background:var(--tabActive); border-color:#88aaff; font-weight:bold}
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+
+    /* Tabla */
+    table{width:100%; border-collapse:collapse; margin-top:10px}
+    th, td{border:1px solid #ccc; padding:8px; text-align:center}
+    th{background:var(--b1)}
+    .clickable{cursor:pointer; color:var(--link); text-decoration:underline}
+
+    /* Modal (mismo patrón que tu reporte de artículos) */
+    .modal{display:none; position:fixed; z-index:99; inset:0; background-color:rgba(0,0,0,0.5)}
+    .modal-content{
+      background-color:#fff; margin:10% auto; padding:20px; border:1px solid #888;
+      width:80%; max-width:520px; position:relative; border-radius:10px;
     }
-    select {
-      padding: 5px;
-      margin-bottom: 20px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    th {
-      background-color: #f2f2f2;
-    }
-    button {
-      padding: 5px 10px;
-      cursor: pointer;
-    }
+    .close{position:absolute; top:10px; right:14px; font-size:28px; cursor:pointer; color:#888}
+    .close:hover{color:#000}
+    .muted{color:var(--c2)}
+    .total-row td{font-weight:bold}
   </style>
-  
+
   <script>
-    // Inicializar Firestore
+    // Firestore
     const db = firebase.firestore();
 
-    // Función para cargar el reporte con filtro de Ruta
-    function loadReport() {
-      const reportTable = document.getElementById("reportTable");
-      reportTable.innerHTML = ""; // Limpiar contenido previo
+    // Estado global
+    let gArticlesDict = {};   // articleId -> Articulo
+    let gIMEIList = [];       // [{docId, articleId, imei, proveedorId?}, ...]
+    let gRutaDict = {};       // docId (de Articulos_X_IMEI) -> "SIN RUTA" | "1"..."10"
+    // Ordenamiento (solo para la vista 2)
+    let currentSortColumn = null;
+    let currentSortDirection = 'asc';
 
-      // Obtener el valor del filtro (TODOS, SIN RUTA o un número)
-      const filterValue = document.getElementById("filterRoute").value;
-      
-      // Primero obtenemos todos los artículos para armar un diccionario (clave = ID)
-      db.collection("Articulos").get()
-      .then((articlesSnapshot) => {
-        let articlesDict = {};
-        articlesSnapshot.forEach((doc) => {
-          let art = doc.data();
-          articlesDict[art.id] = art; // Usamos el campo "id" del artículo
-        });
-        // Luego obtenemos todos los registros de Articulos_X_IMEI
-        return db.collection("Articulos_X_IMEI").get().then((imeiSnapshot) => {
-          let imeiList = [];
-          imeiSnapshot.forEach((doc) => {
-            let data = doc.data();
-            data.docId = doc.id; // Guardamos el ID del documento
-            imeiList.push(data);
-          });
-          return imeiList;
-        }).then((imeiList) => {
-          // Ahora, obtenemos la información de rutas (Articulos_X_IMEI_X_Ruta)
-          return db.collection("Articulos_X_IMEI_X_Ruta").get().then((rutaSnapshot) => {
-            let rutaDict = {};
-            rutaSnapshot.forEach((doc) => {
-              let data = doc.data();
-              // Guardamos la ruta asociada al documento de Articulos_X_IMEI
-              rutaDict[doc.id] = String(data.Ruta);
-            });
-            return { imeiList, rutaDict, articlesDict };
-          });
-        });
-      })
-      .then(({ imeiList, rutaDict, articlesDict }) => {
-         // Recorrer cada registro de Articulos_X_IMEI
-         imeiList.forEach((imeiData) => {
-             const articleId = imeiData.articleId;
-             const imeiValue = imeiData.imei;
-             const docId = imeiData.docId;
-             
-             // Obtener la ruta asignada si existe; de lo contrario, "SIN RUTA"
-             let assignedRoute = rutaDict[docId];
-             if (assignedRoute === undefined) {
-                assignedRoute = "SIN RUTA";
-             }
-             
-             // Aplicar filtro: si el filtro no es "TODOS" y no coincide, se omite la fila
-             if (filterValue !== "TODOS" && filterValue !== assignedRoute) {
-                return; // Salta este registro
-             }
-             
-             // Crear la fila de la tabla
-             let row = document.createElement("tr");
-             
-             // Columna ID (del artículo)
-             let cellID = document.createElement("td");
-             cellID.textContent = articleId;
-             row.appendChild(cellID);
-             
-             // Columna Marca (desde Articulos)
-             let cellMarca = document.createElement("td");
-             cellMarca.textContent = (articlesDict[articleId] && articlesDict[articleId].marca) || "";
-             row.appendChild(cellMarca);
-             
-             // Columna Modelo (desde Articulos)
-             let cellModelo = document.createElement("td");
-             cellModelo.textContent = (articlesDict[articleId] && articlesDict[articleId].modelo) || "";
-             row.appendChild(cellModelo);
-             
-             // Columna IMEI
-             let cellIMEI = document.createElement("td");
-             cellIMEI.textContent = imeiValue;
-             row.appendChild(cellIMEI);
-             
-             // Columna Ruta: un select con opciones "SIN RUTA" y números del 1 al 10
-             let cellRuta = document.createElement("td");
-             let selectRuta = document.createElement("select");
-             selectRuta.id = "rutaSelect_" + docId;
-             
-             // Opción "SIN RUTA"
-             let optionSinRuta = document.createElement("option");
-             optionSinRuta.value = "SIN RUTA";
-             optionSinRuta.textContent = "SIN RUTA";
-             selectRuta.appendChild(optionSinRuta);
-             
-             // Opciones del 1 al 10
-             for (let i = 1; i <= 10; i++) {
-                let option = document.createElement("option");
-                option.value = i;
-                option.textContent = i;
-                selectRuta.appendChild(option);
-             }
-             // Seleccionar el valor asignado
-             selectRuta.value = assignedRoute;
-             cellRuta.appendChild(selectRuta);
-             row.appendChild(cellRuta);
-             
-             // Columna Acción: botón de Guardar
-             let cellAccion = document.createElement("td");
-             let btnGuardar = document.createElement("button");
-             btnGuardar.textContent = "Guardar";
-             btnGuardar.onclick = function() {
-                saveRuta(docId, imeiValue);
-             };
-             cellAccion.appendChild(btnGuardar);
-             row.appendChild(cellAccion);
-             
-             // Agregar la fila a la tabla
-             reportTable.appendChild(row);
-         });
-      })
-      .catch((error) => {
-         console.error("Error al cargar el reporte: ", error);
+    // Helpers UI Tabs
+    function setActiveTab(tabId){
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+      document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Carga todo y renderiza ambas vistas
+    async function loadReport(){
+      // Limpiar tablas
+      document.getElementById('tbody-imeis').innerHTML = '';
+      document.getElementById('tbody-articles').innerHTML = '';
+      document.getElementById('tfoot-articles').innerHTML = '';
+
+      const filterValue = document.getElementById('filterRoute').value;
+
+      // 1) Articulos
+      const artsSnap = await db.collection("Articulos").get();
+      gArticlesDict = {};
+      artsSnap.forEach(doc=>{
+        const a = doc.data();
+        gArticlesDict[a.id] = a;
+      });
+
+      // 2) Articulos_X_IMEI
+      const imeiSnap = await db.collection("Articulos_X_IMEI").get();
+      gIMEIList = [];
+      imeiSnap.forEach(doc=>{
+        const d = doc.data();
+        gIMEIList.push({...d, docId: doc.id});
+      });
+
+      // 3) Rutas (Articulos_X_IMEI_X_Ruta) — clave = docId del IMEI
+      const rutaSnap = await db.collection("Articulos_X_IMEI_X_Ruta").get();
+      gRutaDict = {};
+      rutaSnap.forEach(doc=>{
+        const d = doc.data();
+        gRutaDict[doc.id] = String(d.Ruta);
+      });
+
+      // Renderizar vistas
+      renderIMEITable(filterValue);
+      renderArticlesTable(filterValue);
+    }
+
+    // Vista 1: filas por IMEI (editable)
+    function renderIMEITable(filterValue){
+      const tbody = document.getElementById('tbody-imeis');
+
+      gIMEIList.forEach(imeiData=>{
+        const {docId, articleId, imei} = imeiData;
+
+        // Ruta asignada o SIN RUTA
+        let assignedRoute = gRutaDict[docId];
+        if (assignedRoute === undefined) assignedRoute = "SIN RUTA";
+
+        // Filtro
+        if (filterValue !== "TODOS" && filterValue !== assignedRoute) return;
+
+        const tr = document.createElement('tr');
+
+        // ID
+        const tdId = document.createElement('td');
+        tdId.textContent = articleId || '';
+        tr.appendChild(tdId);
+
+        // Marca
+        const tdMarca = document.createElement('td');
+        tdMarca.textContent = (gArticlesDict[articleId]?.marca) || '';
+        tr.appendChild(tdMarca);
+
+        // Modelo
+        const tdModelo = document.createElement('td');
+        tdModelo.textContent = (gArticlesDict[articleId]?.modelo) || '';
+        tr.appendChild(tdModelo);
+
+        // IMEI
+        const tdIMEI = document.createElement('td');
+        tdIMEI.textContent = imei || '';
+        tr.appendChild(tdIMEI);
+
+        // Ruta (select)
+        const tdRuta = document.createElement('td');
+        const sel = document.createElement('select');
+        sel.id = "rutaSelect_" + docId;
+        // SIN RUTA
+        const opt0 = document.createElement('option');
+        opt0.value = "SIN RUTA"; opt0.textContent = "SIN RUTA";
+        sel.appendChild(opt0);
+        // 1..10
+        for (let i=1;i<=10;i++){
+          const opt = document.createElement('option');
+          opt.value = String(i); opt.textContent = String(i);
+          sel.appendChild(opt);
+        }
+        sel.value = assignedRoute;
+        tdRuta.appendChild(sel);
+        tr.appendChild(tdRuta);
+
+        // Acción (Guardar)
+        const tdAcc = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.textContent = 'Guardar';
+        btn.onclick = ()=>saveRuta(docId, imei);
+        tdAcc.appendChild(btn);
+        tr.appendChild(tdAcc);
+
+        tbody.appendChild(tr);
       });
     }
-    
-    // Función para guardar o eliminar la ruta en Articulos_X_IMEI_X_Ruta
-    function saveRuta(docId, imeiValue) {
-      // Obtener el valor seleccionado del dropdown
-      let selectElement = document.getElementById("rutaSelect_" + docId);
-      let selectedRoute = selectElement.value;
-      
-      if (selectedRoute === "SIN RUTA") {
-        // Si se seleccionó SIN RUTA, eliminamos el registro de la colección
-        db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).delete()
-        .then(() => {
+
+    // Guardar/eliminar ruta (igual que tu lógica original)
+    async function saveRuta(docId, imeiValue){
+      const selectElement = document.getElementById("rutaSelect_" + docId);
+      const selectedRoute = selectElement.value;
+
+      try{
+        if (selectedRoute === "SIN RUTA"){
+          await db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).delete();
           alert("Registro eliminado (SIN RUTA) 😎");
-          loadReport(); // Recargar el reporte para actualizar la vista
-        })
-        .catch((error) => {
-          console.error("Error al eliminar registro: ", error);
-          alert("Error al eliminar registro.");
-        });
-      } else {
-        // Si se seleccionó un número, se guarda o actualiza el registro
-        db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).set({
-          ID: docId,
-          IMEI: imeiValue,
-          Ruta: selectedRoute
-        })
-        .then(() => {
+        }else{
+          await db.collection("Articulos_X_IMEI_X_Ruta").doc(docId).set({
+            ID: docId, IMEI: imeiValue, Ruta: selectedRoute
+          });
           alert("Registro guardado con ruta " + selectedRoute + " 👍");
-          loadReport(); // Recargar el reporte
-        })
-        .catch((error) => {
-          console.error("Error al guardar registro: ", error);
-          alert("Error al guardar registro.");
-        });
+        }
+        // Recargar para refrescar ambas vistas
+        await loadReport();
+      }catch(err){
+        console.error("Error guardando/eliminando ruta:", err);
+        alert("Ocurrió un error al persistir la ruta.");
       }
     }
-    
-    // Cargar el reporte al iniciar la página
-    window.onload = function() {
-      loadReport();
+
+    // Vista 2: agregada por Artículo (filtrando por ruta)
+    function renderArticlesTable(filterValue){
+      // Conteo de IMEIs por artículo según filtro de ruta
+      const counts = {}; // articleId -> count
+      gIMEIList.forEach(imeiData=>{
+        const {docId, articleId} = imeiData;
+        if (!articleId) return;
+
+        let assignedRoute = gRutaDict[docId];
+        if (assignedRoute === undefined) assignedRoute = "SIN RUTA";
+
+        if (filterValue !== "TODOS" && filterValue !== assignedRoute) return;
+
+        counts[articleId] = (counts[articleId] || 0) + 1;
+      });
+
+      // Arreglo de filas con precios y total
+      let rows = [];
+      Object.keys(counts).forEach(articleId=>{
+        const a = gArticlesDict[articleId] || {};
+        const precioCompra = parseFloat(a.precioCompra) || 0;
+        const precioVenta  = parseFloat(a.precioVenta)  || 0;
+        const count = counts[articleId] || 0;
+        const total = precioCompra * count;
+        rows.push({
+          id: articleId,
+          marca: a.marca || '',
+          modelo: a.modelo || '',
+          precioCompra, precioVenta, count, total
+        });
+      });
+
+      // Ordenamiento
+      if (currentSortColumn){
+        rows.sort((A,B)=>{
+          const a = A[currentSortColumn], b = B[currentSortColumn];
+          if (typeof a === 'string'){
+            return currentSortDirection === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+          }
+          return currentSortDirection === 'asc' ? (a-b) : (b-a);
+        });
+      }
+
+      // Render
+      const tbody = document.getElementById('tbody-articles');
+      const tfoot = document.getElementById('tfoot-articles');
+      tbody.innerHTML = '';
+      tfoot.innerHTML = '';
+
+      let grand = 0;
+      rows.forEach(r=>{
+        grand += r.total;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${r.id}</td>
+          <td>${r.marca}</td>
+          <td>${r.modelo}</td>
+          <td>${r.precioCompra}</td>
+          <td>${r.precioVenta}</td>
+          <td class="clickable" onclick="showIMEIModal('${r.id}')">${r.count}</td>
+          <td>${r.total.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const trf = document.createElement('tr');
+      trf.className = 'total-row';
+      trf.innerHTML = `
+        <td colspan="6" style="text-align:right">Total General:</td>
+        <td>${grand.toFixed(2)}</td>
+      `;
+      tfoot.appendChild(trf);
     }
+
+    // Sort handlers para vista 2
+    function sortTable(column){
+      if (currentSortColumn === column){
+        currentSortDirection = (currentSortDirection === 'asc') ? 'desc' : 'asc';
+      }else{
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+      }
+      // Re-render con el filtro actual
+      renderArticlesTable(document.getElementById('filterRoute').value);
+      updateSortIndicators();
+    }
+    function updateSortIndicators(){
+      const cols = ['marca','modelo','precioCompra','precioVenta','count'];
+      cols.forEach(col=>{
+        const span = document.getElementById('sort-' + col);
+        if (!span) return;
+        span.textContent = (currentSortColumn === col) ? (currentSortDirection==='asc'?' ▲':' ▼') : '';
+      });
+    }
+
+    // Modal: lista los IMEIs del artículo, filtrado por ruta actual, incluyendo proveedor (como en tu otra página)
+    async function showIMEIModal(articleId){
+      const currentFilter = document.getElementById('filterRoute').value;
+
+      document.getElementById('modalArticleId').textContent = articleId;
+      const ul = document.getElementById('imeiList');
+      ul.innerHTML = '';
+
+      try{
+        const qs = await db.collection("Articulos_X_IMEI").where("articleId","==",articleId).get();
+        if (qs.empty){
+          ul.innerHTML = '<li class="muted">No hay IMEI registrados 😬</li>';
+        }else{
+          // Recolectar y filtrar por ruta usando gRutaDict
+          for (const doc of qs.docs){
+            const data = doc.data();
+            const docId = doc.id;
+            const imei = data.imei;
+            const proveedorId = data.proveedorId;
+
+            let assignedRoute = gRutaDict[docId];
+            if (assignedRoute === undefined) assignedRoute = "SIN RUTA";
+            if (currentFilter !== "TODOS" && currentFilter !== assignedRoute) continue;
+
+            // Nombre de proveedor (N/D si no hay)
+            let proveedorNombre = "N/D";
+            if (productoTieneValor(proveedorId)){
+              try{
+                const prov = await db.collection("proveedores").doc(proveedorId).get();
+                if (prov.exists){
+                  proveedorNombre = prov.data().nombreProveedor || "Desconocido";
+                }
+              }catch(e){ console.warn("Error obteniendo proveedor:", e); }
+            }
+
+            const li = document.createElement('li');
+            li.textContent = `IMEI: ${imei} - Proveedor: ${proveedorNombre}`;
+            ul.appendChild(li);
+          }
+
+          if (!ul.children.length){
+            ul.innerHTML = '<li class="muted">No hay IMEIs para el filtro de ruta aplicado.</li>';
+          }
+        }
+        document.getElementById('imeiModal').style.display = 'block';
+      }catch(err){
+        console.error("Error al cargar IMEIs:", err);
+        ul.innerHTML = '<li class="muted">Ocurrió un error cargando los IMEIs.</li>';
+        document.getElementById('imeiModal').style.display = 'block';
+      }
+    }
+
+    function productoTieneValor(v){ return v !== undefined && v !== null && String(v).trim() !== ''; }
+
+    function closeModal(){ document.getElementById('imeiModal').style.display='none'; }
+    window.addEventListener('click', (ev)=>{
+      if (ev.target === document.getElementById('imeiModal')) closeModal();
+    });
+
+    // Init
+    window.onload = ()=>{
+      setActiveTab('tab1');
+      loadReport();
+    };
   </script>
+
   <script type="module">
     import {requireAccess} from './auth.js';
-    requireAccess('reportearticulosxruta');  
+    requireAccess('reportearticulosxruta');
   </script>
 </head>
 <body>
   <h1>Reporte Artículos con Filtro de Ruta</h1>
-  
-  <!-- Selector para filtrar por Ruta -->
-  <label for="filterRoute">Filtrar por Ruta:</label>
-  <select id="filterRoute" onchange="loadReport()">
-    <option value="TODOS">TODOS</option>
-    <option value="SIN RUTA">SIN RUTA</option>
-    <option value="1">1</option>
-    <option value="2">2</option>
-    <option value="3">3</option>
-    <option value="4">4</option>
-    <option value="5">5</option>
-    <option value="6">6</option>
-    <option value="7">7</option>
-    <option value="8">8</option>
-    <option value="9">9</option>
-    <option value="10">10</option>
-  </select>
-  
-  <!-- Tabla del reporte -->
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Marca</th>
-        <th>Modelo</th>
-        <th>IMEI</th>
-        <th>Ruta</th>
-        <th>Acción</th>
-      </tr>
-    </thead>
-    <tbody id="reportTable">
-      <!-- Se cargarán dinámicamente las filas -->
-    </tbody>
-  </table>
+
+  <div class="toolbar">
+    <label for="filterRoute">Filtrar por Ruta:</label>
+    <select id="filterRoute" onchange="loadReport()">
+      <option value="TODOS">TODOS</option>
+      <option value="SIN RUTA">SIN RUTA</option>
+      <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+      <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+      <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+      <option value="10">10</option>
+    </select>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="tab1" onclick="setActiveTab('tab1')">Vista 1 · IMEIs (editable)</button>
+    <button class="tab-btn" data-tab="tab2" onclick="setActiveTab('tab2')">Vista 2 · Resumen por Artículo</button>
+  </div>
+
+  <!-- VISTA 1: IMEIs por fila -->
+  <div id="tab1" class="tab-content active">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Marca</th>
+          <th>Modelo</th>
+          <th>IMEI</th>
+          <th>Ruta</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-imeis"></tbody>
+    </table>
+  </div>
+
+  <!-- VISTA 2: Resumen por artículo + modal de IMEIs -->
+  <div id="tab2" class="tab-content">
+    <table>
+      <thead>
+        <tr>
+          <th>ID del Artículo</th>
+          <th style="cursor:pointer" onclick="sortTable('marca')">Marca <span id="sort-marca"></span></th>
+          <th style="cursor:pointer" onclick="sortTable('modelo')">Modelo <span id="sort-modelo"></span></th>
+          <th style="cursor:pointer" onclick="sortTable('precioCompra')">Precio Compra <span id="sort-precioCompra"></span></th>
+          <th style="cursor:pointer" onclick="sortTable('precioVenta')">Precio Venta <span id="sort-precioVenta"></span></th>
+          <th style="cursor:pointer" onclick="sortTable('count')">Cantidad de IMEI <span id="sort-count"></span></th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-articles"></tbody>
+      <tfoot id="tfoot-articles"></tfoot>
+    </table>
+  </div>
+
+  <!-- Modal IMEIs -->
+  <div id="imeiModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
+      <ul id="imeiList"></ul>
+    </div>
+  </div>
 </body>
 </html>
-

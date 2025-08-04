@@ -15,6 +15,8 @@
   <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
   
   <style>
+    html { scroll-behavior: smooth; }
+
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
@@ -50,14 +52,50 @@
       text-align: center;
     }
 
-  #modalProveedor {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: 9999; /* suficiente para estar encima del dropdown */
-  }
-  
+    /* Modal proveedor encima del dropdown */
+    #modalProveedor {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 9999; /* suficiente para estar encima del dropdown */
+    }
+
+    /* Panel colapsable + scroll para el listado grande */
+    details#listadoArticulos {
+      margin-top: 16px;
+    }
+    details#listadoArticulos > summary {
+      cursor: pointer;
+      font-weight: bold;
+      padding: 8px 0;
+    }
+    .table-scroll {
+      max-height: 420px;   /* 👈 ajustable */
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+    .table-scroll table {
+      margin: 0; /* quitar margen extra dentro del contenedor scroll */
+    }
+    .table-scroll thead th {
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+
+    /* Bloque de acciones rápidas arriba */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin: 10px 0 4px 0;
+    }
+    .muted {
+      color: #666; font-size: 0.9rem;
+    }
   </style>
 
   <script>
@@ -71,11 +109,18 @@
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 </head>
 <body>
-  <h1>Gestión de Artículos y Existencias (IMEI) 💾📱💾</h1>
+  <h1>💾 Gestión de Artículos y Existencias (IMEI) 💾📱💾</h1>
 
   <!-- Sección de Artículos -->
   <div class="container" id="articlesSection">
     <h2>Gestión de Artículos</h2>
+
+    <!-- 🔎 Nuevo: Buscador rápido para editar -->
+    <label for="articleQuickEdit" class="muted">Buscar y cargar artículo para editar</label>
+    <select id="articleQuickEdit" style="width: 100%;" placeholder="Buscar artículo...">
+      <option value="">Escribe ID, marca o modelo…</option>
+    </select>
+
     <!-- Formulario para Artículos -->
     <input type="text" id="articleId" placeholder="ID del Artículo" />
     <input type="text" id="marca" placeholder="Marca" />
@@ -85,26 +130,35 @@
     <select id="proveedorSelect" style="width: 100%;" placeholder="Seleccione un Proveedor">
       <option value="">Seleccione un proveedor</option>
     </select>
-    <button onclick="addOrUpdateArticle()">Agregar/Actualizar Artículo</button>
-    <button onclick="clearArticleFields()">Limpiar Campos</button>
 
-    <!-- Tabla de Artículos -->
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Marca</th>
-          <th>Modelo</th>
-          <th>Precio Compra</th>
-          <th>Precio Venta</th>
-          <th>Proveedor</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="articleTable">
-        <!-- Las filas se cargarán dinámicamente -->
-      </tbody>
-    </table>
+    <div class="quick-actions">
+      <button onclick="addOrUpdateArticle()">Agregar/Actualizar Artículo</button>
+      <button onclick="clearArticleFields()">Limpiar Campos</button>
+      <button onclick="document.getElementById('imeiSection').scrollIntoView({behavior:'smooth'});">Ir a Gestión de Existencias (IMEI) ⤵️</button>
+    </div>
+
+    <!-- Listado grande de artículos: colapsable + scroll -->
+    <details id="listadoArticulos" open>
+      <summary>Listado de artículos (click para contraer/expandir) 📋</summary>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Marca</th>
+              <th>Modelo</th>
+              <th>Precio Compra</th>
+              <th>Precio Venta</th>
+              <th>Proveedor</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="articleTable">
+            <!-- Las filas se cargarán dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </details>
   </div>
 
   <!-- Sección de IMEI -->
@@ -152,8 +206,11 @@
     <button id="btnExportarInventario" onclick="exportarInventarioExcel()">Exportar Inventario a Excel 📤</button>
     <div id="estadoExportacionInventario" style="margin-top:10px;font-weight:bold;color:#444;"></div>
 
-    
+    <div class="quick-actions" style="margin-top:12px;">
+      <button onclick="document.getElementById('articlesSection').scrollIntoView({behavior:'smooth'});">Volver a Gestión de Artículos ⤴️</button>
+    </div>
   </div>
+
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script>
@@ -173,10 +230,12 @@
       document.getElementById('precioCompra').value = '';
       document.getElementById('precioVenta').value = '';
 
-        // ✨ Limpiar proveedor
-        document.getElementById('proveedorSelect').value = '';
-        $('#proveedorSelect').val(null).trigger('change'); // para Select2
-      
+      // ✨ Limpiar proveedor
+      document.getElementById('proveedorSelect').value = '';
+      $('#proveedorSelect').val(null).trigger('change'); // para Select2
+
+      // ✨ Limpiar selección rápida también
+      $('#articleQuickEdit').val(null).trigger('change');
     }
 
     function addOrUpdateArticle() {
@@ -215,81 +274,61 @@
       });
     }
 
-    /*function loadArticles() {
-      db.collection("Articulos").get().then((querySnapshot) => {
-        const articleTable = document.getElementById('articleTable');
-        const articleSelector = document.getElementById('articleSelector');
-        articleTable.innerHTML = '';
-        articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
-
-        querySnapshot.forEach((doc) => {
-          const article = doc.data();
-          // Agregar fila a la tabla de artículos con botones para Editar y Eliminar
-          
-          const row = `<tr>
-                        <td>${article.id}</td>
-                        <td>${article.marca}</td>
-                        <td>${article.modelo}</td>
-                        <td>${article.precioCompra}</td>
-                        <td>${article.precioVenta}</td>
-                        <td>
-                          <button onclick="editArticle('${doc.id}')">Editar</button>
-                          <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
-                        </td>
-                      </tr>`;
-          articleTable.innerHTML += row;
-          // Agregar opción al selector de artículos
-          const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
-          articleSelector.innerHTML += option;
-        });
-      }).catch((error) => {
-        console.error("Error al cargar los artículos: ", error);
-      });
-    }*/
     async function loadArticles() {
-          const articleTable = document.getElementById('articleTable');
-          const articleSelector = document.getElementById('articleSelector');
-          articleTable.innerHTML = '';
-          articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
-        
-          const querySnapshot = await db.collection("Articulos").get();
-        
-          for (const doc of querySnapshot.docs) {
-            const article = doc.data();
-            const proveedorId = article.proveedorId || '';
-            let proveedorNombre = 'Sin proveedor';
-        
-            if (proveedorId) {
-              try {
-                const provDoc = await db.collection("proveedores").doc(proveedorId).get();
-                if (provDoc.exists) {
-                  proveedorNombre = provDoc.data().nombreProveedor || 'Desconocido';
-                }
-              } catch (err) {
-                console.warn("Error obteniendo proveedor:", err);
-              }
+      const articleTable = document.getElementById('articleTable');
+      const articleSelector = document.getElementById('articleSelector');
+      const quickEdit = document.getElementById('articleQuickEdit');
+
+      articleTable.innerHTML = '';
+      articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
+      quickEdit.innerHTML = '<option value="">Escribe ID, marca o modelo…</option>';
+
+      const querySnapshot = await db.collection("Articulos").get();
+
+      for (const doc of querySnapshot.docs) {
+        const article = doc.data();
+        const proveedorId = article.proveedorId || '';
+        let proveedorNombre = 'Sin proveedor';
+
+        if (proveedorId) {
+          try {
+            const provDoc = await db.collection("proveedores").doc(proveedorId).get();
+            if (provDoc.exists) {
+              proveedorNombre = provDoc.data().nombreProveedor || 'Desconocido';
             }
-        
-            const row = `<tr>
-              <td>${article.id}</td>
-              <td>${article.marca}</td>
-              <td>${article.modelo}</td>
-              <td>${article.precioCompra}</td>
-              <td>${article.precioVenta}</td>
-              <td>${proveedorNombre}</td>
-              <td>
-                <button onclick="editArticle('${doc.id}')">Editar</button>
-                <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
-              </td>
-            </tr>`;
-            articleTable.innerHTML += row;
-        
-            // También actualizar el selector
-            const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
-            articleSelector.innerHTML += option;
+          } catch (err) {
+            console.warn("Error obteniendo proveedor:", err);
           }
         }
 
+        const row = `<tr>
+          <td>${article.id}</td>
+          <td>${article.marca}</td>
+          <td>${article.modelo}</td>
+          <td>${article.precioCompra}</td>
+          <td>${article.precioVenta}</td>
+          <td>${proveedorNombre}</td>
+          <td>
+            <button onclick="editArticle('${doc.id}')">Editar</button>
+            <button onclick="deleteArticle('${doc.id}')">Eliminar</button>
+          </td>
+        </tr>`;
+        articleTable.innerHTML += row;
+
+        // Selector IMEI
+        const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
+        articleSelector.innerHTML += option;
+
+        // 🔎 Nuevo: opciones para el buscador rápido de edición
+        const quickOpt = document.createElement('option');
+        quickOpt.value = article.id;
+        quickOpt.textContent = `${article.id} - ${article.marca} ${article.modelo}`;
+        quickEdit.appendChild(quickOpt);
+      }
+
+      // Refrescar Select2 de edición rápida tras recargar datos
+      $('#articleQuickEdit').trigger('change.select2');
+    }
 
     function editArticle(id) {
       db.collection("Articulos").doc(id).get().then((doc) => {
@@ -304,38 +343,16 @@
           // 🆕 Establecer proveedor en Select2
           document.getElementById('proveedorSelect').value = article.proveedorId || '';
           $('#proveedorSelect').trigger('change');
-          
+
+          // UX: subir al formulario y enfocar
+          document.getElementById('articlesSection').scrollIntoView({behavior:'smooth', block:'start'});
+          document.getElementById('marca').focus();
         }
       }).catch((error) => {
         console.error("Error al obtener el artículo: ", error);
       });
     }
 
-    // Función para eliminar un artículo solo si no tiene IMEIs asociados
-    /*function deleteArticle(id) {
-      // Verificar si hay IMEIs asociados al artículo
-      db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
-      .then((querySnapshot) => {
-        if (!querySnapshot.empty) {
-          alert("No se puede eliminar el artículo porque tiene IMEI asociados 😬");
-          return;
-        } else {
-          if (confirm("¿Está seguro de que desea eliminar este artículo?")) {
-            db.collection("Articulos").doc(id).delete()
-            .then(() => {
-              alert("Artículo eliminado 😊");
-              loadArticles();
-            })
-            .catch((error) => {
-              console.error("Error al eliminar el artículo: ", error);
-            });
-          }
-        }
-      })
-      .catch((error) => {
-        console.error("Error al verificar IMEIs asociados: ", error);
-      });
-    }*/
     function deleteArticle(id) {
       // Verificar si hay IMEIs asociados al artículo
       db.collection("Articulos_X_IMEI").where("articleId", "==", id).get()
@@ -380,11 +397,9 @@
       });
     }
 
-
     /* =============================
        Funciones para IMEI
        ============================= */
-    // Función para agregar IMEI a la lista pendiente (preview)
     function addIMEI() {
       const articleId = document.getElementById('articleSelector').value;
       const imei = document.getElementById('imei').value.trim();
@@ -408,7 +423,6 @@
       document.getElementById('imei').focus();
     }
 
-    // Actualiza la tabla de previsualización con los IMEIs pendientes
     function updatePreviewTable() {
       const previewTableBody = document.getElementById('previewTable').getElementsByTagName('tbody')[0];
       previewTableBody.innerHTML = '';
@@ -421,117 +435,71 @@
       });
     }
 
-    // Elimina un IMEI de la lista pendiente
     function removePendingIMEI(index) {
       pendingIMEIs.splice(index, 1);
       updatePreviewTable();
     }
 
-    // Guarda todos los IMEIs pendientes en Firestore
-    /*function savePendingIMEIs() {
-      const articleId = document.getElementById('articleSelector').value;
-      if (!articleId) {
-        alert("Debes seleccionar un artículo primero 😅");
-        return;
-      }
+    // Abrir modal de proveedor y confirmar guardado
+    function savePendingIMEIs() {
       if (pendingIMEIs.length === 0) {
         alert("No hay IMEIs pendientes para guardar 😬");
         return;
       }
-      let promises = [];
-      // Iterar sobre cada IMEI pendiente
-      pendingIMEIs.forEach((imei) => {
-        // Verificar en Firestore si el IMEI ya existe
-        let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
-        .then((querySnapshot) => {
-          if (!querySnapshot.empty) {
-            console.log("El IMEI ya existe:", imei);
-            return Promise.resolve(null);
-          } else {
-            return db.collection("Articulos_X_IMEI").add({
-              articleId: articleId,
-              imei: imei
-            });
-          }
-        });
-        promises.push(promise);
-      });
-      Promise.all(promises)
-      .then(() => {
-        alert("Todos los IMEIs pendientes han sido guardados 👍");
-        pendingIMEIs = [];
-        updatePreviewTable();
-        loadIMEIs(articleId);
-      })
-      .catch((error) => {
-        console.error("Error al guardar los IMEIs: ", error);
-      });
-    }*/
-    
-      function savePendingIMEIs() {
-          if (pendingIMEIs.length === 0) {
-          alert("No hay IMEIs pendientes para guardar 😬");
-          return;
-          }
-          
-          // Mostrar modal para seleccionar proveedor
-          cargarProveedoresEnModal();
-          document.getElementById("modalProveedor").style.display = "flex";
-      }
+      cargarProveedoresEnModal();
+      document.getElementById("modalProveedor").style.display = "flex";
+    }
 
-      function cargarProveedoresEnModal() {
-        const select = document.getElementById("modalProveedorSelect");
-        select.innerHTML = '<option value="">Seleccione un proveedor</option>';
-        db.collection("proveedores").get().then((snapshot) => {
-          snapshot.forEach((doc) => {
-            const opt = document.createElement("option");
-            opt.value = doc.id;
-            opt.textContent = doc.data().nombreProveedor;
-            select.appendChild(opt);
-          });
-      
-          // Inicializar Select2 dentro del modal
-          $('#modalProveedorSelect').select2({
-            dropdownParent: $('#modalProveedor')
-          });
+    function cargarProveedoresEnModal() {
+      const select = document.getElementById("modalProveedorSelect");
+      select.innerHTML = '<option value="">Seleccione un proveedor</option>';
+      db.collection("proveedores").get().then((snapshot) => {
+        snapshot.forEach((doc) => {
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().nombreProveedor;
+          select.appendChild(opt);
         });
-      }
+        // Inicializar Select2 dentro del modal
+        $('#modalProveedorSelect').select2({
+          dropdownParent: $('#modalProveedor')
+        });
+      });
+    }
 
-      
-      function cerrarModalProveedor() {
+    function cerrarModalProveedor() {
       document.getElementById("modalProveedor").style.display = "none";
-      }
-      
-      function confirmarGuardadoIMEIs() {
+    }
+
+    function confirmarGuardadoIMEIs() {
       const proveedorId = document.getElementById("modalProveedorSelect").value;
       const articleId = document.getElementById("articleSelector").value;
       
       if (!articleId) {
-      alert("Debes seleccionar un artículo primero 😅");
-      return;
+        alert("Debes seleccionar un artículo primero 😅");
+        return;
       }
-      
       if (!proveedorId) {
-      alert("Selecciona un proveedor válido 😬");
-      return;
+        alert("Selecciona un proveedor válido 😬");
+        return;
       }
       
       let promises = [];
       pendingIMEIs.forEach((imei) => {
-      let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
-        .then((querySnapshot) => {
-          if (!querySnapshot.empty) {
-            console.log("El IMEI ya existe:", imei);
-            return Promise.resolve(null);
-          } else {
-            return db.collection("Articulos_X_IMEI").add({
-              articleId,
-              imei,
-              proveedorId
-            });
-          }
-        });
-      promises.push(promise);
+        let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
+          .then((querySnapshot) => {
+            if (!querySnapshot.empty) {
+              console.log("El IMEI ya existe:", imei);
+              return Promise.resolve(null);
+            } else {
+              return db.collection("Articulos_X_IMEI").add({
+                articleId,
+                imei,
+                proveedorId
+              });
+            }
+          });
+        promises.push(promise);
       });
       
       Promise.all(promises)
@@ -545,9 +513,8 @@
       .catch((err) => {
         console.error("Error al guardar IMEIs:", err);
       });
-      }
+    }
 
-    // Función para cargar los IMEIs guardados en Firestore para un artículo dado
     function loadIMEIs(articleId) {
       db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
       .then((querySnapshot) => {
@@ -599,10 +566,24 @@
       }
     });
 
+    // 🔎 Nuevo: evento de edición rápida por Select2
+    function wireQuickEdit() {
+      $('#articleQuickEdit').on('change', function() {
+        const id = $(this).val();
+        if (id) {
+          editArticle(id);
+        }
+      });
+    }
+
     // Cargar los artículos al iniciar la página
     window.onload = function() {
-      $('#proveedorSelect').select2();
-      cargarProveedores(); // cargar opciones desde Firestore
+      // Inicializar select2
+      $('#proveedorSelect').select2({ placeholder: 'Seleccione un proveedor', allowClear: true, width: '100%' });
+      $('#articleQuickEdit').select2({ placeholder: 'Buscar artículo…', allowClear: true, width: '100%' });
+
+      wireQuickEdit();
+      cargarProveedores(); // cargar proveedores para el select de artículos
       loadArticles();
     };
 
@@ -686,15 +667,14 @@
       btn.disabled = false;
       btn.textContent = "Exportar Inventario a Excel 📤";
     }
-
-    
   </script>
+
   <script type="module">
     import {requireAccess} from './auth.js';
     requireAccess('articulos');  
   </script>
 
-    <!-- Modal de selección de proveedor -->
+  <!-- Modal de selección de proveedor -->
   <div id="modalProveedor" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
     background-color:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
     <div style="background:white; padding:20px; border-radius:8px; max-width:400px; width:100%;">

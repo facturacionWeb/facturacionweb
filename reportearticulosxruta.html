@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Reporte Artículos con Filtro de Ruta</title>
+  <title>Reporte Artículos con Filtro de Ruta 📊</title>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -231,20 +231,17 @@
         counts[key].count += 1;
       });
 
-      // Arreglo de filas con precios y total
+      // Arreglo de filas sin precios
       let rows = [];
       Object.keys(counts).forEach(key=>{
         const { articleId, ruta, count } = counts[key];
         const a = gArticlesDict[articleId] || {};
-        const precioCompra = parseFloat(a.precioCompra) || 0;
-        const precioVenta  = parseFloat(a.precioVenta)  || 0;
-        const total = precioCompra * count;
         rows.push({
           id: articleId,
           marca: a.marca || '',
           modelo: a.modelo || '',
           ruta: ruta,
-          precioCompra, precioVenta, count, total
+          count
         });
       });
 
@@ -265,30 +262,17 @@
       tbody.innerHTML = '';
       tfoot.innerHTML = '';
 
-      let grand = 0;
       rows.forEach(r=>{
-        grand += r.total;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${r.id}</td>
           <td>${r.marca}</td>
           <td>${r.modelo}</td>
           <td>${r.ruta}</td>
-          <td>${r.precioCompra}</td>
-          <td>${r.precioVenta}</td>
           <td class="clickable" onclick="showIMEIModal('${r.id}','${r.ruta}')">${r.count}</td>
-          <td>${r.total.toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
       });
-
-      const trf = document.createElement('tr');
-      trf.className = 'total-row';
-      trf.innerHTML = `
-        <td colspan="7" style="text-align:right">Total General:</td>
-        <td>${grand.toFixed(2)}</td>
-      `;
-      tfoot.appendChild(trf);
 
       updateSortIndicators();
     }
@@ -305,7 +289,7 @@
       updateSortIndicators();
     }
     function updateSortIndicators(){
-      const cols = ['marca','modelo','ruta','precioCompra','precioVenta','count'];
+      const cols = ['marca','modelo','ruta','count'];
       cols.forEach(col=>{
         const span = document.getElementById('sort-' + col);
         if (!span) return;
@@ -424,7 +408,7 @@
     </table>
   </div>
 
-  <!-- VISTA 2: Resumen por artículo + modal de IMEIs -->
+  <!-- VISTA 2: Resumen por artículo (sin precios ni total) + modal de IMEIs -->
   <div id="tab2" class="tab-content">
     <table>
       <thead>
@@ -433,10 +417,7 @@
           <th style="cursor:pointer" onclick="sortTable('marca')">Marca <span id="sort-marca"></span></th>
           <th style="cursor:pointer" onclick="sortTable('modelo')">Modelo <span id="sort-modelo"></span></th>
           <th style="cursor:pointer" onclick="sortTable('ruta')">Ruta <span id="sort-ruta"></span></th>
-          <th style="cursor:pointer" onclick="sortTable('precioCompra')">Precio Compra <span id="sort-precioCompra"></span></th>
-          <th style="cursor:pointer" onclick="sortTable('precioVenta')">Precio Venta <span id="sort-precioVenta"></span></th>
           <th style="cursor:pointer" onclick="sortTable('count')">Cantidad de IMEI <span id="sort-count"></span></th>
-          <th>Total</th>
         </tr>
       </thead>
       <tbody id="tbody-articles"></tbody>

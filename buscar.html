@@ -25,7 +25,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🔍 Buscar Factura por IMEI</h1>
+    <h1>🔍 Buscar Factura por IMEI 🔍</h1>
     <input type="text" id="imeiInput" placeholder="Ingresa el IMEI a buscar" />
     <button onclick="buscarFacturaPorIMEI()">Buscar IMEI 📲</button>
     <div id="facturaResultado"></div>
@@ -34,50 +34,42 @@
   <script>
     const db = firebase.firestore();
 
+    // Agrupa items por artículo/precio/desc, acumulando cantidad/total e IMEIs
     function agruparItemsFactura(items) {
       const map = new Map();
       items.forEach(item => {
-        const key = `${item.articleId}|${item.brand}|${item.model}|${item.price}|${item.discount}`;
+        const brand = item.brand || item.marca || '';
+        const model = item.model || item.modelo || '';
+        const price = Number(item.price ?? item.precioVenta ?? 0);
+        const discount = Number(item.discount ?? 0);
+
+        const key = `${item.articleId}|${brand}|${model}|${price}|${discount}`;
         if (!map.has(key)) {
           map.set(key, {
             quantity: 0,
-            brand: item.brand,
-            model: item.model,
-            price: item.price,
-            discount: item.discount,
+            brand,
+            model,
+            price,
+            discount,
             total: 0,
             imeis: []
           });
         }
         const group = map.get(key);
-        group.quantity += item.quantity;
-        group.total += item.total;
+        const qty = Number(item.quantity ?? 1);
+        const lineTotal = Number(item.total ?? (qty * price * (1 - discount/100)));
+        group.quantity += qty;
+        group.total += lineTotal;
         if (item.imei) group.imeis.push(item.imei);
       });
       return Array.from(map.values());
     }
 
-    // Obtiene un diccionario { IMEI: NombreProveedor || "N/D" }
-    async function obtenerProveedorPorIMEIs(imeis) {
-      const unicos = Array.from(new Set(imeis.filter(Boolean)));
-      const imeiToProvId = {};
-      const imeiToProvName = {};
-      if (unicos.length === 0) return imeiToProvName;
-
-      // Firestore 'in' admite hasta 10 valores; hacemos chunks de 10
-      for (let i = 0; i < unicos.length; i += 10) {
-        const chunk = unicos.slice(i, i + 10);
-        const snap = await db.collection("Articulos_X_IMEI")
-          .where("imei", "in", chunk)
-          .get();
-        snap.forEach(doc => {
-          const d = doc.data();
-          imeiToProvId[d.imei] = d.proveedorId || null;
-        });
-      }
-
-      // Resolvemos proveedorId -> nombreProveedor (cache simple)
-      const provIds = Array.from(new Set(Object.values(imeiToProvId).filter(Boolean)));
+    // Devuelve { proveedorId: nombreProveedor } usando la colección "proveedores"
+    async function mapProveedoresPorIdDesdeItems(items) {
+      const provIds = Array.from(new Set(
+        (items || []).map(i => i.proveedorId).filter(Boolean)
+      ));
       const provIdToName = {};
       for (const pid of provIds) {
         try {
@@ -87,14 +79,7 @@
           provIdToName[pid] = "N/D";
         }
       }
-
-      // Construimos el mapa final IMEI -> NombreProveedor/N/D
-      unicos.forEach(i => {
-        const pid = imeiToProvId[i];
-        imeiToProvName[i] = pid ? (provIdToName[pid] || "N/D") : "N/D";
-      });
-
-      return imeiToProvName;
+      return provIdToName;
     }
 
     async function buscarFacturaPorIMEI() {
@@ -131,12 +116,19 @@
       const fecha = facturaEncontrada.fecha?.toDate ? facturaEncontrada.fecha.toDate()
                                                     : new Date(facturaEncontrada.fecha);
 
-      // Agrupamos items
-      const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items || []);
+      // 🔑 Nombres de proveedores desde la factura (a nivel de item)
+      const provIdToName = await mapProveedoresPorIdDesdeItems(facturaEncontrada.items || []);
 
-      // Recolectamos todos los IMEIs de la factura para resolver proveedores
-      const todosIMEIs = itemsAgrupados.flatMap(g => g.imeis);
-      const proveedoresPorIMEI = await obtenerProveedorPorIMEIs(todosIMEIs);
+      // Construimos un mapa IMEI -> NombreProveedor/N/D
+      const proveedoresPorIMEI = {};
+      (facturaEncontrada.items || []).forEach(it => {
+        if (!it?.imei) return;
+        const name = it.proveedorId ? (provIdToName[it.proveedorId] || "N/D") : "N/D";
+        proveedoresPorIMEI[it.imei] = name;
+      });
+
+      // Agrupamos items para presentación
+      const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items || []);
 
       const html = `
         <div class="invoice-header">

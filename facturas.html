@@ -141,7 +141,7 @@
 <body>
   <a href="index.html">Volver a la Página Principal</a>
   <div class="container">
-    <h1>Facturación de Artículos 📄💰</h1>
+    <h1>💰 Facturación de Artículos 📄💰</h1>
     
     <!-- Sección: Crear Nueva Factura -->
     <h2>Crear Nueva Factura</h2>
@@ -366,6 +366,8 @@
         const doc = querySnapshot.docs[0];
         const imeiData = doc.data();
         const articleId = imeiData.articleId;
+        const proveedorId = imeiData.proveedorId || null;
+        
         // Consultar la información del artículo en la colección Articulos
         db.collection("Articulos").doc(articleId).get().then((docSnap) => {
           if (!docSnap.exists) {
@@ -383,7 +385,8 @@
             imeiDocId: doc.id,
             discount: 0,
             total: parseFloat(articleData.precioVenta || 0),
-            costo_compra: articleData.precioCompra || 0
+            costo_compra: articleData.precioCompra || 0,
+            proveedorId: proveedorId 
           };
           // Agregar al arreglo y actualizar tabla de previsualización
           invoicePreviewItems.push(newItem);
@@ -679,7 +682,8 @@
           price,
           discount,
           total,
-          costo_compra: parsedValue.costo_compra || 0 
+          costo_compra: parsedValue.costo_compra || 0,
+          proveedorId: parsedValue.proveedorId || null
         });
       });
 
@@ -900,7 +904,8 @@
                 if (item.imei && item.articleId) {
                   const imeiDoc = {
                     imei: item.imei,
-                    articleId: item.articleId
+                    articleId: item.articleId,
+                    proveedorId: item.proveedorId || null
                   };
               
                   // 🔍 Mostrar el contenido a insertar

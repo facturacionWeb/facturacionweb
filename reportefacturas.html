@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📊 Reporte de Facturas por Tipo y Periodo</title>
+  <title>📊 Reporte de Facturas por Tipo y Periodo 📊 </title>
   <!-- Para exportar a excel el total de facturas -->
   <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
@@ -23,7 +23,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>📋 Reporte de Facturas (Crédito vs Contado)</h1>
+    <h1>📋 Reporte de Facturas (Crédito vs Contado) 📊 </h1>
 
     <label for="startDate">Desde:</label>
     <input type="date" id="startDate">
@@ -60,8 +60,8 @@
 
   <script>
     const db = firebase.firestore();
-
-    async function generarReporte() {
+    
+   /* async function generarReporte() {
       const startInput = document.getElementById('startDate').value;
       const endInput = document.getElementById('endDate').value;
       
@@ -102,21 +102,9 @@
           }
         }
 
-        //const nombreCliente = cliente.exists ? cliente.data().nombreCliente : f.clientId;
-
         const saldoPendiente = f.paymentType === "Credito" ? f.saldo : 0;
         const pagado = f.total - saldoPendiente;
 
-        /*tbody.innerHTML += `
-          <tr>
-            <td>${nombreCliente}</td>
-            <td>${f.consecutivo || 'N/A'}</td>
-            <td>${f.paymentType}</td>
-            <td>${f.total.toFixed(2)}</td>
-            <td>${saldoPendiente.toFixed(2)}</td>
-            <td>${pagado.toFixed(2)}</td>
-          </tr>
-        `;*/
         tbody.innerHTML += `
           <tr>
             <td>${nombreCliente}</td>
@@ -137,97 +125,8 @@
       document.getElementById('totalMonto').textContent = new Intl.NumberFormat('es-NI').format(totalMonto.toFixed(2));//totalMonto.toFixed(2);
       document.getElementById('totalPendiente').textContent = new Intl.NumberFormat('es-NI').format(totalPendiente.toFixed(2)); //totalPendiente.toFixed(2);
       document.getElementById('totalPagado').textContent = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2)); //totalPagado.toFixed(2);
-    }
-
-   /* async function exportarExcel() {
-  const btn = document.getElementById("btnExportar");
-  const estado = document.getElementById("estadoExportacion");
-  const startInput = document.getElementById('startDate').value;
-  const endInput = document.getElementById('endDate').value;
-
-  if (!startInput || !endInput) {
-    alert('Por favor selecciona la fecha inicial y final para exportar.');
-    return;
-  }
-
-  // 🔄 Mostrar mensaje de carga
-  btn.disabled = true;
-  btn.textContent = "Exportando... ⏳";
-  estado.textContent = "Generando el archivo Excel, por favor espera...";
-  estado.style.color = "#333";
-
-  try {
-    const fechaInicio = new Date(startInput);
-    const fechaFin = new Date(endInput);
-    fechaFin.setHours(23, 59, 59, 999);
-
-    const snapshot = await db.collection("facturas")
-      .where("fecha", ">=", fechaInicio)
-      .where("fecha", "<=", fechaFin)
-      .where("anulada", "==", false)
-      .orderBy("fecha", "asc")
-      .get();
-
-    let facturasPorMes = {};
-    for (const doc of snapshot.docs) {
-      const f = doc.data();
-
-      let nombreCliente = "Cliente desconocido";
-      if (f.clientId) {
-        try {
-          const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
-          nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
-        } catch (e) {
-          nombreCliente = f.clientId;
-        }
-      }
-
-      const fecha = f.fecha.toDate();
-      const mesClave = `${fecha.getFullYear()}-${(fecha.getMonth() + 1).toString().padStart(2, '0')}`;
-
-      if (!facturasPorMes[mesClave]) facturasPorMes[mesClave] = [];
-
-      facturasPorMes[mesClave].push({
-        fechaFactura: fecha.toLocaleDateString('es-NI'),
-        cliente: nombreCliente,
-        total: f.total
-      });
-    }
-
-    let hoja = [["Fecha Factura", "Nombre del Cliente", "Total C$"]];
-    for (const mes in facturasPorMes) {
-      hoja.push([`Mes: ${mes}`, "", ""]);
-      let totalMes = 0;
-      for (const f of facturasPorMes[mes]) {
-        hoja.push([f.fechaFactura, f.cliente, f.total]);
-        totalMes += f.total;
-      }
-      hoja.push(["TOTAL MES", "", totalMes]);
-      hoja.push([]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(hoja);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "ReporteFacturas");
-
-    const nombreArchivo = `Reporte_Facturas_${startInput}_a_${endInput}.xlsx`;
-    XLSX.writeFile(wb, nombreArchivo);
-
-    // ✅ Finalizado
-    estado.textContent = "✔️ ¡Archivo Excel generado con éxito!";
-    estado.style.color = "green";
-
-  } catch (err) {
-    console.error(err);
-    estado.textContent = "❌ Error al generar el archivo. Revisá la consola.";
-    estado.style.color = "red";
-  }
-
-  // 🔁 Restaurar el botón
-  btn.disabled = false;
-  btn.textContent = "Exportar a Excel 📥";
-}*/
-
+    }*/
+/*
     async function exportarExcel() {
   const btn = document.getElementById("btnExportar");
   const estado = document.getElementById("estadoExportacion");
@@ -321,8 +220,257 @@
 
   btn.disabled = false;
   btn.textContent = "Exportar a Excel 📥";
-}
+}*/
+  async function generarReporte() {
+    // Firestore
+    const db = firebase.firestore();
+  
+    // --- Helpers internos (sin dependencias externas) ---
+    function parseLocalDate(yyyyMmDd) {
+      const [y, m, d] = yyyyMmDd.split('-').map(Number);
+      return new Date(y, m - 1, d, 0, 0, 0, 0); // medianoche LOCAL
+    }
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[m]));
+    }
+    const nf = new Intl.NumberFormat('es-NI', { minimumFractionDigits: 0 });
+  
+    // --- Entradas ---
+    const startInput = document.getElementById('startDate')?.value;
+    const endInput   = document.getElementById('endDate')?.value;
+    if (!startInput || !endInput) {
+      alert('Por favor selecciona la fecha inicial y la fecha final.');
+      return;
+    }
+  
+    // --- Rango de fechas con fin EXCLUSIVO ---
+    const start = parseLocalDate(startInput);
+    const endExclusive = parseLocalDate(endInput);
+    endExclusive.setDate(endExclusive.getDate() + 1); // día siguiente (exclusivo)
+  
+    // --- Query principal ---
+    const snap = await db.collection('facturas')
+      .where('anulada', '==', false)
+      .where('fecha', '>=', start)
+      .where('fecha', '<',  endExclusive)   // ← fin EXCLUSIVO
+      .orderBy('fecha', 'asc')
+      .get();
+  
+    // --- Normalización de filas ---
+    const rows = [];
+    let totalCredito = 0, totalContado = 0;
+  
+    snap.forEach((doc) => {
+      const x = doc.data() || {};
+      const fechaObj = x.fecha && typeof x.fecha.toDate === 'function' ? x.fecha.toDate() : null;
+      const fechaYMD = fechaObj ? fechaObj.toISOString().slice(0, 10) : '';
+      const consecutivo = x.consecutivo || '';
+      const cliente = x.clienteNombre || x.cliente || '';
+      const tipoRaw = (x.tipo || '').toString().toLowerCase();
+  
+      // Tomamos el monto base desde el campo disponible
+      const montoBase = (typeof x.total === 'number') ? x.total
+                       : (typeof x.monto === 'number') ? x.monto
+                       : (typeof x.montoTotal === 'number') ? x.montoTotal
+                       : 0;
+  
+      // Soporta esquemas con montoCredito/montoContado o tipo = 'Credito'/'Contado'
+      let credito = 0, contado = 0;
+      if (typeof x.montoCredito === 'number' || typeof x.montoContado === 'number') {
+        credito = x.montoCredito || 0;
+        contado = x.montoContado || 0;
+      } else if (tipoRaw.includes('credi')) {
+        credito = montoBase;
+      } else {
+        contado = montoBase; // por defecto tratamos como contado
+      }
+  
+      totalCredito += credito;
+      totalContado += contado;
+  
+      rows.push({
+        Fecha: fechaYMD,
+        Consecutivo: consecutivo,
+        Cliente: cliente,
+        Tipo: credito > 0 ? 'Credito' : (contado > 0 ? 'Contado' : (x.tipo || '')),
+        Credito: credito,
+        Contado: contado,
+        Total: credito + contado
+      });
+    });
+  
+    // --- Render en tabla (si existe el contenedor) ---
+    const container = document.getElementById('reporteTabla') 
+                   || document.getElementById('resultado') 
+                   || document.getElementById('tablaReporte');
+  
+    if (!container) {
+      // Fallback: mostrar en consola si no hay contenedor en el DOM
+      console.table(rows);
+      console.log('Totales -> Crédito:', totalCredito, 'Contado:', totalContado, 'Total:', totalCredito + totalContado);
+      return;
+    }
+  
+    let html = '';
+    html += '<table class="table table-striped table-bordered" style="width:100%">';
+    html += '<thead><tr>';
+    html += '<th>Cliente</th><th>Consecutivo</th><th>Tipo</th><th>Crédito</th><th>Contado</th><th>Total</th>';
+    html += '</tr></thead><tbody>';
+  
+    for (const r of rows) {
+      html += `<tr>
+        <td>${escapeHtml(r.Cliente)}</td>
+        <td>${escapeHtml(r.Consecutivo)}</td>
+        <td>${escapeHtml(r.Tipo)}</td>
+        <td style="text-align:right">${nf.format(r.Credito)}</td>
+        <td style="text-align:right">${nf.format(r.Contado)}</td>
+        <td style="text-align:right">${nf.format(r.Total)}</td>
+      </tr>`;
+    }
+  
+    html += '</tbody>';
+    html += `<tfoot>
+      <tr>
+        <th colspan="3" style="text-align:right">Totales</th>
+        <th style="text-align:right">${nf.format(totalCredito)}</th>
+        <th style="text-align:right">${nf.format(totalContado)}</th>
+        <th style="text-align:right">${nf.format(totalCredito + totalContado)}</th>
+      </tr>
+    </tfoot>`;
+    html += '</table>';
+  
+    container.innerHTML = html;
+  }
 
+    async function exportarExcel() {
+    const db = firebase.firestore();
+  
+    // --- Helpers ---
+    function parseLocalDate(yyyyMmDd) {
+      const [y, m, d] = yyyyMmDd.split('-').map(Number);
+      return new Date(y, m - 1, d, 0, 0, 0, 0); // medianoche LOCAL
+    }
+    async function ensureXLSX() {
+      if (window.XLSX) return;
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+  
+    // --- Entradas ---
+    const startInput = document.getElementById('startDate')?.value;
+    const endInput   = document.getElementById('endDate')?.value;
+    if (!startInput || !endInput) {
+      alert('Por favor selecciona la fecha inicial y la fecha final.');
+      return;
+    }
+  
+    // --- Rango con fin EXCLUSIVO ---
+    const start = parseLocalDate(startInput);
+    const endExclusive = parseLocalDate(endInput);
+    endExclusive.setDate(endExclusive.getDate() + 1);
+  
+    // --- Query (mismo filtro que la vista) ---
+    const snap = await db.collection('facturas')
+      .where('anulada', '==', false)
+      .where('fecha', '>=', start)
+      .where('fecha', '<',  endExclusive)
+      .orderBy('fecha', 'asc')
+      .get();
+  
+    // --- Arreglo de filas y totales ---
+    const rows = [];
+    let totalCredito = 0, totalContado = 0;
+  
+    snap.forEach((doc) => {
+      const x = doc.data() || {};
+      const fechaObj = x.fecha && typeof x.fecha.toDate === 'function' ? x.fecha.toDate() : null;
+      const fechaYMD = fechaObj ? fechaObj.toISOString().slice(0, 10) : '';
+      const consecutivo = x.consecutivo || '';
+      const cliente = x.clienteNombre || x.cliente || '';
+      const tipoRaw = (x.tipo || '').toString().toLowerCase();
+  
+      const montoBase = (typeof x.total === 'number') ? x.total
+                       : (typeof x.monto === 'number') ? x.monto
+                       : (typeof x.montoTotal === 'number') ? x.montoTotal
+                       : 0;
+  
+      let credito = 0, contado = 0;
+      if (typeof x.montoCredito === 'number' || typeof x.montoContado === 'number') {
+        credito = x.montoCredito || 0;
+        contado = x.montoContado || 0;
+      } else if (tipoRaw.includes('credi')) {
+        credito = montoBase;
+      } else {
+        contado = montoBase;
+      }
+  
+      totalCredito += credito;
+      totalContado += contado;
+  
+      rows.push({
+        Fecha: fechaYMD,
+        Consecutivo: consecutivo,
+        Cliente: cliente,
+        Tipo: credito > 0 ? 'Credito' : (contado > 0 ? 'Contado' : (x.tipo || '')),
+        Credito: credito,
+        Contado: contado,
+        Total: credito + contado
+      });
+    });
+  
+    // Agregar fila de totales al final
+    rows.push({
+      Fecha: '',
+      Consecutivo: '',
+      Cliente: '',
+      Tipo: 'Totales',
+      Credito: totalCredito,
+      Contado: totalContado,
+      Total: totalCredito + totalContado
+    });
+  
+    // --- Generar Excel (.xlsx) con SheetJS ---
+    await ensureXLSX();
+  
+    const headers = ['Fecha','Consecutivo','Cliente','Tipo','Credito','Contado','Total'];
+    const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+  
+    // Anchos de columna
+    ws['!cols'] = [
+      { wch: 12 }, // Fecha
+      { wch: 22 }, // Consecutivo
+      { wch: 32 }, // Cliente
+      { wch: 10 }, // Tipo
+      { wch: 14 }, // Credito
+      { wch: 14 }, // Contado
+      { wch: 14 }  // Total
+    ];
+  
+    // Formato numérico para columnas de dinero
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    // E,F,G son las columnas 5,6,7 (1-indexed en Excel)
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) { // +1 para saltar encabezados
+      ['E','F','G'].forEach(letter => {
+        const cell = ws[letter + (R + 1)]; // filas son 1-indexed
+        if (cell && typeof cell.v === 'number') cell.z = '#,##0';
+      });
+    }
+  
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+  
+    XLSX.writeFile(
+      wb,
+      `reporte_facturas_credito_vs_contado_${startInput}_al_${endInput}.xlsx`
+    );
+  }
     
   </script>
 

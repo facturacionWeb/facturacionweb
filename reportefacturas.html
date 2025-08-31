@@ -23,7 +23,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>📋 Reporte de Facturas (Crédito vs Contado) 📋 </h1>
+    <h1>📋 Reporte de Facturas (Crédito vs Contado) 📋📋 </h1>
 
     <label for="startDate">Desde:</label>
     <input type="date" id="startDate">
@@ -128,7 +128,9 @@
       document.getElementById('totalPagado').textContent    = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2));
     }
   
-    // ✅ FIX espejo para Excel: mismos límites en LOCAL + fin exclusivo
+   // Caché simple para nombres de clientes
+    window.clientNameMap = window.clientNameMap || {};
+  
     async function exportarExcel() {
       const btn    = document.getElementById("btnExportar");
       const estado = document.getElementById("estadoExportacion");
@@ -146,7 +148,7 @@
       estado.style.color = "#333";
   
       try {
-        // Límites locales + fin exclusivo
+        // ✅ Límites en horario local + fin EXCLUSIVO
         const [y1, m1, d1] = startInput.split('-').map(Number);
         const [y2, m2, d2] = endInput.split('-').map(Number);
         const fechaInicio  = new Date(y1, m1 - 1, d1, 0, 0, 0, 0);
@@ -154,53 +156,62 @@
   
         const snapshot = await db.collection("facturas")
           .where("fecha", ">=", fechaInicio)
-          .where("fecha", "<",  fechaFinExcl)   // 👈 exclusivo
+          .where("fecha", "<",  fechaFinExcl)
           .where("anulada", "==", false)
           .orderBy("fecha", "asc")
           .get();
   
-        let facturasPorMes = {};
-  
-        for (const doc of snapshot.docs) {
+        // ✅ Resolver nombres de clientes en paralelo y cachear
+        const ids = new Set();
+        snapshot.forEach(doc => {
           const f = doc.data();
-  
-          let nombreCliente = "Cliente desconocido";
-          if (f.clientId) {
-            try {
-              const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
-              nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
-            } catch (e) {
-              nombreCliente = f.clientId;
-            }
-          }
-  
-          const fechaReal = f.fecha.toDate(); // para agrupar/mostrar
-          const mesClave  = `${fechaReal.getFullYear()}-${(fechaReal.getMonth() + 1).toString().padStart(2, '0')}`;
-  
-          if (!facturasPorMes[mesClave]) facturasPorMes[mesClave] = [];
-  
-          facturasPorMes[mesClave].push({
-            fechaFactura: fechaReal.toLocaleDateString('es-NI'),
-            cliente: nombreCliente,
-            consecutivo: f.consecutivo || 'N/A',
-            tipo: f.paymentType || 'N/D',
-            total: f.total || 0
+          if (f.clientId && !window.clientNameMap[f.clientId]) ids.add(f.clientId);
+        });
+        if (ids.size > 0) {
+          const idArr = Array.from(ids);
+          const snaps = await Promise.all(idArr.map(id => db.collection("clientes").doc(id).get()));
+          snaps.forEach((s, i) => {
+            const id = idArr[i];
+            window.clientNameMap[id] = s.exists ? (s.data().nombreCliente || id) : id;
           });
         }
   
-        let hoja = [["Fecha Factura", "Cliente", "Consecutivo", "Tipo Factura", "Monto C$"]];
+        // ✅ Mismas columnas que el reporte (6 columnas fijas)
+        const hoja = [
+          ["Cliente", "Consecutivo", "Tipo", "Monto C$", "Saldo Pendiente C$", "Saldo Pagado C$"]
+        ];
   
-        for (const mes in facturasPorMes) {
-          hoja.push([`Mes: ${mes}`, "", "", "", ""]);
-          let totalMes = 0;
-          for (const f of facturasPorMes[mes]) {
-            hoja.push([f.fechaFactura, f.cliente, f.consecutivo, f.tipo, f.total]);
-            totalMes += f.total;
-          }
-          hoja.push(["TOTAL MES", "", "", "", totalMes]);
-          hoja.push([]);
-        }
+        let totalMonto = 0, totalPendiente = 0, totalPagado = 0;
   
+        snapshot.forEach(doc => {
+          const f = doc.data();
+  
+          const total     = Number(f.total || 0);
+          const pendiente = (f.paymentType === "Credito") ? Number(f.saldo || 0) : 0;
+          const pagado    = total - pendiente;
+  
+          const nombre = f.clientId
+            ? (window.clientNameMap[f.clientId] || f.clientId)
+            : "Cliente desconocido";
+  
+          hoja.push([
+            nombre,
+            f.consecutivo || 'N/A',
+            f.paymentType || 'N/D',
+            total,
+            pendiente,
+            pagado
+          ]);
+  
+          totalMonto     += total;
+          totalPendiente += pendiente;
+          totalPagado    += pagado;
+        });
+  
+        // Fila de totales (misma cantidad de columnas)
+        hoja.push(["Totales", "", "", totalMonto, totalPendiente, totalPagado]);
+  
+        // Exportar (dejar números como números para que Excel formatee)
         const ws = XLSX.utils.aoa_to_sheet(hoja);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "ReporteFacturas");

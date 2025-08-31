@@ -284,6 +284,10 @@
       <option value="Credito">Crédito</option>
     </select>
 
+    <!-- 🔥 Nuevo: Filtro por Cliente -->
+    <label for="filterClient">Cliente:</label>
+    <select id="filterClient" style="width:100%"></select>
+
     <button onclick="filterInvoices()">Filtrar Facturas 🔍</button>
 
     <table id="invoicesTable">
@@ -944,6 +948,9 @@
       const filterAnulada = document.getElementById('filterAnulada').value;
       const filterPaymentMethod = document.getElementById('filterPaymentMethod').value;
 
+      const filterClient = document.getElementById('filterClient').value;
+
+      
       let query = db.collection("facturas");
 
       if (filterDate) {
@@ -958,6 +965,10 @@
       }
       if (filterPaymentMethod) {
         query = query.where("paymentType", "==", filterPaymentMethod);
+      }
+
+      if (filterClient) {
+        query = query.where("clientId", "==", filterClient);
       }
 
       query = query.orderBy("fecha", "desc");
@@ -1521,6 +1532,8 @@
       loadClients();          // Para facturación
       loadInvoices();         // Para listado de facturas
       $('#clientSelect').select2(); // 🪄 Activar Select2
+      loadClientsFilter();
+      
     };
 
 
@@ -1581,9 +1594,39 @@
   });
 }
 
-
-
+  // 🆕 Poblar el filtro de clientes (con opción -- Todos --)
+  function loadClientsFilter() {
+      const select = document.getElementById("filterClient");
+      if (!select) return;
     
+      // Limpia y agrega "-- Todos --"
+      select.innerHTML = "";
+      const optAll = document.createElement("option");
+      optAll.value = "";
+      optAll.text = "-- Todos --";
+      select.appendChild(optAll);
+    
+      // Cargar clientes
+      db.collection("clientes").get().then((qs) => {
+        qs.forEach((doc) => {
+          const c = doc.data();
+          const fullName = `${c.nombreCliente} - ${c.nombreTienda || ""}`.trim();
+          // Completar el mapa para la grilla
+          window.clientNameMap[doc.id] = fullName;
+    
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.text = fullName;
+          select.appendChild(opt);
+        });
+    
+        // Si ya usás Select2, activalo también aquí
+        if (window.$ && $("#filterClient").select2) {
+          $("#filterClient").select2();
+        }
+      });
+  }
+ 
   </script>
 
   <script type="module">

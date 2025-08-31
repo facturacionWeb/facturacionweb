@@ -23,7 +23,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>📋 Reporte de Facturas (Crédito vs Contado) 📊 </h1>
+    <h1>📋 Reporte de Facturas (Crédito vs Contado) 📋 </h1>
 
     <label for="startDate">Desde:</label>
     <input type="date" id="startDate">
@@ -60,7 +60,167 @@
 
   <script>
     const db = firebase.firestore();
+
+    // ✅ FIX: límites de día en horario local + fin exclusivo
+    async function generarReporte() {
+      const startInput = document.getElementById('startDate').value;
+      const endInput   = document.getElementById('endDate').value;
+  
+      if (!startInput || !endInput) {
+        alert('Por favor selecciona la fecha inicial y la fecha final.');
+        return;
+      }
+  
+      // Construir fechas en LOCAL (no UTC) y hacer el fin EXCLUSIVO
+      const [y1, m1, d1] = startInput.split('-').map(Number);
+      const [y2, m2, d2] = endInput.split('-').map(Number);
+      const fechaInicio   = new Date(y1, m1 - 1, d1, 0, 0, 0, 0);      // 00:00 local
+      const fechaFinExcl  = new Date(y2, m2 - 1, d2 + 1, 0, 0, 0, 0);  // 00:00 del día siguiente (exclusivo)
+  
+      const snapshot = await db.collection("facturas")
+        .where("fecha", ">=", fechaInicio)
+        .where("fecha", "<",  fechaFinExcl)   // 👈 exclusivo
+        .where("anulada", "==", false)
+        .orderBy("fecha", "desc")
+        .get();
+  
+      const tbody = document.querySelector('#reporteFacturas tbody');
+      tbody.innerHTML = "";
+  
+      let totalMonto = 0, totalPendiente = 0, totalPagado = 0;
+  
+      for (const doc of snapshot.docs) {
+        const f = doc.data();
+  
+        // Resolver nombre del cliente con fallback
+        let nombreCliente = "Cliente desconocido";
+        if (f.clientId) {
+          try {
+            const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
+            nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
+          } catch (e) {
+            console.warn(`Error al obtener cliente ${f.clientId}:`, e);
+            nombreCliente = f.clientId;
+          }
+        }
+  
+        const saldoPendiente = f.paymentType === "Credito" ? (f.saldo || 0) : 0;
+        const pagado = (f.total || 0) - saldoPendiente;
+  
+        tbody.innerHTML += `
+          <tr>
+            <td>${nombreCliente}</td>
+            <td>${f.consecutivo || 'N/A'}</td>
+            <td>${f.paymentType || 'N/D'}</td>
+            <td>${new Intl.NumberFormat('es-NI').format((f.total || 0).toFixed(2))}</td>
+            <td>${new Intl.NumberFormat('es-NI').format(saldoPendiente.toFixed(2))}</td>
+            <td>${new Intl.NumberFormat('es-NI').format(pagado.toFixed(2))}</td>
+          </tr>
+        `;
+  
+        totalMonto     += (f.total || 0);
+        totalPendiente += saldoPendiente;
+        totalPagado    += pagado;
+      }
+  
+      document.getElementById('totalMonto').textContent     = new Intl.NumberFormat('es-NI').format(totalMonto.toFixed(2));
+      document.getElementById('totalPendiente').textContent = new Intl.NumberFormat('es-NI').format(totalPendiente.toFixed(2));
+      document.getElementById('totalPagado').textContent    = new Intl.NumberFormat('es-NI').format(totalPagado.toFixed(2));
+    }
+  
+    // ✅ FIX espejo para Excel: mismos límites en LOCAL + fin exclusivo
+    async function exportarExcel() {
+      const btn    = document.getElementById("btnExportar");
+      const estado = document.getElementById("estadoExportacion");
+      const startInput = document.getElementById('startDate').value;
+      const endInput   = document.getElementById('endDate').value;
+  
+      if (!startInput || !endInput) {
+        alert('Por favor selecciona la fecha inicial y final para exportar.');
+        return;
+      }
+  
+      btn.disabled = true;
+      btn.textContent = "Exportando... ⏳";
+      estado.textContent = "Generando el archivo Excel, por favor espera...";
+      estado.style.color = "#333";
+  
+      try {
+        // Límites locales + fin exclusivo
+        const [y1, m1, d1] = startInput.split('-').map(Number);
+        const [y2, m2, d2] = endInput.split('-').map(Number);
+        const fechaInicio  = new Date(y1, m1 - 1, d1, 0, 0, 0, 0);
+        const fechaFinExcl = new Date(y2, m2 - 1, d2 + 1, 0, 0, 0, 0);
+  
+        const snapshot = await db.collection("facturas")
+          .where("fecha", ">=", fechaInicio)
+          .where("fecha", "<",  fechaFinExcl)   // 👈 exclusivo
+          .where("anulada", "==", false)
+          .orderBy("fecha", "asc")
+          .get();
+  
+        let facturasPorMes = {};
+  
+        for (const doc of snapshot.docs) {
+          const f = doc.data();
+  
+          let nombreCliente = "Cliente desconocido";
+          if (f.clientId) {
+            try {
+              const clienteDoc = await db.collection("clientes").doc(f.clientId).get();
+              nombreCliente = clienteDoc.exists ? clienteDoc.data().nombreCliente : f.clientId;
+            } catch (e) {
+              nombreCliente = f.clientId;
+            }
+          }
+  
+          const fechaReal = f.fecha.toDate(); // para agrupar/mostrar
+          const mesClave  = `${fechaReal.getFullYear()}-${(fechaReal.getMonth() + 1).toString().padStart(2, '0')}`;
+  
+          if (!facturasPorMes[mesClave]) facturasPorMes[mesClave] = [];
+  
+          facturasPorMes[mesClave].push({
+            fechaFactura: fechaReal.toLocaleDateString('es-NI'),
+            cliente: nombreCliente,
+            consecutivo: f.consecutivo || 'N/A',
+            tipo: f.paymentType || 'N/D',
+            total: f.total || 0
+          });
+        }
+  
+        let hoja = [["Fecha Factura", "Cliente", "Consecutivo", "Tipo Factura", "Monto C$"]];
+  
+        for (const mes in facturasPorMes) {
+          hoja.push([`Mes: ${mes}`, "", "", "", ""]);
+          let totalMes = 0;
+          for (const f of facturasPorMes[mes]) {
+            hoja.push([f.fechaFactura, f.cliente, f.consecutivo, f.tipo, f.total]);
+            totalMes += f.total;
+          }
+          hoja.push(["TOTAL MES", "", "", "", totalMes]);
+          hoja.push([]);
+        }
+  
+        const ws = XLSX.utils.aoa_to_sheet(hoja);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "ReporteFacturas");
+  
+        const nombreArchivo = `Reporte_Facturas_${startInput}_a_${endInput}.xlsx`;
+        XLSX.writeFile(wb, nombreArchivo);
+  
+        estado.textContent = "✔️ ¡Archivo Excel generado con éxito!";
+        estado.style.color = "green";
+      } catch (err) {
+        console.error(err);
+        estado.textContent = "❌ Error al generar el archivo. Revisá la consola.";
+        estado.style.color = "red";
+      }
+  
+      btn.disabled = false;
+      btn.textContent = "Exportar a Excel 📥";
+    }
     
+    /*
     async function generarReporte() {
       const startInput = document.getElementById('startDate').value;
       const endInput = document.getElementById('endDate').value;
@@ -220,7 +380,7 @@
 
   btn.disabled = false;
   btn.textContent = "Exportar a Excel 📥";
-}
+}*/
   
     
   </script>

@@ -1612,7 +1612,7 @@
           const c = doc.data();
           const fullName = `${c.nombreCliente} - ${c.nombreTienda || ""}`.trim();
           // Completar el mapa para la grilla
-          window.clientNameMap[doc.id] = fullName;
+          clientNameMap[doc.id] = fullName;
     
           const opt = document.createElement("option");
           opt.value = doc.id;

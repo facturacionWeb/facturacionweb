@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1> Registrar Abonos 💸</h1>
+  <h1> Registrar Abonos 💸💸💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -1055,7 +1055,7 @@ function setupHistorialInfiniteScroll() {
   }*/
   
   /************* Aplicar (transacción multi-doc) *************/
-  async function aplicarAbonos() {
+  /*async function aplicarAbonos() {
     const abonos = multiFacturas.filter(f => f.abono > 0);
     if (abonos.length === 0) {
       alert('No hay abonos propuestos.');
@@ -1129,8 +1129,106 @@ function setupHistorialInfiniteScroll() {
       console.error(err);
       alert('Error aplicando abonos: ' + err.message);
     }
+  }*/
+
+async function aplicarAbonos() {
+  // 1) Validaciones y datos comunes
+  const montoTotal = parseFloat(document.getElementById('multiMonto').value);
+  if (isNaN(montoTotal) || montoTotal <= 0) {
+    alert('Ingresá un monto válido a distribuir.');
+    return;
   }
 
+  const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+  if (!currentUser) {
+    alert('Sesión expirada. Iniciá de nuevo.');
+    return window.location.href = 'index.html';
+  }
+
+  const clienteId = document.getElementById('clienteSelect').value;
+  const ruta = document.getElementById('rutaAbono').value || 'SIN RUTA';
+  const metodo = 'Efectivo';
+  const banco = 'N/A';
+  const fecha = new Date();
+  const refBase = generateReference();
+
+  // Tomamos las facturas en el orden ya mostrado (asc por fecha)
+  const targets = multiFacturas.map(f => ({ id: f.id }));
+
+  if (targets.length === 0) {
+    alert('Este cliente no tiene facturas con saldo pendiente.');
+    return;
+  }
+
+  const facturaRefs = targets.map(t => db.collection('facturas').doc(t.id));
+
+  try {
+    await db.runTransaction(async (tx) => {
+      // 2) LEER TODO PRIMERO (todas las facturas dentro de la transacción)
+      const snaps = await Promise.all(facturaRefs.map(ref => tx.get(ref)));
+
+      // 3) Recalcular distribución con saldos actuales (a prueba de concurrencia)
+      let restante = Math.round(montoTotal * 100) / 100;
+      const acciones = []; // {ref, aplicar, nuevoSaldo}
+
+      for (let i = 0; i < snaps.length && restante > 0; i++) {
+        const snap = snaps[i];
+        if (!snap.exists) continue;
+
+        const data = snap.data();
+        const total = Math.round((data.total || 0) * 100) / 100;
+        const saldoActual = Math.round(((data.saldo !== undefined ? data.saldo : total)) * 100) / 100;
+        if (saldoActual <= 0) continue;
+
+        const aplicar = Math.min(restante, saldoActual);
+        if (aplicar <= 0) continue;
+
+        const nuevoSaldo = Math.round((saldoActual - aplicar) * 100) / 100;
+
+        acciones.push({ ref: facturaRefs[i], aplicar, nuevoSaldo });
+        restante = Math.round((restante - aplicar) * 100) / 100;
+      }
+
+      // Si no hay nada para aplicar, abortamos
+      if (acciones.length === 0) return;
+
+      // 4) ESCRIBIR TODO DESPUÉS (updates + abonos)
+      for (let i = 0; i < acciones.length; i++) {
+        const { ref, aplicar, nuevoSaldo } = acciones[i];
+
+        const abonoRef = ref.collection('abonos').doc();
+        const abonoData = {
+          clientId: clienteId,
+          amount: aplicar,
+          pendingBalance: nuevoSaldo,
+          dateTime: fecha,
+          route: ruta,
+          metodoPago: metodo,
+          banco,
+          referenciaBancaria: null,
+          notaCreditoId: null,
+          reference: `${refBase}-${String(i + 1).padStart(2, '0')}`,
+          usuario: {
+            username: currentUser.username,
+            fullName: currentUser.fullName
+          }
+        };
+
+        tx.update(ref, { saldo: nuevoSaldo });
+        tx.set(abonoRef, abonoData);
+      }
+    });
+
+    // 5) UI final
+    toast('✅ Abonos aplicados correctamente.');
+    closeMultiAbonoModal();
+    cargarFacturasCredito();
+    cargarHistorialAbonos();
+  } catch (err) {
+    console.error(err);
+    alert('Error aplicando abonos: ' + err.message);
+  }
+}
 
   
 </script>

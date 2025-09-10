@@ -25,7 +25,7 @@
   <div id="loginContainer" class="container">
     <h1>🔑 Iniciar Sesión</h1>
     <input id="username" type="text" placeholder="Usuario" />
-    <input id="userPassword" type="password" placeholder="Clave" />
+    <input id="userPassword" type="password" placeholder="Contraseña" />
     <button onclick="login()">🔓 Entrar</button>
   </div>
 
@@ -65,16 +65,16 @@
       const password = document.getElementById('userPassword').value.trim();
       if(!username || !password) return alert('Faltan datos 🤔');
 
-      const rawLoc = (data.userLocation ?? 'TODOS');
-      const userLocation = typeof rawLoc === 'string' ? rawLoc.toUpperCase() : String(rawLoc);
-
-      console.log("Ruta:" + userLocation);
-
       db.collection('users').doc(username).get()
         .then(doc=>{
           if(!doc.exists) return alert('Usuario no encontrado 😢');
           const data = doc.data();
           if(data.password !== password) return alert('Contraseña incorrecta 😬');
+
+         const rawLoc = (data.userLocation ?? 'TODOS');
+         const userLocation = typeof rawLoc === 'string' ? rawLoc.toUpperCase() : String(rawLoc);
+
+         console.log("Ruta:" + userLocation);
 
           sessionStorage.setItem('currentUser', JSON.stringify({
             username,

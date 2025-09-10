@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>💸 Registrar Abonos 💸</h1>
+  <h1> Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -195,6 +195,16 @@
     </thead>
     <tbody id="tablaHistorial"></tbody>
   </table>
+  <div id="histLoading" style="text-align:center; padding:8px; display:none;">
+  Cargando más abonos…
+</div>
+  
+<div id="histSentinel" style="height:1px;"></div>
+<!-- Fallback opcional (botón) -->
+<button id="btnLoadMore" style="display:none; margin:10px auto; width:100%; max-width:240px;">
+  Cargar más
+</button>
+
 </div>
 
 <!-- Snackbar -->
@@ -212,6 +222,13 @@
   // Inicializar Firestore
   const db = firebase.firestore();
   const clientesMap = {}; // Para mostrar nombres de clientes
+
+  const HIST_PAGE_SIZE = 20;
+  let histQuery = null;      // referencia base
+  let histCursor = null;     // último doc de la página previa
+  let histLoading = false;   // bandera de carga
+  let histDone = false;      // no hay más datos
+  let histObserver = null;   // IntersectionObserver
 
   /*********************** HELPER: Snackbar *************************/
   function toast(msg) {
@@ -546,37 +563,7 @@
   }
 
   /*********************** HISTORIAL *************************/
-/*  function cargarHistorialAbonos() {
-  const tbody = document.getElementById('tablaHistorial');
-  tbody.innerHTML = '';
-
-  db.collectionGroup('abonos')
-    .orderBy('dateTime', 'desc')
-    .limit(20)
-    .get()
-    .then(qs => {
-      qs.forEach(doc => {
-        const a = doc.data();
-        const facturaId = doc.ref.parent.parent.id;
-        const fecha = (typeof a.dateTime.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
-
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${fecha.toLocaleString()}</td>
-          <td>
-            <button onclick="viewInvoiceDetail('${facturaId}')" style="padding:5px 10px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
-              ${facturaId}
-            </button>
-          </td>
-          <td>${a.metodoPago}</td>
-          <td>C$${a.amount.toFixed(2)}</td>
-          <td>C$${a.pendingBalance.toFixed(2)}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    });
-}*/
-function cargarHistorialAbonos() {
+/*function cargarHistorialAbonos() {
   const tbody = document.getElementById('tablaHistorial');
   tbody.innerHTML = '';
 
@@ -610,6 +597,10 @@ function cargarHistorialAbonos() {
         tbody.appendChild(tr);
       });
     });
+}*/
+function cargarHistorialAbonos() {
+  // Mantengo el nombre por compatibilidad con tu código existente
+  setupHistorialInfiniteScroll();
 }
 
 async function eliminarAbono(facturaId, abonoId) {
@@ -780,6 +771,113 @@ return `
   </div>
 `;
 }
+
+function renderAbonoRow(doc) {
+  const a = doc.data();
+  const facturaId = doc.ref.parent.parent.id;
+  const abonoId = doc.id;
+  const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+  
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${fecha.toLocaleString()}</td>
+    <td>
+      <button onclick="viewInvoiceDetail('${facturaId}')" style="padding:5px 10px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
+        ${facturaId}
+      </button>
+    </td>
+    <td>${(a.usuario && (a.usuario.fullName || a.usuario.username)) || 'Administrador'}</td>
+    <td>${a.metodoPago}</td>
+    <td>C$${a.amount.toFixed(2)}</td>
+    <td>C$${a.pendingBalance.toFixed(2)}</td>
+    <td>
+      <button onclick="eliminarAbono('${facturaId}', '${abonoId}')" style="padding:5px 10px; background:#dc3545; color:white; border:none; border-radius:4px;">Eliminar</button>
+    </td>
+  `;
+  return tr;
+}
+
+  async function loadMoreAbonos() {
+    if (histLoading || histDone) return;
+    histLoading = true;
+    document.getElementById('histLoading').style.display = 'block';
+  
+    try {
+      let q = histQuery.limit(HIST_PAGE_SIZE);
+      if (histCursor) q = q.startAfter(histCursor);
+  
+      const snap = await q.get();
+  
+      // ¿No hay más?
+      if (snap.empty) {
+        histDone = true;
+        document.getElementById('histLoading').textContent = 'No hay más abonos.';
+        if (histObserver) histObserver.disconnect();
+        return;
+      }
+  
+      const tbody = document.getElementById('tablaHistorial');
+      snap.forEach(doc => tbody.appendChild(renderAbonoRow(doc)));
+  
+      // actualiza cursor
+      histCursor = snap.docs[snap.docs.length - 1];
+  
+      // Si vino menos de lo pedido, llegamos al final
+      if (snap.size < HIST_PAGE_SIZE) {
+        histDone = true;
+        document.getElementById('histLoading').textContent = 'Fin del historial.';
+        if (histObserver) histObserver.disconnect();
+      } else {
+        document.getElementById('histLoading').style.display = 'none';
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error al cargar historial: ' + err.message);
+    } finally {
+      histLoading = false;
+    }
+}
+
+function setupHistorialInfiniteScroll() {
+  // query base
+  histQuery = db.collectionGroup('abonos').orderBy('dateTime', 'desc');
+
+  // reset de estado
+  histCursor = null;
+  histLoading = false;
+  histDone = false;
+
+  // limpia tabla
+  const tbody = document.getElementById('tablaHistorial');
+  tbody.innerHTML = '';
+
+  // desconecta observer previo
+  if (histObserver) histObserver.disconnect();
+
+  const sentinel = document.getElementById('histSentinel');
+  histObserver = new IntersectionObserver(entries => {
+    const entry = entries[0];
+    if (entry.isIntersecting) {
+      loadMoreAbonos();
+    }
+  }, { root: null, rootMargin: '200px', threshold: 0 });
+
+  histObserver.observe(sentinel);
+
+  // primera página
+  loadMoreAbonos();
+}
+
+  const btnLoadMore = document.getElementById('btnLoadMore');
+  btnLoadMore.onclick = loadMoreAbonos;
+  
+  function enableLoadMoreButtonMode() {
+    // Mostrar botón y desactivar observer
+    if (histObserver) histObserver.disconnect();
+    btnLoadMore.style.display = 'block';
+    document.getElementById('histSentinel').style.display = 'none';
+  }
+
   
 </script>
 

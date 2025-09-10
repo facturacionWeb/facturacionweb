@@ -108,11 +108,16 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1> Registrar Abonos 💸</h1>
+  <h1> Registrar Abonos 💸💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
   <select id="clienteSelect"></select>
+
+  <!-- Botón Abono Múltiple (aparte del flujo actual) -->
+  <button id="btnAbonoMultiple" style="margin-left:8px; display:inline-block;">
+    Abono múltiple
+  </button>
 
   <!-- Selección de Factura Crédito -->
   <label for="facturaSelect">Selecciona Factura de Crédito:</label>
@@ -218,6 +223,47 @@
   </div>
 </div>  
 
+<!-- Modal: Abono Múltiple -->
+<div id="multiAbonoModal" class="modal" style="display:none;">
+  <div class="modal-content" style="max-width: 980px;">
+    <span class="close" onclick="closeMultiAbonoModal()">&times;</span>
+    <h2 style="margin-top:0;">Abono múltiple</h2>
+
+    <div style="display:flex; gap:12px; align-items: center; margin-bottom:12px;">
+      <div>
+        <label for="multiMonto">Monto total a distribuir (C$):</label>
+        <input type="number" id="multiMonto" min="0.01" step="0.01" />
+      </div>
+      <button id="btnDistribuir" style="height:38px;">Distribuir abonos</button>
+      <div id="multiResumen" style="margin-left:auto; font-weight:600;">
+        Total: C$0.00 • Distribuido: C$0.00 • Restante: C$0.00
+      </div>
+    </div>
+
+    <div style="overflow:auto; max-height: 55vh; border:1px solid #ddd;">
+      <table style="width:100%; border-collapse: collapse;">
+        <thead>
+          <tr>
+            <th>Fecha/Hora</th>
+            <th>Id Factura</th>
+            <th>Consecutivo</th>
+            <th>Monto</th>
+            <th>Saldo Pendiente</th>
+            <th>Saldo Proyectado</th>
+          </tr>
+        </thead>
+        <tbody id="multiAbonoTbody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+      <button onclick="closeMultiAbonoModal()" style="background:#aaa;">Cancelar</button>
+      <button id="btnAplicarAbonos" disabled>Aplicar abonos</button>
+    </div>
+  </div>
+</div>
+
+  
 <script>
   // Inicializar Firestore
   const db = firebase.firestore();
@@ -369,20 +415,6 @@
         
       });
   }
-
-  /*function setMontoPorNotaCredito() {
-    const metodo = document.getElementById('metodoPago').value;
-    if (metodo !== 'NotaCredito') return;
-    const sel = document.getElementById('notaCreditoSelect');
-    const opt = sel.options[sel.selectedIndex];
-    if (opt && opt.dataset.monto) {
-      document.getElementById('montoAbono').value = parseFloat(opt.dataset.monto).toFixed(2);
-      document.getElementById('montoAbono').readOnly = true;
-    } else {
-      document.getElementById('montoAbono').value = '';
-      document.getElementById('montoAbono').readOnly = false;
-    }
-  }*/
 
   function setMontoPorNotaCredito() {
   if (document.getElementById('metodoPago').value !== 'NotaCredito') return;
@@ -877,6 +909,228 @@ function setupHistorialInfiniteScroll() {
     btnLoadMore.style.display = 'block';
     document.getElementById('histSentinel').style.display = 'none';
   }
+
+  /*Lógica de multi-abonos*/
+    /************* ABONO MÚLTIPLE – ESTADO *************/
+  let multiFacturas = []; // [{id, fecha, consecutivo, total, saldo, proyectado, abono}]
+  let multiObserverAttached = false;
+  
+  /************* ABONO MÚLTIPLE – UI HOOK *************/
+  window.addEventListener('load', () => {
+    const btnMulti = document.getElementById('btnAbonoMultiple');
+    if (btnMulti) {
+      btnMulti.addEventListener('click', openMultiAbonoModal);
+    }
+  });
+  
+  /************* Utils *************/
+  function cord(n) {
+    if (isNaN(n)) return 'C$0.00';
+    return 'C$' + (Math.round(n * 100) / 100).toFixed(2);
+  }
+  function toDateMaybe(tsOrDate) {
+    // Firestore Timestamp o Date/ISO
+    if (tsOrDate && typeof tsOrDate.toDate === 'function') return tsOrDate.toDate();
+    return new Date(tsOrDate);
+  }
+  
+  /************* Modal *************/
+  function openMultiAbonoModal() {
+    const clienteId = document.getElementById('clienteSelect').value;
+    if (!clienteId) {
+      alert('Seleccioná primero un cliente.');
+      return;
+    }
+  
+    // Limpia estado
+    multiFacturas = [];
+    document.getElementById('multiAbonoTbody').innerHTML = '';
+    document.getElementById('multiMonto').value = '';
+    updateMultiResumen(0, 0);
+  
+    // Cargar facturas del cliente con saldo > 0 (más antiguas primero)
+    db.collection('facturas')
+      .where('clientId', '==', clienteId)
+      .where('paymentType', '==', 'Credito')
+      .where('anulada', '==', false)
+      .orderBy('fecha', 'asc')
+      .get()
+      .then(qs => {
+        const tbody = document.getElementById('multiAbonoTbody');
+        qs.forEach(doc => {
+          const f = doc.data();
+          const total = f.total;
+          const saldo = (f.saldo !== undefined ? f.saldo : total);
+          if (saldo <= 0) return; // solo con saldo pendiente
+  
+          const fecha = toDateMaybe(f.fecha);
+          const row = {
+            id: doc.id,
+            fecha,
+            consecutivo: f.consecutivo || 'N/A',
+            total: Math.round(total * 100) / 100,
+            saldo: Math.round(saldo * 100) / 100,
+            proyectado: Math.round(saldo * 100) / 100,
+            abono: 0
+          };
+          multiFacturas.push(row);
+  
+          const tr = document.createElement('tr');
+          tr.dataset.facturaId = row.id;
+          tr.innerHTML = `
+            <td>${fecha.toLocaleString()}</td>
+            <td>${row.id}</td>
+            <td>${row.consecutivo}</td>
+            <td style="text-align:right;">${cord(row.total)}</td>
+            <td style="text-align:right;" data-col="saldo">${cord(row.saldo)}</td>
+            <td style="text-align:right;" data-col="proyectado">${cord(row.proyectado)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+  
+        if (multiFacturas.length === 0) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td colspan="6" style="text-align:center; padding:12px;">Este cliente no tiene facturas con saldo pendiente.</td>`;
+          document.getElementById('multiAbonoTbody').appendChild(tr);
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error al cargar facturas: ' + err.message);
+      });
+  
+    // Bindear botones del modal (una sola vez)
+    if (!multiObserverAttached) {
+      document.getElementById('btnDistribuir').addEventListener('click', distribuirAbonos);
+      document.getElementById('btnAplicarAbonos').addEventListener('click', aplicarAbonos);
+      multiObserverAttached = true;
+    }
+  
+    document.getElementById('multiAbonoModal').style.display = 'block';
+  }
+  
+  function closeMultiAbonoModal() {
+    document.getElementById('multiAbonoModal').style.display = 'none';
+  }
+  
+  /************* Distribución *************/
+  function distribuirAbonos() {
+    let monto = parseFloat(document.getElementById('multiMonto').value);
+    if (isNaN(monto) || monto <= 0) {
+      alert('Ingresá un monto válido a distribuir.');
+      return;
+    }
+    monto = Math.round(monto * 100) / 100;
+  
+    // Reset proyección
+    multiFacturas.forEach(f => { f.proyectado = f.saldo; f.abono = 0; });
+  
+    let restante = monto;
+    // Regla: pagar primero las más antiguas (ya vienen ordenadas por fecha asc)
+    for (const f of multiFacturas) {
+      if (restante <= 0) break;
+      const aplicar = Math.min(f.saldo, restante);
+      f.abono = Math.round(aplicar * 100) / 100;
+      f.proyectado = Math.round((f.saldo - f.abono) * 100) / 100;
+      restante = Math.round((restante - aplicar) * 100) / 100;
+  
+      // Actualizar celda "Saldo Proyectado"
+      const tr = document.querySelector(`tr[data-factura-id="${f.id}"]`);
+      if (tr) {
+        tr.querySelector('[data-col="proyectado"]').textContent = cord(f.proyectado);
+      }
+    }
+  
+    const distribuido = Math.round((monto - restante) * 100) / 100;
+    updateMultiResumen(monto, distribuido);
+  
+    // Habilitar aplicar si hay algo que aplicar
+    document.getElementById('btnAplicarAbonos').disabled = (distribuido <= 0 || multiFacturas.every(f => f.abono <= 0));
+  }
+  
+  function updateMultiResumen(monto, distribuido) {
+    const restante = Math.max(0, Math.round((monto - distribuido) * 100) / 100);
+    document.getElementById('multiResumen').textContent =
+      `Total: ${cord(monto)} • Distribuido: ${cord(distribuido)} • Restante: ${cord(restante)}`;
+  }
+  
+  /************* Aplicar (transacción multi-doc) *************/
+  async function aplicarAbonos() {
+    const abonos = multiFacturas.filter(f => f.abono > 0);
+    if (abonos.length === 0) {
+      alert('No hay abonos propuestos.');
+      return;
+    }
+  
+    // Datos comunes
+    const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+    if (!currentUser) {
+      alert('Sesión expirada. Iniciá de nuevo.');
+      return window.location.href = 'index.html';
+    }
+  
+    const clienteId = document.getElementById('clienteSelect').value;
+    const ruta = document.getElementById('rutaAbono').value || 'SIN RUTA';
+    const metodo = 'Efectivo';           // Dejamos simple para el múltiple
+    const banco = 'N/A';
+    const referenciaBancaria = 'N/A';
+    const fecha = new Date();            // Misma fecha/hora para todos
+    const refBase = generateReference(); // base legible (si querés)
+  
+    try {
+      await db.runTransaction(async (tx) => {
+        for (let i = 0; i < abonos.length; i++) {
+          const f = abonos[i];
+          const facturaRef = db.collection('facturas').doc(f.id);
+          const facturaSnap = await tx.get(facturaRef);
+          if (!facturaSnap.exists) throw new Error(`La factura ${f.id} no existe`);
+  
+          const data = facturaSnap.data();
+          const saldoActual = Math.round((data.saldo !== undefined ? data.saldo : data.total) * 100) / 100;
+          if (saldoActual <= 0) continue; // ya saldada
+  
+          // Seguridad por si cambió el saldo desde que se proyectó
+          const aplicar = Math.min(f.abono, saldoActual);
+          if (aplicar <= 0) continue;
+  
+          const nuevoSaldo = Math.round((saldoActual - aplicar) * 100) / 100;
+  
+          const abonoRef = facturaRef.collection('abonos').doc();
+          const abonoData = {
+            clientId: clienteId,
+            amount: aplicar,
+            pendingBalance: nuevoSaldo,
+            dateTime: fecha,
+            route: ruta,
+            metodoPago: metodo,
+            banco,
+            referenciaBancaria: null,     // no aplica
+            notaCreditoId: null,          // no aplica en múltiple
+            reference: `${refBase}-${String(i+1).padStart(2,'0')}`,
+            usuario: {
+              username: currentUser.username,
+              fullName: currentUser.fullName
+            }
+          };
+  
+          // Actualizar factura + crear abono
+          tx.update(facturaRef, { saldo: nuevoSaldo });
+          tx.set(abonoRef, abonoData);
+        }
+      });
+  
+      toast(`✅ Abonos aplicados: ${abonos.length}`);
+      closeMultiAbonoModal();
+  
+      // Refrescar UI existente
+      cargarFacturasCredito();     // repobla select de facturas (filtra saldadas)
+      cargarHistorialAbonos();     // historial infinito actualizado
+    } catch (err) {
+      console.error(err);
+      alert('Error aplicando abonos: ' + err.message);
+    }
+  }
+
 
   
 </script>

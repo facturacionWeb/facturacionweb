@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1> Registrar Abonos 💸</h1>
+  <h1> 💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -190,6 +190,7 @@
   <table>
     <thead>
       <tr>
+        <th>Recibo</th>
         <th>Fecha/Hora</th>
         <th>Factura</th>
         <th>Usuario</th>
@@ -804,7 +805,7 @@ return `
 `;
 }
 
-function renderAbonoRow(doc) {
+/*function renderAbonoRow(doc) {
   const a = doc.data();
   const facturaId = doc.ref.parent.parent.id;
   const abonoId = doc.id;
@@ -827,7 +828,77 @@ function renderAbonoRow(doc) {
     </td>
   `;
   return tr;
+}*/
+  function renderAbonoRow(doc) {
+  const a = doc.data();
+  const facturaId = doc.ref.parent.parent.id;
+  const abonoId = doc.id;
+  const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <button
+        onclick="imprimirReciboAbono('${facturaId}','${abonoId}')"
+        title="Imprimir recibo"
+        style="padding:5px 10px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+        🖨️
+      </button>
+    </td>
+    <td>${fecha.toLocaleString()}</td>
+    <td>
+      <button onclick="viewInvoiceDetail('${facturaId}')" style="padding:5px 10px;background:#007bff;color:white;border:none;border-radius:4px;cursor:pointer;">
+        ${facturaId}
+      </button>
+    </td>
+    <td>${(a.usuario && (a.usuario.fullName || a.usuario.username)) || 'Administrador'}</td>
+    <td>${a.metodoPago}</td>
+    <td>C$${a.amount.toFixed(2)}</td>
+    <td>C$${a.pendingBalance.toFixed(2)}</td>
+  `;
+  return tr;
 }
+
+  async function imprimirReciboAbono(facturaId, abonoId) {
+  try {
+    const abonoRef = db.collection('facturas').doc(facturaId).collection('abonos').doc(abonoId);
+    const snap = await abonoRef.get();
+    if (!snap.exists) {
+      alert('No se encontró el abono.');
+      return;
+    }
+
+    const a = snap.data();
+    const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+
+    // Reusamos tu función existente para renderizar el recibo en el contenedor
+    // y luego llamamos a imprimir.
+    mostrarReciboEnPantalla({
+      facturaId: facturaId,
+      monto: a.amount,
+      saldoPendiente: a.pendingBalance,
+      fecha: fecha,
+      ruta: a.route || 'SIN RUTA',
+      metodo: a.metodoPago || 'N/A',
+      banco: a.banco || 'N/A',
+      referenciaBancaria: a.referenciaBancaria || 'N/A',
+      notaCreditoId: a.notaCreditoId || null,
+      // Mostramos "Registrado por" con el usuario que quedó guardado en el abono
+      currentUser: {
+        fullName: (a.usuario && a.usuario.fullName) || (a.usuario && a.usuario.username) || 'Administrador',
+        username: (a.usuario && a.usuario.username) || 'admin'
+      }
+    });
+
+    // Abre la ventana de impresión con el HTML del recibo
+    imprimirRecibo();
+  } catch (err) {
+    console.error(err);
+    alert('Error generando recibo: ' + err.message);
+  }
+}
+
+
 
   async function loadMoreAbonos() {
     if (histLoading || histDone) return;

@@ -59,6 +59,54 @@
     // Firestore
     const db = firebase.firestore();
 
+        // --- NUEVO: candado de ruta por usuario ---
+    let USER_ROUTE_LOCK = null; // null => sin candado (admin o TODOS). String => "1".."10" o "SIN RUTA".
+    
+    function safeGetCurrentUser(){
+      try{
+        const raw = sessionStorage.getItem('currentUser');
+        return raw ? JSON.parse(raw) : null;
+      }catch(e){
+        console.warn('No se pudo leer currentUser', e);
+        return null;
+      }
+    }
+    
+    /**
+     * Lee userLocation del usuario actual y:
+     * - Si es "TODOS": deja el select completo (sin candidado).
+     * - Si es "SIN RUTA" o "1".."10": reconstruye <select> con una sola opción y lo deshabilita.
+     */
+    function initRouteFilterWithUser(){
+      const u = safeGetCurrentUser();
+      const sel = document.getElementById('filterRoute');
+    
+      // Reset por si acaso
+      USER_ROUTE_LOCK = null;
+      sel.disabled = false;
+    
+      const loc = String(u?.userLocation ?? 'TODOS');
+    
+      if (loc === 'TODOS'){
+        // Admin o usuario global → nada que hacer: mantener todas las opciones
+        return;
+      }
+    
+      // Candado a ruta específica (o SIN RUTA)
+      USER_ROUTE_LOCK = loc;
+    
+      // reconstruir el select con SOLO esa opción
+      sel.innerHTML = '';
+      const opt = document.createElement('option');
+      opt.value = USER_ROUTE_LOCK;
+      opt.textContent = USER_ROUTE_LOCK;
+      sel.appendChild(opt);
+      sel.value = USER_ROUTE_LOCK;
+      sel.disabled = true; // opcional, pero recomendable
+    }
+
+    
+
     // Estado global
     let gArticlesDict = {};   // articleId -> Articulo
     let gIMEIList = [];       // [{docId, articleId, imei, proveedorId?}, ...]
@@ -81,8 +129,12 @@
       document.getElementById('tbody-articles').innerHTML = '';
       document.getElementById('tfoot-articles').innerHTML = '';
 
-      const filterValue = document.getElementById('filterRoute').value;
-
+      //const filterValue = document.getElementById('filterRoute').value;
+      // ANTES: const filterValue = document.getElementById('filterRoute').value;
+      // AHORA: respetar el candado si existe
+      const uiValue = document.getElementById('filterRoute').value;
+      const filterValue = (USER_ROUTE_LOCK ?? uiValue);
+      
       // 1) Articulos
       const artsSnap = await db.collection("Articulos").get();
       gArticlesDict = {};
@@ -300,8 +352,10 @@
     // Modal: lista IMEIs del artículo, filtrado por ruta indicada (si viene), o por el filtro actual
     async function showIMEIModal(articleId, rutaParam=null){
       // Si viene la ruta del renglón (TODOS), usamos esa; si no, usamos el filtro actual
-      const rutaFiltro = rutaParam ?? document.getElementById('filterRoute').value;
-
+      //const rutaFiltro = rutaParam ?? document.getElementById('filterRoute').value;
+      // Antes: const rutaFiltro = rutaParam ?? document.getElementById('filterRoute').value;
+      const rutaFiltro = rutaParam ?? (USER_ROUTE_LOCK ?? document.getElementById('filterRoute').value);
+      
       document.getElementById('modalArticleId').textContent = articleId;
       document.getElementById('modalRuta').textContent = `Ruta: ${rutaFiltro}`;
       const ul = document.getElementById('imeiList');
@@ -362,6 +416,7 @@
     // Init
     window.onload = ()=>{
       setActiveTab('tab1');
+      initRouteFilterWithUser(); // <-- NUEVO
       loadReport();
     };
   </script>
@@ -372,7 +427,7 @@
   </script>
 </head>
 <body>
-  <h1>Reporte Artículos con Filtro de Ruta</h1>
+  <h1>Reporte Artículos con Filtro de Ruta 📊</h1>
 
   <div class="toolbar">
     <label for="filterRoute">Filtrar por Ruta:</label>

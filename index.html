@@ -19,11 +19,61 @@
     .logout-btn{background:#dc3545} .logout-btn:hover{background:#a71d2a}
     #userInfo{font-size:.9rem;margin-bottom:10px;padding:8px;background:#eef;border-radius:6px}
   </style>
+  <style>
+    /* Botón pequeño en línea junto al #userInfo */
+    .btn-inline {
+      width: auto !important;
+      display: inline-flex !important;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px !important;
+      margin-left: 8px;
+      font-size: 12px !important;
+      background:#198754 !important; /* verde sutil */
+    }
+    .btn-inline:hover { background:#157347 !important; }
+  
+    /* Modal genérico (reusa estilo similar a tus otras páginas) */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+    }
+    .modal-content {
+      background:#fff;
+      margin: 6% auto;
+      padding: 18px;
+      width: 92%;
+      max-width: 860px;
+      border-radius: 10px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    .modal .close {
+      position: absolute;
+      right: 14px;
+      top: 8px;
+      font-size: 28px;
+      color:#666;
+      cursor:pointer;
+    }
+  
+    /* Tabla del cuadre */
+    #crTabla { width:100%; border-collapse: collapse; margin-top:10px; }
+    #crTabla th, #crTabla td { border:1px solid #ddd; padding:10px; text-align:center; }
+    #crTabla th { background:#333; color:#fff; }
+    #crTabla tfoot td { font-weight:700; }
+    .badge { display:inline-block; padding:3px 8px; border-radius:12px; font-size:12px; background:#eef; color:#334; }
+  </style>
+
+  
 </head>
 <body>
   <!-- LOGIN -->
   <div id="loginContainer" class="container">
-    <h1>🔑 Iniciar Sesión</h1>
+    <h1>🔑 Iniciar Sesión 🔑</h1>
     <input id="username" type="text" placeholder="Usuario" />
     <input id="userPassword" type="password" placeholder="Contraseña" />
     <button onclick="login()">🔓 Entrar</button>
@@ -31,6 +81,42 @@
 
   <!-- PANEL -->
   <div id="adminPanel" class="container" style="display:none;">
+
+    <!-- Modal: Cuadrar Ruta -->
+    <div id="cuadrarRutaModal" class="modal" aria-hidden="true">
+      <div class="modal-content">
+        <span class="close" onclick="closeCuadrarRutaModal()">&times;</span>
+        <h2 style="margin:0 0 8px 0;">🧾 Cuadre de Ruta — <span id="crFecha"></span></h2>
+        <div style="color:#666; margin-bottom:6px;">
+          Usuario: <span id="crUsuario" class="badge"></span>
+        </div>
+        <table id="crTabla">
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Cantidad</th>
+              <th>Monto Total (C$)</th>
+            </tr>
+          </thead>
+          <tbody id="crBody">
+            <!-- Se llena por JS -->
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="text-align:right;">TOTAL FACTURAS (Efectivo + Transferencia):</td>
+              <td id="crTotalFacturasCant">0</td>
+              <td id="crTotalFacturasMonto">0.00</td>
+            </tr>
+            <tr>
+              <td style="text-align:right;">TOTAL ABONOS (Efectivo + Transferencia):</td>
+              <td id="crTotalAbonosCant">0</td>
+              <td id="crTotalAbonosMonto">0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
     <h1>📌 Menú Principal</h1>
     <div id="userInfo"></div>
 
@@ -57,6 +143,17 @@
 
     window.onload = () => {
       const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+
+      // 👉 Insertar botón "Cuadrar Ruta" a la par del nombre
+      const btnCR = document.createElement('button');
+      btnCR.id = 'btnCuadrarRuta';
+      btnCR.className = 'btn-inline';
+      btnCR.type = 'button';
+      btnCR.textContent = 'Cuadrar Ruta';
+      btnCR.onclick = openCuadrarRutaModal;
+      document.getElementById('userInfo').appendChild(btnCR);
+
+      
       if (current) showPanel();
     };
 
@@ -114,5 +211,134 @@
 
     function goTo(page){ window.location.href = page; }
   </script>
+  <script>
+    // ⚠️ Ya tenés const db = firebase.firestore(); en este archivo. Reutilizamos.
+  
+    function openCuadrarRutaModal(){
+      const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+      if(!current){ alert('Sesión expirada. Iniciá de nuevo.'); return location.href='index.html'; }
+  
+      // Fecha del día local (igual que usás en facturas: fechaStr)
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
+  
+      document.getElementById('crFecha').textContent = todayStr;
+      document.getElementById('crUsuario').textContent = `${current.fullName || current.username}`;
+      document.getElementById('cuadrarRutaModal').style.display = 'block';
+  
+      // Cargar datos
+      cargarCuadreRuta(current.username, todayStr).catch(err=>{
+        console.error('Error Cuadrar Ruta:', err);
+        alert('Ocurrió un error al calcular el cuadre. Ver consola para más detalles.');
+      });
+    }
+  
+    function closeCuadrarRutaModal(){
+      document.getElementById('cuadrarRutaModal').style.display = 'none';
+    }
+  
+    // Rango de hoy (local) para abonos con dateTime (Timestamp)
+    function hoyBounds(){
+      const start = new Date(); start.setHours(0,0,0,0);
+      const end   = new Date(); end.setHours(23,59,59,999);
+      return {start, end};
+    }
+  
+    async function cargarCuadreRuta(username, todayStr){
+      // 🧮 Consultas paralelas (4): facturas Efectivo/Transferencia + abonos Efectivo/Transferencia
+      const [facEfec, facTrans, aboEfec, aboTrans] = await Promise.all([
+        fetchFacturas(username, todayStr, 'Efectivo'),
+        fetchFacturas(username, todayStr, 'Transferencia'),
+        fetchAbonos(username, 'Efectivo'),
+        fetchAbonos(username, 'Transferencia'),
+      ]);
+  
+      // Pintar filas
+      const rows = [
+        { label: 'Facturas pagadas en Efectivo',   ...facEfec },
+        { label: 'Facturas pagadas por Transferencia', ...facTrans },
+        { label: 'Abonos pagados en Efectivo',     ...aboEfec },
+        { label: 'Abonos pagados por Transferencia',   ...aboTrans },
+      ];
+  
+      const tbody = document.getElementById('crBody');
+      tbody.innerHTML = '';
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="text-align:left;">${r.label}</td>
+          <td>${r.count}</td>
+          <td>${r.amount.toFixed(2)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+  
+      // Totales por bloque
+      const totalFacCant  = facEfec.count + facTrans.count;
+      const totalFacMonto = facEfec.amount + facTrans.amount;
+      const totalAboCant  = aboEfec.count + aboTrans.count;
+      const totalAboMonto = aboEfec.amount + aboTrans.amount;
+  
+      document.getElementById('crTotalFacturasCant').textContent  = totalFacCant;
+      document.getElementById('crTotalFacturasMonto').textContent = totalFacMonto.toFixed(2);
+      document.getElementById('crTotalAbonosCant').textContent    = totalAboCant;
+      document.getElementById('crTotalAbonosMonto').textContent   = totalAboMonto.toFixed(2);
+    }
+  
+    // 📄 FACTURAS del día por usuario y paymentType (Efectivo o Transferencia)
+    async function fetchFacturas(username, todayStr, paymentType){
+      // Campos existentes en tus facturas: paymentType, total, fechaStr, anulada, usuario.username
+      // → Filtramos por igualdad + anulada=false. (Crédito no se incluye porque filtramos por paymentType)
+      const qs = await db.collection('facturas')
+        .where('anulada', '==', false)
+        .where('paymentType','==', paymentType)
+        .where('usuario.username','==', username)
+        .where('fechaStr','==', todayStr)
+        .get();
+  
+      let count = 0, amount = 0;
+      qs.forEach(doc=>{
+        const f = doc.data();
+        count += 1;
+        amount += Number(f.total || 0);
+      });
+      return {count, amount};
+    }
+  
+    // 💵 ABONOS del día por usuario y metodoPago (Efectivo o Transferencia)
+    async function fetchAbonos(username, metodoPago){
+      const {start, end} = hoyBounds();
+      // Campos existentes en abonos: amount, metodoPago, dateTime, usuario.username
+      const qs = await db.collectionGroup('abonos')
+        .where('usuario.username','==', username)
+        .where('metodoPago','==', metodoPago)
+        .where('dateTime','>=', start)
+        .where('dateTime','<',  end)
+        .get();
+  
+      let count = 0, amount = 0;
+      qs.forEach(doc=>{
+        const a = doc.data();
+        count += 1;
+        amount += Number(a.amount || 0);
+      });
+      return {count, amount};
+    }
+  
+    // Cerrar modal con ESC o click fuera
+    (function setupModalCloseUX(){
+      document.addEventListener('keydown', (e)=>{
+        if(e.key === 'Escape') closeCuadrarRutaModal();
+      });
+      document.getElementById('cuadrarRutaModal').addEventListener('click', (e)=>{
+        if(e.target.id === 'cuadrarRutaModal') closeCuadrarRutaModal();
+      });
+    })();
+  </script>
+
+  
 </body>
 </html>

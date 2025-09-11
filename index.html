@@ -73,7 +73,7 @@
 <body>
   <!-- LOGIN -->
   <div id="loginContainer" class="container">
-    <h1>🔑 Iniciar Sesión 🔑</h1>
+    <h1>🔑 Iniciar Sesión </h1>
     <input id="username" type="text" placeholder="Usuario" />
     <input id="userPassword" type="password" placeholder="Contraseña" />
     <button onclick="login()">🔓 Entrar</button>
@@ -143,17 +143,6 @@
 
     window.onload = () => {
       const current = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
-
-      // 👉 Insertar botón "Cuadrar Ruta" a la par del nombre
-      const btnCR = document.createElement('button');
-      btnCR.id = 'btnCuadrarRuta';
-      btnCR.className = 'btn-inline';
-      btnCR.type = 'button';
-      btnCR.textContent = 'Cuadrar Ruta';
-      btnCR.onclick = openCuadrarRutaModal;
-      document.getElementById('userInfo').appendChild(btnCR);
-
-      
       if (current) showPanel();
     };
 
@@ -193,6 +182,15 @@
 
       // Mostrar info de usuario
       userInfo.textContent = `${current.fullName || '(Sin nombre)'} (${current.username})`;
+
+      // 👉 Insertar botón "Cuadrar Ruta" a la par del nombre
+      const btnCR = document.createElement('button');
+      btnCR.id = 'btnCuadrarRuta';
+      btnCR.className = 'btn-inline';
+      btnCR.type = 'button';
+      btnCR.textContent = 'Cuadrar Ruta';
+      btnCR.onclick = openCuadrarRutaModal;
+      document.getElementById('userInfo').appendChild(btnCR);
 
       // Ocultar botones no autorizados
       const allowed = current.allowedPages || [];

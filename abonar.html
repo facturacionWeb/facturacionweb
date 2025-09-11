@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1> 💸 Registrar Abonos 💸</h1>
+  <h1>  Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -481,6 +481,8 @@
     if (metodo==='Transferencia' && !referenciaBancaria) return alert('Ingrese referencia bancaria');
     if (metodo==='NotaCredito' && !notaCreditoId) return alert('Seleccione una nota de crédito');
 
+    let createdAbonoPath = null;  
+    
     try {
       await db.runTransaction(async (tx) => {
         const facturaRef = db.collection('facturas').doc(facturaId);
@@ -498,6 +500,7 @@
         const nuevoSaldo = saldoActual - monto;
         const fecha = new Date();
         const abonoRef = facturaRef.collection('abonos').doc();
+        createdAbonoPath = abonoRef.path;         // 👈 NUEVO (guardamos la ruta del abono)
         const abonoData = {
           clientId: clienteId,
           amount: monto,
@@ -527,11 +530,20 @@
         }
       });
 
+      // ✅ Después del commit: calculamos y escribimos el snapshot total
+      const saldoTotalCliente = await calcularSaldoPendienteTotalCliente(clienteId);
+      if (createdAbonoPath) {
+        await db.doc(createdAbonoPath).update({
+        saldoPendienteTotalCliente: saldoTotalCliente
+        });
+      }
+
       toast('✅ Abono registrado');
       mostrarReciboEnPantalla({
         facturaId,
         monto,
         saldoPendiente: (document.querySelector(`#facturaSelect option[value="${facturaId}"]`).dataset.saldo - monto),
+        saldoPendienteTotalCliente: saldoTotalCliente,   // 👈 NUEVO
         fecha: new Date(),
         ruta,
         metodo,
@@ -551,7 +563,7 @@
   }
 
   /*********************** RECIBO *************************/
-  function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
+  /*function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
     const div = document.getElementById('recibo');
     const fechaStr = fecha.toLocaleString();
 
@@ -568,6 +580,28 @@
       <hr>
       <p><strong>Abonado:</strong> C$${monto.toFixed(2)}</p>
       <p><strong>Saldo Pendiente:</strong> C$${saldoPendiente.toFixed(2)}</p>
+    `;
+    document.getElementById('reciboContainer').style.display = 'block';
+  }*/
+    function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, saldoPendienteTotalCliente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
+    const div = document.getElementById('recibo');
+    const fechaStr = fecha.toLocaleString();
+  
+    let metodoTxt = metodo;
+    if (metodo==='Transferencia') metodoTxt += ` (${banco} #${referenciaBancaria})`;
+    if (metodo==='NotaCredito')  metodoTxt += ` (NC: ${notaCreditoId})`;
+  
+    document.getElementById('reciboContainer').style.display = 'block';
+    div.innerHTML = `
+      <h3 style="text-align:center;">Recibo de Abono</h3>
+      <p><strong>Fecha:</strong> ${fechaStr}</p>
+      <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
+      <p><strong>Factura #:</strong> ${facturaId}</p>
+      <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
+      <hr>
+      <p><strong>Abonado:</strong> C$${Number(monto).toFixed(2)}</p>
+      <p><strong>Saldo Pendiente a Factura:</strong> C$${Number(saldoPendiente).toFixed(2)}</p>
+      <p><strong>Saldo Pendiente Total:</strong> C$${Number(saldoPendienteTotalCliente || 0).toFixed(2)}</p>
     `;
     document.getElementById('reciboContainer').style.display = 'block';
   }
@@ -1242,6 +1276,9 @@ async function aplicarAbonos() {
   const facturaRefs = targets.map(t => db.collection('facturas').doc(t.id));
 
   try {
+    
+    const createdAbonoPaths = []; // 👈 NUEVO
+    
     await db.runTransaction(async (tx) => {
       // 2) LEER TODO PRIMERO (todas las facturas dentro de la transacción)
       const snaps = await Promise.all(facturaRefs.map(ref => tx.get(ref)));
@@ -1292,11 +1329,19 @@ async function aplicarAbonos() {
             fullName: currentUser.fullName
           }
         };
-
+        
+        createdAbonoPaths.push(abonoRef.path);  
+        
         tx.update(ref, { saldo: nuevoSaldo });
         tx.set(abonoRef, abonoData);
       }
     });
+
+    // Setear el snapshot total en todos los abonos creados
+    const totalCliente = await calcularSaldoPendienteTotalCliente(clienteId);
+    const batch = db.batch();
+    createdAbonoPaths.forEach(p => batch.update(db.doc(p), { saldoPendienteTotalCliente: totalCliente }));
+    await batch.commit();
 
     // 5) UI final
     toast('✅ Abonos aplicados correctamente.');
@@ -1340,6 +1385,25 @@ async function recalcularSaldosFactura(facturaId) {
 
   await batch.commit();
 }  
+
+  function round2(n){ return Math.round((Number(n)||0)*100)/100; }
+  
+  /** Suma todos los saldos > 0 de las facturas del cliente */
+  async function calcularSaldoPendienteTotalCliente(clienteId) {
+    const qs = await db.collection('facturas')
+      .where('clientId','==',clienteId)
+      .get();
+    
+    let total = 0;
+    qs.forEach(d => {
+      const data = d.data();
+      const saldo = Number(data.saldo != null ? data.saldo : data.total);
+      // si querés excluir anuladas: if (data.anulada) return;
+      if (saldo > 0) total += saldo;
+    });
+    return round2(total);
+  }
+
   
 </script>
 

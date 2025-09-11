@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  Registrar Abonos 💸</h1>
+  <h1> 💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -671,7 +671,10 @@ async function eliminarAbono(facturaId, abonoId) {
       }
     });
 
-    toast("✅ Abono eliminado correctamente");
+    // 🔁 Reencadenar pendingBalance de los abonos restantes de la misma factura
+    await recalcularSaldosFactura(facturaId);
+    toast("✅ Abono eliminado y saldos reencadenados");
+    
     cargarFacturasCredito();
     cargarHistorialAbonos();
   } catch (err) {
@@ -1306,6 +1309,37 @@ async function aplicarAbonos() {
   }
 }
 
+async function recalcularSaldosFactura(facturaId) {
+  const facturaRef = db.collection('facturas').doc(facturaId);
+
+  // 1) Leemos total de la factura
+  const facturaSnap = await facturaRef.get();
+  if (!facturaSnap.exists) return;
+  const totalFactura = Math.round((facturaSnap.data().total || 0) * 100) / 100;
+
+  // 2) Leemos todos los abonos en orden cronológico
+  const abonosSnap = await facturaRef
+    .collection('abonos')
+    .orderBy('dateTime', 'asc')
+    .get();
+
+  // 3) Reencadenamos saldos
+  let saldo = totalFactura;
+  const batch = db.batch();
+
+  abonosSnap.forEach(doc => {
+    const a = doc.data();
+    const monto = Math.round((a.amount || 0) * 100) / 100;
+
+    saldo = Math.round((saldo - monto) * 100) / 100;     // saldo después de aplicar este abono
+    batch.update(doc.ref, { pendingBalance: saldo });     // actualizamos el snapshot
+  });
+
+  // 4) Dejamos el saldo real de la factura coherente con el último saldo
+  batch.update(facturaRef, { saldo });
+
+  await batch.commit();
+}  
   
 </script>
 

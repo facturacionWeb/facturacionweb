@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  Registrar Abonos 💸💸</h1>
+  <h1>  💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -1392,9 +1392,7 @@ async function recalcularSaldosFactura(facturaId) {
   await batch.commit();
 }  
 
-  function round2(n){ return Math.round((Number(n)||0)*100)/100; }
-  
-  /** Suma todos los saldos > 0 de las facturas del cliente */
+  /*function round2(n){ return Math.round((Number(n)||0)*100)/100; }
   async function calcularSaldoPendienteTotalCliente(clienteId) {
     const qs = await db.collection('facturas')
       .where('clientId','==',clienteId)
@@ -1408,7 +1406,46 @@ async function recalcularSaldosFactura(facturaId) {
       if (saldo > 0) total += saldo;
     });
     return round2(total);
+  }*/
+  
+function round2(n){ return Math.round((Number(n)||0)*100)/100; }
+
+/**
+ * Calcula la deuda total pendiente del cliente
+ * Opciones por defecto alineadas con el reporte.
+ */
+async function calcularSaldoPendienteTotalCliente(clienteId, {
+  soloCredito = true,
+  excluirAnuladas = true,
+  usarSaldoPrimero = true
+} = {}) {
+  let q = db.collection('facturas').where('clientId','==',clienteId);
+  if (soloCredito)     q = q.where('paymentType','==','Credito');
+  if (excluirAnuladas) q = q.where('anulada','==',false);
+
+  const qs = await q.get();
+  let total = 0;
+
+  for (const doc of qs.docs) {
+    const f = doc.data();
+    let saldo;
+
+    if (usarSaldoPrimero && f.saldo != null) {
+      saldo = Number(f.saldo);
+    } else {
+      // Fallback: recomputar por abonos
+      const abonosSnap = await doc.ref.collection('abonos').get();
+      const abonado = abonosSnap.docs.reduce((s,a)=> s + Number(a.data().amount||0), 0);
+      saldo = Number(f.total||0) - abonado;
+    }
+
+    saldo = Math.max(0, round2(saldo));  // sin negativos por redondeo
+    if (saldo > 0) total += saldo;
   }
+
+  return round2(total);
+}
+
 
   
 </script>

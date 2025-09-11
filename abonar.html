@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  Registrar Abonos 💸</h1>
+  <h1>  Registrar Abonos 💸💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -913,12 +913,18 @@ return `
     const a = snap.data();
     const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
 
+    // ✅ Tomamos el snapshot si existe; si no, lo calculamos en vivo
+    const totalCliente = (a.saldoPendienteTotalCliente != null)
+    ? a.saldoPendienteTotalCliente
+    : await calcularSaldoPendienteTotalCliente(a.clientId);
+    
     // Reusamos tu función existente para renderizar el recibo en el contenedor
     // y luego llamamos a imprimir.
     mostrarReciboEnPantalla({
       facturaId: facturaId,
       monto: a.amount,
       saldoPendiente: a.pendingBalance,
+      saldoPendienteTotalCliente: totalCliente,    // 👈 PASARLO ES LA CLAVE
       fecha: fecha,
       ruta: a.route || 'SIN RUTA',
       metodo: a.metodoPago || 'N/A',

@@ -461,9 +461,6 @@
     const facturaId = document.getElementById('facturaSelect').value;
     const monto = parseFloat(document.getElementById('montoAbono').value);
     const ruta = document.getElementById('rutaAbono').value;
-    /*const metodo = document.getElementById('metodoPago').value;
-    const banco = document.getElementById('bancoSelect').value;
-    const referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();*/
     const metodo = document.getElementById('metodoPago').value;
     let banco = document.getElementById('bancoSelect').value;
     let referenciaBancaria = document.getElementById('referenciaBancaria').value.trim();
@@ -538,8 +535,14 @@
         });
       }
 
+      const clienteId = document.getElementById('clienteSelect').value;
+      const clienteNombre =
+      clientesMap[clienteId] ||
+      $('#clienteSelect option:selected').text(); 
+
       toast('✅ Abono registrado');
       mostrarReciboEnPantalla({
+        clienteNombre,
         facturaId,
         monto,
         saldoPendiente: (document.querySelector(`#facturaSelect option[value="${facturaId}"]`).dataset.saldo - monto),
@@ -563,27 +566,8 @@
   }
 
   /*********************** RECIBO *************************/
-  /*function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
-    const div = document.getElementById('recibo');
-    const fechaStr = fecha.toLocaleString();
 
-    let metodoTxt = metodo;
-    if (metodo==='Transferencia') metodoTxt += ` (${banco} #${referenciaBancaria})`;
-    if (metodo==='NotaCredito') metodoTxt += ` (NC: ${notaCreditoId})`;
-    console.log("👤 currentUser:", currentUser); document.getElementById('reciboContainer').style.display = 'block';
-    div.innerHTML = `
-      <h3 style="text-align:center;">Recibo de Abono</h3>
-      <p><strong>Fecha:</strong> ${fechaStr}</p>
-      <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
-      <p><strong>Factura #:</strong> ${facturaId}</p>
-      <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
-      <hr>
-      <p><strong>Abonado:</strong> C$${monto.toFixed(2)}</p>
-      <p><strong>Saldo Pendiente:</strong> C$${saldoPendiente.toFixed(2)}</p>
-    `;
-    document.getElementById('reciboContainer').style.display = 'block';
-  }*/
-    function mostrarReciboEnPantalla({ facturaId, monto, saldoPendiente, saldoPendienteTotalCliente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
+    function mostrarReciboEnPantalla({ clienteNombre, facturaId, monto, saldoPendiente, saldoPendienteTotalCliente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
     const div = document.getElementById('recibo');
     const fechaStr = fecha.toLocaleString();
   
@@ -595,6 +579,7 @@
     div.innerHTML = `
       <h3 style="text-align:center;">Recibo de Abono</h3>
       <p><strong>Fecha:</strong> ${fechaStr}</p>
+      <p><strong>Cliente:</strong> ${clienteNombre || 'N/A'}</p>
       <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
       <p><strong>Factura #:</strong> ${facturaId}</p>
       <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
@@ -917,10 +902,12 @@ return `
     const totalCliente = (a.saldoPendienteTotalCliente != null)
     ? a.saldoPendienteTotalCliente
     : await calcularSaldoPendienteTotalCliente(a.clientId);
-    
+
+    const clienteNombre = clientesMap[a.clientId] || a.clientId;
     // Reusamos tu función existente para renderizar el recibo en el contenedor
     // y luego llamamos a imprimir.
     mostrarReciboEnPantalla({
+      clienteNombre,
       facturaId: facturaId,
       monto: a.amount,
       saldoPendiente: a.pendingBalance,

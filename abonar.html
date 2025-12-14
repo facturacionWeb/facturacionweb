@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  💸 Registrar Abonos 💸</h1>
+  <h1>  💸💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -828,30 +828,6 @@ return `
 `;
 }
 
-/*function renderAbonoRow(doc) {
-  const a = doc.data();
-  const facturaId = doc.ref.parent.parent.id;
-  const abonoId = doc.id;
-  const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
-  
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td>${fecha.toLocaleString()}</td>
-    <td>
-      <button onclick="viewInvoiceDetail('${facturaId}')" style="padding:5px 10px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer;">
-        ${facturaId}
-      </button>
-    </td>
-    <td>${(a.usuario && (a.usuario.fullName || a.usuario.username)) || 'Administrador'}</td>
-    <td>${a.metodoPago}</td>
-    <td>C$${a.amount.toFixed(2)}</td>
-    <td>C$${a.pendingBalance.toFixed(2)}</td>
-    <td>
-      <button onclick="eliminarAbono('${facturaId}', '${abonoId}')" style="padding:5px 10px; background:#dc3545; color:white; border:none; border-radius:4px;">Eliminar</button>
-    </td>
-  `;
-  return tr;
-}*/
   function renderAbonoRow(doc) {
   const a = doc.data();
   const facturaId = doc.ref.parent.parent.id;
@@ -861,12 +837,16 @@ return `
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td>
-      <button
-        onclick="imprimirReciboAbono('${facturaId}','${abonoId}')"
-        title="Imprimir recibo"
-        style="padding:5px 10px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">
-        🖨️
-      </button>
+      <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+          <button onclick="imprimirReciboAbono(...)" ...> 🖨️ </button>
+          
+          <button
+            onclick="imprimirReciboAbonoMovil('${facturaId}','${abonoId}')"
+            title="Imprimir abono móvil"
+            style="padding:5px 10px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+            📱
+          </button>
+      </div>
     </td>
     <td>${fecha.toLocaleString()}</td>
     <td>
@@ -932,7 +912,130 @@ return `
   }
 }
 
+/* =========================================================
+   IMPRESIÓN MÓVIL (Bluetooth / App Android)
+   - Envía texto formateado al WebView (AndroidBridge.printTicket)
+   - Usa el mismo estilo de tags que facturas.html ([C], [L], <b>, etc.)
+========================================================= */
 
+  function formatDateShort(d) {
+    try {
+      const dt = (d instanceof Date) ? d : new Date(d);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+    } catch (_) {
+      return String(d || '');
+    }
+  }
+  
+  function formatCordobas(n) {
+    const num = Number(n);
+    if (Number.isNaN(num)) return 'C$0.00';
+    return `C$${num.toFixed(2)}`;
+  }
+  
+  function buildAbonoThermalText(payload) {
+    const {
+      clienteNombre,
+      facturaId,
+      fecha,
+      ruta,
+      metodo,
+      banco,
+      referenciaBancaria,
+      notaCreditoId,
+      monto,
+      saldoPendiente,
+      saldoPendienteTotalCliente,
+      usuario
+    } = payload || {};
+  
+    const LINE = "================================";
+    const SEP  = "--------------------------------";
+  
+    const parts = [];
+    parts.push("[C]<b>RECIBO DE ABONO</b>");
+    parts.push("[C]" + SEP);
+  
+    parts.push(`[L]Fecha: ${formatDateShort(fecha)}`);
+    parts.push(`[L]Cliente: ${clienteNombre || 'N/A'}`);
+    parts.push(`[L]Factura: ${facturaId || 'N/A'}`);
+    if (ruta) parts.push(`[L]Ruta: ${ruta}`);
+  
+    const metodoTxt = metodo || 'N/A';
+    parts.push(`[L]Método: ${metodoTxt}`);
+  
+    // Detalles extra según método
+    const mLower = String(metodoTxt).toLowerCase();
+    if (mLower.includes("transfer")) {
+      if (banco) parts.push(`[L]Banco: ${banco}`);
+      if (referenciaBancaria) parts.push(`[L]Ref: ${referenciaBancaria}`);
+    }
+    if (mLower.includes("nota")) {
+      if (notaCreditoId) parts.push(`[L]Nota crédito: ${notaCreditoId}`);
+    }
+  
+    parts.push("[C]" + SEP);
+  
+    parts.push(`[L]Monto abonado: ${formatCordobas(monto)}`);
+    parts.push(`[L]Saldo factura: ${formatCordobas(saldoPendiente)}`);
+    parts.push(`[L]Saldo cliente: ${formatCordobas(saldoPendienteTotalCliente)}`);
+  
+    parts.push("[C]" + SEP);
+    if (usuario) parts.push(`[L]Registrado por: ${usuario}`);
+  
+    parts.push("");
+    parts.push("[C]Gracias por su pago");
+    parts.push("[C]" + LINE);
+    parts.push("");
+  
+    return parts.join("\n");
+  }
+  
+  async function imprimirReciboAbonoMovil(facturaId, abonoId) {
+    try {
+      const abonoRef = db.collection('facturas').doc(facturaId).collection('abonos').doc(abonoId);
+      const snap = await abonoRef.get();
+      if (!snap.exists) {
+        alert('No se encontró el abono.');
+        return;
+      }
+  
+      const a = snap.data();
+      const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+  
+      const totalCliente = (a.saldoPendienteTotalCliente != null)
+        ? a.saldoPendienteTotalCliente
+        : await calcularSaldoPendienteTotalCliente(a.clientId);
+  
+      const clienteNombre = clientesMap[a.clientId] || a.clientId;
+      const usuario = (a.usuario && (a.usuario.fullName || a.usuario.username)) || 'Administrador';
+  
+      const finalText = buildAbonoThermalText({
+        clienteNombre,
+        facturaId,
+        fecha,
+        ruta: a.route || '',
+        metodo: a.metodoPago || 'N/A',
+        banco: a.banco || '',
+        referenciaBancaria: a.referenciaBancaria || '',
+        notaCreditoId: a.notaCreditoId || '',
+        monto: a.amount,
+        saldoPendiente: a.pendingBalance,
+        saldoPendienteTotalCliente: totalCliente,
+        usuario
+      });
+  
+      if (typeof AndroidBridge !== "undefined" && AndroidBridge.printTicket) {
+        AndroidBridge.printTicket(finalText);
+      } else {
+        alert("AndroidBridge no está disponible. ¿Estás en la app Android?");
+      }
+  
+    } catch (err) {
+      alert('Error en impresión móvil: ' + err.message);
+    }
+  }
 
   async function loadMoreAbonos() {
     if (histLoading || histDone) return;

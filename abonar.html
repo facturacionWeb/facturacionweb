@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  💸💸 Registrar Abonos 💸</h1>
+  <h1>  💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -838,7 +838,7 @@ return `
   tr.innerHTML = `
     <td>
       <div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
-          <button onclick="imprimirReciboAbono(...)" ...> 🖨️ </button>
+          <button onclick="imprimirReciboAbono('${facturaId}','${abonoId}')"> 🖨️ </button>
           
           <button
             onclick="imprimirReciboAbonoMovil('${facturaId}','${abonoId}')"

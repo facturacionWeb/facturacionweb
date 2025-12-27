@@ -32,17 +32,8 @@
     button:hover { background:#45a049; }
     .chart-container { position:relative; max-width:600px; height:300px; margin:0 auto; }
 
-    .card p {
-      font-size: 1.8em;
-      font-weight: bold;
-      color: #333;
-    }
-
-    .hint {
-      margin: 6px 0 0;
-      font-size: 0.9em;
-      color: #666;
-    }
+    .card p { font-size: 1.8em; font-weight: bold; color: #333; }
+    .hint { margin: 6px 0 0; font-size: 0.9em; color: #666; }
 
     /* Tiny toolbar inside cards */
     .card-toolbar{
@@ -59,13 +50,18 @@
       gap:10px;
       flex-wrap:wrap;
     }
-    .select{
+
+    .select, .input{
       padding:8px 10px;
       border:1px solid #ddd;
       border-radius:8px;
       background:#fff;
     }
-    .select:focus{ outline: none; border-color:#4CAF50; box-shadow:0 0 0 3px rgba(76,175,80,.15); }
+    .select:focus, .input:focus{
+      outline: none;
+      border-color:#4CAF50;
+      box-shadow:0 0 0 3px rgba(76,175,80,.15);
+    }
 
     /* Modal */
     .modal-overlay{
@@ -81,7 +77,7 @@
     .modal-overlay.show{ display:flex; }
     .modal{
       background:#fff;
-      width:min(980px, 96vw);
+      width:min(1080px, 96vw);
       border-radius:12px;
       box-shadow:0 15px 45px rgba(0,0,0,.25);
       padding:14px;
@@ -94,12 +90,25 @@
       margin-bottom:10px;
       padding-bottom:8px;
       border-bottom:1px solid #eee;
+      flex-wrap: wrap;
     }
     .modal-header h2{
       margin:0;
       font-size:1.1rem;
       text-align:left;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap: wrap;
     }
+
+    .modal-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
     .btn-close{
       background:#e74c3c;
       padding:8px 12px;
@@ -107,21 +116,93 @@
     }
     .btn-close:hover{ background:#cf3e30; }
 
+    .btn-tab{
+      background:#eaeaea;
+      color:#222;
+      padding:8px 10px;
+      border-radius:8px;
+    }
+    .btn-tab:hover{ background:#dfdfdf; }
+    .btn-tab.active{
+      background:#4CAF50;
+      color:#fff;
+    }
+
     .modal-note{
       text-align:left;
-      margin: 6px 0 0;
+      margin: 8px 0 0;
       font-size: 0.9em;
       color: #666;
     }
 
+    .modal-body{ display:block; }
+
     .chart-container.modal-chart{
-      max-width: 920px;
-      height: 420px;
+      max-width: 1000px;
+      height: 520px;
+    }
+
+    .hidden{ display:none !important; }
+
+    /* Table */
+    .table-wrap{
+      margin-top:10px;
+      border:1px solid #eee;
+      border-radius:12px;
+      overflow:hidden;
+    }
+    .table-toolbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px;
+      background:#fafafa;
+      border-bottom:1px solid #eee;
+      flex-wrap:wrap;
+    }
+    .table-toolbar .left{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .table-scroll{
+      max-height: 520px;
+      overflow:auto;
+      background:#fff;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      text-align:left;
+    }
+    th, td{
+      padding:10px 12px;
+      border-bottom:1px solid #f0f0f0;
+      vertical-align:top;
+      font-size: 0.95em;
+    }
+    th{
+      position:sticky;
+      top:0;
+      background:#fff;
+      z-index:1;
+      font-weight:700;
+    }
+    td.num{ text-align:right; white-space:nowrap; }
+    .badge{
+      display:inline-block;
+      padding:2px 8px;
+      border-radius:999px;
+      background:#f2f2f2;
+      font-size:0.85em;
+      color:#444;
     }
   </style>
 </head>
 <body>
-  <h1>🚀 Dashboard de Ventas🚀🚀🚀</h1>
+  <h1>🚀 Dashboard de Ventas</h1>
 
   <!-- Filtros -->
   <div class="flex">
@@ -194,14 +275,71 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="monthModalTitle">
       <div class="modal-header">
         <h2 id="monthModalTitle">📦 Ventas por modelo</h2>
-        <button class="btn-close" onclick="closeMonthModal()">Cerrar ✖</button>
+
+        <div class="modal-actions">
+          <button id="tabChartBtn" class="btn-tab active" onclick="switchMonthModalView('chart')">Gráfico 📊</button>
+          <button id="tabTableBtn" class="btn-tab" onclick="switchMonthModalView('table')">Tabla 🧾</button>
+
+          <span class="badge" id="monthTotalsBadge">Total: 0</span>
+
+          <label for="topNSelect"><strong>Top:</strong></label>
+          <select id="topNSelect" class="select" title="Cuántos modelos mostrar en el gráfico">
+            <option value="10">10</option>
+            <option value="15" selected>15</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+            <option value="40">40</option>
+          </select>
+
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input id="groupOthersChk" type="checkbox" checked>
+            Agrupar “Otros”
+          </label>
+
+          <button class="btn-close" onclick="closeMonthModal()">Cerrar ✖</button>
+        </div>
       </div>
 
-      <div class="chart-container modal-chart">
-        <canvas id="monthModelsChart"></canvas>
-      </div>
+      <div class="modal-body">
+        <!-- Chart view -->
+        <div id="monthChartView">
+          <div class="chart-container modal-chart">
+            <canvas id="monthModelsChart"></canvas>
+          </div>
+          <div id="monthModalNote" class="modal-note"></div>
+        </div>
 
-      <div id="monthModalNote" class="modal-note"></div>
+        <!-- Table view -->
+        <div id="monthTableView" class="hidden">
+          <div class="table-wrap">
+            <div class="table-toolbar">
+              <div class="left">
+                <label for="modelSearch"><strong>Buscar:</strong></label>
+                <input id="modelSearch" class="input" placeholder="Escribí marca/modelo..." />
+              </div>
+              <div class="left">
+                <span class="badge" id="tableCountBadge">0 modelos</span>
+              </div>
+            </div>
+
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:55%;">Modelo</th>
+                    <th style="width:15%;">Unidades</th>
+                    <th style="width:15%;">% del mes</th>
+                    <th style="width:15%;">Acum.</th>
+                  </tr>
+                </thead>
+                <tbody id="modelsTbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="modal-note" id="monthTableNote"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -211,6 +349,14 @@
     const NOW = new Date();
     const CURRENT_YEAR  = NOW.getFullYear();
     const CURRENT_MONTH = NOW.getMonth() + 1; // 1..12
+
+    // estado modal
+    window.__monthModalState = {
+      monthKey: null,
+      entries: [],
+      total: 0,
+      fullLabels: [],
+    };
 
     function obtenerLabelProducto(item) {
       if (item.brand || item.model) return `${item.brand||''} ${item.model||''}`.trim();
@@ -224,11 +370,8 @@
     }
 
     function getInvoiceDate(inv){
-      // 1) Timestamp de Firestore
       if (inv && inv.fecha && typeof inv.fecha.toDate === 'function') return inv.fecha.toDate();
-      // 2) Date nativo
       if (inv && inv.fecha instanceof Date) return inv.fecha;
-      // 3) fechaStr tipo 'YYYY-MM-DD'
       if (inv && inv.fechaStr) {
         const dt = new Date(inv.fechaStr + 'T00:00:00');
         if (!isNaN(dt.getTime())) return dt;
@@ -256,6 +399,13 @@
         keys.push(`${year}-${String(m).padStart(2,'0')}`);
       }
       return keys;
+    }
+
+    function shortenLabel(str, max=26){
+      if (!str) return str;
+      const s = String(str).trim();
+      if (s.length <= max) return s;
+      return s.slice(0, max-1) + '…';
     }
 
     async function generarDashboard() {
@@ -298,10 +448,7 @@
         daily[day].ventas += inv.total || 0;
         dailyCount[day]++;
 
-        if (!Array.isArray(inv.items)) {
-          console.warn("⚠ Factura sin items o items no array:", doc.id);
-          return;
-        }
+        if (!Array.isArray(inv.items)) return;
 
         inv.items.forEach(item => {
           const costo = Number(item.costo_compra) || 0;
@@ -316,12 +463,9 @@
           daily[day].profit += gananciaTotal;
 
           const key = item.articleId || `${item.brand || ''}-${item.model || ''}` || 'SIN_ID';
-          if (!productStats[key]) {
-            productStats[key] = { qty: 0, label: obtenerLabelProducto(item) };
-          }
+          if (!productStats[key]) productStats[key] = { qty: 0, label: obtenerLabelProducto(item) };
           productStats[key].qty += qty;
         });
-
       });
 
       const formatter = new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD' });
@@ -456,50 +600,157 @@
       });
     }
 
+    function switchMonthModalView(view){
+      const chartView = document.getElementById('monthChartView');
+      const tableView = document.getElementById('monthTableView');
+      const tabChart = document.getElementById('tabChartBtn');
+      const tabTable = document.getElementById('tabTableBtn');
+
+      if (view === 'table'){
+        chartView.classList.add('hidden');
+        tableView.classList.remove('hidden');
+        tabChart.classList.remove('active');
+        tabTable.classList.add('active');
+      }else{
+        tableView.classList.add('hidden');
+        chartView.classList.remove('hidden');
+        tabTable.classList.remove('active');
+        tabChart.classList.add('active');
+      }
+    }
+
+    function renderMonthModelChart(){
+      const st = window.__monthModalState;
+      const numberFormatter = new Intl.NumberFormat('es-NI');
+
+      const topN = Number(document.getElementById('topNSelect').value || 15);
+      const groupOthers = !!document.getElementById('groupOthersChk').checked;
+
+      const entries = st.entries || [];
+      const total = st.total || 0;
+
+      const top = entries.slice(0, topN);
+      const rest = entries.slice(topN);
+
+      let labelsFull = top.map(([k]) => k);
+      let data = top.map(([,v]) => v);
+
+      if (groupOthers && rest.length){
+        const otros = rest.reduce((acc, [,v]) => acc + (v||0), 0);
+        labelsFull = [...labelsFull, `Otros (${rest.length})`];
+        data = [...data, otros];
+      }
+
+      const labelsShort = labelsFull.map(s => shortenLabel(s, 32));
+      st.fullLabels = labelsFull;
+
+      renderChart('monthModelsChart', {
+        type:'bar',
+        data:{ labels: labelsShort, datasets:[{ label:'Unidades', data }] },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          indexAxis: 'y',
+          scales:{ x:{ beginAtZero:true }, y:{ ticks:{ autoSkip:false } } },
+          plugins:{
+            tooltip:{
+              callbacks:{
+                title: (items) => {
+                  const idx = items?.[0]?.dataIndex ?? 0;
+                  return st.fullLabels?.[idx] || items?.[0]?.label || '';
+                },
+                label: (ctx) => ` ${ctx.dataset.label}: ${numberFormatter.format(ctx.raw)}`
+              }
+            }
+          }
+        }
+      });
+
+      const note = document.getElementById('monthModalNote');
+      if (entries.length === 0){
+        note.innerText = 'Este mes no tiene ventas registradas 😅';
+      } else {
+        const showing = groupOthers && rest.length ? (top.length + 1) : top.length;
+        note.innerText = `Mostrando ${showing} barras (Top ${topN}${groupOthers && rest.length ? ' + Otros' : ''}). Total modelos: ${entries.length}.`;
+      }
+    }
+
+    function renderMonthModelTable(){
+      const st = window.__monthModalState;
+      const numberFormatter = new Intl.NumberFormat('es-NI');
+
+      const tbody = document.getElementById('modelsTbody');
+      const badge = document.getElementById('tableCountBadge');
+      const note  = document.getElementById('monthTableNote');
+      const search = document.getElementById('modelSearch');
+
+      const entries = st.entries || [];
+      const total = st.total || 0;
+
+      let acum = 0;
+      const rows = entries.map(([label, qty]) => {
+        const pct = total ? (qty / total) * 100 : 0;
+        acum += pct;
+        return { label, qty, pct, acum };
+      });
+
+      function renderRows(filtered){
+        tbody.innerHTML = filtered.map(r => {
+          const pctTxt = (r.pct || 0).toFixed(1) + '%';
+          const acumTxt = (r.acum || 0).toFixed(1) + '%';
+          return `
+            <tr>
+              <td>${r.label}</td>
+              <td class="num">${numberFormatter.format(r.qty)}</td>
+              <td class="num">${pctTxt}</td>
+              <td class="num">${acumTxt}</td>
+            </tr>
+          `;
+        }).join('');
+
+        badge.textContent = `${filtered.length} modelos`;
+        note.textContent = total ? `Total unidades del mes: ${numberFormatter.format(total)}.` : 'Sin unidades este mes.';
+      }
+
+      renderRows(rows);
+
+      if (search){
+        search.value = '';
+        search.oninput = () => {
+          const q = (search.value || '').trim().toLowerCase();
+          if (!q) return renderRows(rows);
+          const filtered = rows.filter(r => String(r.label).toLowerCase().includes(q));
+          renderRows(filtered);
+        };
+      }
+    }
+
     function openMonthModal(monthKey){
       const overlay = document.getElementById('monthModal');
       const title = document.getElementById('monthModalTitle');
-      const note = document.getElementById('monthModalNote');
+      const totalsBadge = document.getElementById('monthTotalsBadge');
+      const numberFormatter = new Intl.NumberFormat('es-NI');
 
       title.innerText = `📦 Ventas por modelo — ${monthLabelFromKey(monthKey)}`;
-      note.innerText = '';
 
       const modelObj = (window.__monthlyByModel && window.__monthlyByModel[monthKey]) ? window.__monthlyByModel[monthKey] : {};
       const entries = Object.entries(modelObj).sort((a,b) => (b[1]||0) - (a[1]||0));
+      const total = entries.reduce((acc, [,v]) => acc + (v||0), 0);
 
-      if (entries.length === 0) {
-        note.innerText = 'Este mes no tiene ventas registradas 😅';
-        renderChart('monthModelsChart', {
-          type:'bar',
-          data:{ labels:['Sin datos'], datasets:[{ label:'Unidades', data:[0] }] },
-          options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
-        });
-      } else {
-        const TOP = 60;
-        const top = entries.slice(0, TOP);
+      window.__monthModalState.monthKey = monthKey;
+      window.__monthModalState.entries = entries;
+      window.__monthModalState.total = total;
 
-        if (entries.length > TOP) {
-          note.innerText = `Mostrando Top ${TOP} de ${entries.length} modelos (para no saturar la gráfica).`;
-        } else {
-          note.innerText = `Modelos distintos: ${entries.length}`;
-        }
+      totalsBadge.textContent = `Total: ${numberFormatter.format(total)} uds`;
 
-        renderChart('monthModelsChart', {
-          type:'bar',
-          data:{
-            labels: top.map(([k]) => k),
-            datasets:[{ label:'Unidades', data: top.map(([,v]) => v) }]
-          },
-          options:{
-            responsive:true,
-            maintainAspectRatio:false,
-            scales:{
-              y:{ beginAtZero:true },
-              x:{ ticks:{ autoSkip:false, maxRotation:45, minRotation:0 } }
-            }
-          }
-        });
-      }
+      switchMonthModalView('chart');
+      renderMonthModelChart();
+      renderMonthModelTable();
+
+      const topSel = document.getElementById('topNSelect');
+      const chk = document.getElementById('groupOthersChk');
+      if (topSel) topSel.onchange = () => renderMonthModelChart();
+      if (chk) chk.onchange = () => renderMonthModelChart();
 
       overlay.classList.add('show');
       overlay.setAttribute('aria-hidden','false');
@@ -525,7 +776,6 @@
 
       const MIN_YEAR = 2018;
       sel.innerHTML = '';
-
       for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--){
         const opt = document.createElement('option');
         opt.value = String(y);
@@ -535,7 +785,6 @@
       sel.value = String(CURRENT_YEAR);
 
       sel.addEventListener('change', () => loadMonthlyItemsChart());
-
       loadMonthlyItemsChart();
     }
 

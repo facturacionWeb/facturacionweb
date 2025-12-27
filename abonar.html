@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  💸 Registrar Abonos 💸💸</h1>
+  <h1>  💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -291,10 +291,23 @@
       </table>
     </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
-      <button onclick="closeMultiAbonoModal()" style="background:#aaa;">Cancelar</button>
-      <button id="btnAplicarAbonos" disabled>Aplicar abonos</button>
+        <div style="display:flex; justify-content:space-between; gap:8px; margin-top:12px; align-items:center; flex-wrap:wrap;">
+      <div id="multiReciboStatus" style="font-size:13px; color:#555;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+        <button id="btnImprimirMultiWeb" disabled title="Imprimir recibo (web)">🖨️ Imprimir</button>
+        <button
+          id="btnImprimirMultiMovil"
+          disabled
+          title="Imprimir recibo (móvil)"
+          style="padding:5px 10px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+          📱 Móvil
+        </button>
+        <button onclick="closeMultiAbonoModal()" style="background:#aaa;">Cerrar</button>
+        <button id="btnAplicarAbonos" disabled>Aplicar abonos</button>
+      </div>
     </div>
+
+    <div id="multiReciboPreview" style="display:none; margin-top:12px; border:1px dashed #bbb; padding:12px; border-radius:10px; background:#fafafa;"></div>
   </div>
 </div>
 
@@ -1069,7 +1082,179 @@ return `
     }
   }
 
-  async function loadMoreAbonos() {
+  
+
+/* =========================================================
+   RECIBO ABONO MÚLTIPLE (WEB + MÓVIL)
+   - Se genera después de aplicar el lote (abono múltiple)
+========================================================= */
+
+function renderMultiReciboHtml(payload) {
+  const p = payload || {};
+  const fecha = (p.fecha instanceof Date) ? p.fecha : new Date(p.fecha || Date.now());
+  const fechaStr = fecha.toLocaleString();
+
+  let metodoTxt = p.metodo || 'N/A';
+  if ((p.metodo || '').toLowerCase().includes('transfer')) {
+    metodoTxt += ` (${p.banco || 'N/A'} #${p.referenciaBancaria || 'N/A'})`;
+  }
+
+  const items = Array.isArray(p.items) ? p.items : [];
+  const total = Number(p.totalAplicado || 0);
+
+  const rows = items.map((it, idx) => {
+    const facturaId = it.facturaId || 'N/A';
+    const consecutivo = it.consecutivo || 'N/A';
+    const saldoAntes = Number(it.saldoAntes || 0);
+    const monto = Number(it.monto || 0);
+    const saldoDespues = Number(it.saldoDespues || 0);
+
+    return `
+      <tr>
+        <td style="text-align:center;">${idx + 1}</td>
+        <td>${facturaId}</td>
+        <td>${consecutivo}</td>
+        <td style="text-align:right;">${cord(saldoAntes)}</td>
+        <td style="text-align:right;">${cord(monto)}</td>
+        <td style="text-align:right;">${cord(saldoDespues)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <h3 style="text-align:center;">Recibo de Abono Múltiple</h3>
+    <p><strong>Fecha:</strong> ${fechaStr}</p>
+    <p><strong>Cliente:</strong> ${p.clienteNombre || 'N/A'}</p>
+    <p><strong>Registrado por:</strong> ${p.usuarioNombre || 'N/A'}</p>
+    <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
+    <p><strong>Referencia lote:</strong> ${p.refBase || 'N/A'}</p>
+    <hr>
+    <p><strong>Total abonado:</strong> ${cord(total)}</p>
+    <p><strong>Saldo Pendiente Total:</strong> ${cord(Number(p.saldoPendienteTotalCliente || 0))}</p>
+
+    <div style="margin-top:12px;">
+      <table style="width:100%; border-collapse:collapse;" border="1" cellpadding="6">
+        <thead>
+          <tr style="background:#f3f3f3;">
+            <th style="width:40px;">#</th>
+            <th>Factura</th>
+            <th>Consecutivo</th>
+            <th>Saldo antes</th>
+            <th>Abono</th>
+            <th>Saldo después</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows || `<tr><td colspan="6" style="text-align:center;">Sin detalle</td></tr>`}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;"><strong>Total</strong></td>
+            <td style="text-align:right;"><strong>${cord(total)}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+}
+
+function printHtmlInNewWindow(html) {
+  const w = window.open('', '_blank', 'width=900,height=650');
+  w.document.write(`<!DOCTYPE html><html><head><title>Recibo</title>
+    <style>
+      body{font-family:Arial;margin:20px;color:#111;}
+      hr{margin:10px 0;}
+      table{font-size:13px;}
+      th,td{border:1px solid #ddd;}
+    </style>
+  </head><body>${html}</body></html>`);
+  w.document.close();
+  w.focus();
+  w.print();
+  w.close();
+}
+
+function mostrarReciboMultiPreview(payload) {
+  const div = document.getElementById('multiReciboPreview');
+  if (!div) return;
+  div.innerHTML = renderMultiReciboHtml(payload);
+  div.style.display = 'block';
+}
+
+function imprimirReciboMultiWeb() {
+  if (!lastMultiReceiptPayload) {
+    alert('Todavía no hay un recibo listo. Primero aplicá los abonos.');
+    return;
+  }
+  const html = renderMultiReciboHtml(lastMultiReceiptPayload);
+  printHtmlInNewWindow(html);
+}
+
+function buildMultiAbonoThermalText(payload) {
+  const p = payload || {};
+  const LINE = "================================";
+  const SEP  = "--------------------------------";
+
+  const parts = [];
+  parts.push("[C]<b>RECIBO ABONO MULTIPLE</b>");
+  parts.push("[C]" + SEP);
+
+  parts.push(`[L]Fecha: ${formatDateShort(p.fecha)}`);
+  parts.push(`[L]Cliente: ${p.clienteNombre || 'N/A'}`);
+  parts.push(`[L]Registrado: ${p.usuarioNombre || 'N/A'}`);
+  parts.push(`[L]Ref lote: ${p.refBase || 'N/A'}`);
+
+  const metodoTxt = p.metodo || 'N/A';
+  parts.push(`[L]Metodo: ${metodoTxt}`);
+
+  const mLower = String(metodoTxt).toLowerCase();
+  if (mLower.includes("transfer")) {
+    if (p.banco) parts.push(`[L]Banco: ${p.banco}`);
+    if (p.referenciaBancaria) parts.push(`[L]Ref: ${p.referenciaBancaria}`);
+  }
+
+  parts.push("[C]" + SEP);
+
+  const items = Array.isArray(p.items) ? p.items : [];
+  items.forEach((it, idx) => {
+    const facturaId = it.facturaId || 'N/A';
+    const monto = it.monto || 0;
+    const saldoDespues = it.saldoDespues || 0;
+
+    parts.push(`[L]${idx + 1}. F:${facturaId}`);
+    parts.push(`[L]   Abono: ${formatCordobas(monto)}`);
+    parts.push(`[L]   Saldo: ${formatCordobas(saldoDespues)}`);
+  });
+
+  parts.push("[C]" + SEP);
+  parts.push(`[L]Total abonado: ${formatCordobas(p.totalAplicado || 0)}`);
+  parts.push(`[L]Saldo cliente: ${formatCordobas(p.saldoPendienteTotalCliente || 0)}`);
+
+  parts.push("[C]" + SEP);
+  parts.push("[C]Gracias por su pago");
+  parts.push("[C]" + LINE);
+  parts.push("");
+
+  return parts.join("\n");
+}
+
+function imprimirReciboMultiMovil() {
+  if (!lastMultiReceiptPayload) {
+    alert('Todavía no hay un recibo listo. Primero aplicá los abonos.');
+    return;
+  }
+
+  const finalText = buildMultiAbonoThermalText(lastMultiReceiptPayload);
+
+  if (typeof AndroidBridge !== "undefined" && AndroidBridge.printTicket) {
+    AndroidBridge.printTicket(finalText);
+  } else {
+    alert("AndroidBridge no está disponible. ¿Estás en la app Android?");
+  }
+}
+
+async function loadMoreAbonos() {
     if (histLoading || histDone) return;
     histLoading = true;
     document.getElementById('histLoading').style.display = 'block';
@@ -1154,6 +1339,7 @@ function setupHistorialInfiniteScroll() {
     /************* ABONO MÚLTIPLE – ESTADO *************/
   let multiFacturas = []; // [{id, fecha, consecutivo, total, saldo, proyectado, abono}]
   let multiObserverAttached = false;
+  let lastMultiReceiptPayload = null; // snapshot para imprimir recibo del lote
   
   /************* ABONO MÚLTIPLE – UI HOOK *************/
   window.addEventListener('load', () => {
@@ -1196,6 +1382,21 @@ function setupHistorialInfiniteScroll() {
     document.getElementById('multiAbonoTbody').innerHTML = '';
     document.getElementById('multiMonto').value = '';
     updateMultiResumen(0, 0);
+  
+    // Reset impresión multi
+    lastMultiReceiptPayload = null;
+    const btnPW = document.getElementById('btnImprimirMultiWeb');
+    const btnPM = document.getElementById('btnImprimirMultiMovil');
+    if (btnPW) btnPW.disabled = true;
+    if (btnPM) btnPM.disabled = true;
+    const prev = document.getElementById('multiReciboPreview');
+    if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+    const st = document.getElementById('multiReciboStatus');
+    if (st) st.textContent = '';
+    const btnAp = document.getElementById('btnAplicarAbonos');
+    if (btnAp) btnAp.disabled = true;
+    const btnDist = document.getElementById('btnDistribuir');
+    if (btnDist) btnDist.disabled = false;
   
     
     // Reset método de pago multi (por defecto: efectivo)
@@ -1263,7 +1464,13 @@ function setupHistorialInfiniteScroll() {
     if (!multiObserverAttached) {
       document.getElementById('btnDistribuir').addEventListener('click', distribuirAbonos);
       document.getElementById('btnAplicarAbonos').addEventListener('click', aplicarAbonos);
-      
+
+      // Impresión del recibo multi (web + móvil)
+      const btnPW = document.getElementById('btnImprimirMultiWeb');
+      const btnPM = document.getElementById('btnImprimirMultiMovil');
+      if (btnPW) btnPW.addEventListener('click', imprimirReciboMultiWeb);
+      if (btnPM) btnPM.addEventListener('click', imprimirReciboMultiMovil);
+
       const mp = document.getElementById('multiMetodoPago');
       if (mp) mp.addEventListener('change', toggleMultiMetodoPago);
 multiObserverAttached = true;
@@ -1439,6 +1646,7 @@ async function aplicarAbonos() {
   }
 
   const facturaRefs = targets.map(t => db.collection('facturas').doc(t.id));
+  let accionesAplicadas = [];
 
   try {
     
@@ -1466,12 +1674,21 @@ async function aplicarAbonos() {
 
         const nuevoSaldo = Math.round((saldoActual - aplicar) * 100) / 100;
 
-        acciones.push({ ref: facturaRefs[i], aplicar, nuevoSaldo });
+        acciones.push({ ref: facturaRefs[i], aplicar, nuevoSaldo, saldoAntes: saldoActual, consecutivo: data.consecutivo || 'N/A' });
         restante = Math.round((restante - aplicar) * 100) / 100;
       }
 
       // Si no hay nada para aplicar, abortamos
       if (acciones.length === 0) return;
+
+      // Snapshot para recibo multi (para imprimir)
+      accionesAplicadas = acciones.map(x => ({
+        facturaId: x.ref.id,
+        consecutivo: x.consecutivo || 'N/A',
+        saldoAntes: x.saldoAntes,
+        monto: x.aplicar,
+        saldoDespues: x.nuevoSaldo
+      }));
 
       // 4) ESCRIBIR TODO DESPUÉS (updates + abonos)
       for (let i = 0; i < acciones.length; i++) {
@@ -1502,6 +1719,11 @@ async function aplicarAbonos() {
       }
     });
 
+    if (createdAbonoPaths.length === 0) {
+      alert('No se aplicó ningún abono (quizá las facturas ya estaban saldadas).');
+      return;
+    }
+
     // Setear el snapshot total en todos los abonos creados
     const totalCliente = await calcularSaldoPendienteTotalCliente(clienteId);
     const batch = db.batch();
@@ -1510,10 +1732,52 @@ async function aplicarAbonos() {
 
     // 5) UI final
     toast('✅ Abonos aplicados correctamente.');
-    closeMultiAbonoModal();
+
+    const clienteNombre =
+      clientesMap[clienteId] ||
+      ($('#clienteSelect option:selected').text() || clienteId);
+
+    const usuarioNombre =
+      (currentUser && (currentUser.fullName || currentUser.username)) || 'Administrador';
+
+    const totalAplicado = Math.round(
+      accionesAplicadas.reduce((acc, it) => acc + Number(it.monto || 0), 0) * 100
+    ) / 100;
+
+    // Guardar snapshot para impresión
+    lastMultiReceiptPayload = {
+      fecha,
+      clienteNombre,
+      usuarioNombre,
+      metodo,
+      banco,
+      referenciaBancaria,
+      refBase,
+      totalAplicado,
+      saldoPendienteTotalCliente: totalCliente,
+      items: accionesAplicadas
+    };
+
+    const st = document.getElementById('multiReciboStatus');
+    if (st) st.textContent = `Listo ✅ Podés imprimir el recibo del lote ${refBase}.`;
+
+    const btnPW = document.getElementById('btnImprimirMultiWeb');
+    const btnPM = document.getElementById('btnImprimirMultiMovil');
+    if (btnPW) btnPW.disabled = false;
+    if (btnPM) btnPM.disabled = false;
+
+    mostrarReciboMultiPreview(lastMultiReceiptPayload);
+
+    // Evitar doble aplicación del lote
+    const btnAp = document.getElementById('btnAplicarAbonos');
+    if (btnAp) btnAp.disabled = true;
+    const btnDist = document.getElementById('btnDistribuir');
+    if (btnDist) btnDist.disabled = true;
+
+    // Refrescar UI existente
     cargarFacturasCredito();
     cargarHistorialAbonos();
-  } catch (err) {
+} catch (err) {
     console.error(err);
     alert('Error aplicando abonos: ' + err.message);
   }

@@ -89,7 +89,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Reporte de Estados de Cuenta 😎📊</h1>
+    <h1>😎 Reporte de Estados de Cuenta 😎📊</h1>
 
     <label for="clientSelect">Selecciona Cliente:</label>
     <select id="clientSelect"></select>
@@ -292,7 +292,7 @@ async function generateReport(clientId){
     // ===== ORDENAMIENTO NUEVO =====
     // Mantener grupos (ROJO -> AMARILLO -> BLANCO -> VERDE)
     // y dentro de cada grupo: Fecha Emisión DESC (más recientes primero)
-    items.sort((a,b)=>{
+    /*items.sort((a,b)=>{
       const ga = getGroupRank(a);
       const gb = getGroupRank(b);
       if (ga !== gb) return ga - gb;
@@ -302,6 +302,19 @@ async function generateReport(clientId){
 
       // desempate estable (por id)
       return String(b.id).localeCompare(String(a.id));
+    });*/
+    items.sort((a,b)=>{
+      const ga = getGroupRank(a);
+      const gb = getGroupRank(b);
+    
+      // Mantener el orden por grupos: ROJO -> AMARILLO -> BLANCO -> VERDE
+      if (ga !== gb) return ga - gb;
+    
+      //  más antigua → más reciente
+      if (a.fechaEmisionMs !== b.fechaEmisionMs) return a.fechaEmisionMs - b.fechaEmisionMs;
+    
+      // Desempate estable por id (opcional)
+      return String(a.id).localeCompare(String(b.id));
     });
 
     // ===== Render =====

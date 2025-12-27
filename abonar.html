@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>   Registrar Abonos </h1>
+  <h1>  💸 Registrar Abonos 💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -523,6 +523,9 @@
     if (metodo==='Transferencia' && !referenciaBancaria) return alert('Ingrese referencia bancaria');
     if (metodo==='NotaCredito' && !notaCreditoId) return alert('Seleccione una nota de crédito');
 
+    // ✅ Consecutivo único del abono (YYYYMMDDHHmmss)
+    const consecutivoAbono = generateReference();
+
     let createdAbonoPath = null;  
     
     try {
@@ -541,7 +544,7 @@
         // Preparar datos abono
         const nuevoSaldo = saldoActual - monto;
         const fecha = new Date();
-        const abonoRef = facturaRef.collection('abonos').doc();
+const abonoRef = facturaRef.collection('abonos').doc();
         createdAbonoPath = abonoRef.path;         // 👈 NUEVO (guardamos la ruta del abono)
         const abonoData = {
           clientId: clienteId,
@@ -554,6 +557,7 @@
           referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
           notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null,
           reference: generateReference(),
+          consecutivoAbono: consecutivoAbono,
           usuario: {
             username: currentUser.username,
             fullName: currentUser.fullName
@@ -588,6 +592,7 @@
       mostrarReciboEnPantalla({
         clienteNombre,
         facturaId,
+        consecutivoAbono,
         monto,
         saldoPendiente: (document.querySelector(`#facturaSelect option[value="${facturaId}"]`).dataset.saldo - monto),
         saldoPendienteTotalCliente: saldoTotalCliente,   // 👈 NUEVO
@@ -611,7 +616,7 @@
 
   /*********************** RECIBO *************************/
 
-    function mostrarReciboEnPantalla({ clienteNombre, facturaId, monto, saldoPendiente, saldoPendienteTotalCliente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
+    function mostrarReciboEnPantalla({ clienteNombre, facturaId, consecutivoAbono, monto, saldoPendiente, saldoPendienteTotalCliente, fecha, ruta, metodo, banco, referenciaBancaria, notaCreditoId, currentUser }) {
     const div = document.getElementById('recibo');
     const fechaStr = fecha.toLocaleString();
   
@@ -626,6 +631,7 @@
       <p><strong>Cliente:</strong> ${clienteNombre || 'N/A'}</p>
       <p><strong>Registrado por:</strong> ${currentUser.fullName || currentUser.username}</p>
       <p><strong>Factura #:</strong> ${facturaId}</p>
+      <p><strong>Consecutivo abono:</strong> ${consecutivoAbono || 'N/A'}</p>
       <p><strong>Método de Pago:</strong> ${metodoTxt}</p>
       <hr>
       <p><strong>Abonado:</strong> C$${Number(monto).toFixed(2)}</p>
@@ -921,6 +927,16 @@ return `
 
     const a = snap.data();
     const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+    // ✅ Consecutivo del abono (persistido en Firestore)
+    let consecutivoAbono = a.consecutivoAbono || null;
+    if (!consecutivoAbono) {
+      consecutivoAbono = generateReference();
+    }
+    // Si el abono es antiguo y no tiene consecutivo, lo guardamos para futuras impresiones
+    if (!a.consecutivoAbono) {
+      try { await abonoRef.update({ consecutivoAbono }); } catch (e) { /* ignore */ }
+    }
+
 
     // ✅ Tomamos el snapshot si existe; si no, lo calculamos en vivo
     const totalCliente = (a.saldoPendienteTotalCliente != null)
@@ -933,6 +949,7 @@ return `
     mostrarReciboEnPantalla({
       clienteNombre,
       facturaId: facturaId,
+      consecutivoAbono: consecutivoAbono,
       monto: a.amount,
       saldoPendiente: a.pendingBalance,
       saldoPendienteTotalCliente: totalCliente,    // 👈 PASARLO ES LA CLAVE
@@ -983,6 +1000,7 @@ return `
     const {
       clienteNombre,
       facturaId,
+      consecutivoAbono,
       fecha,
       ruta,
       metodo,
@@ -1005,7 +1023,8 @@ return `
     parts.push(`[L]Fecha: ${formatDateShort(fecha)}`);
     parts.push(`[L]Cliente: ${clienteNombre || 'N/A'}`);
     parts.push(`[L]Factura: ${facturaId || 'N/A'}`);
-    if (ruta) parts.push(`[L]Ruta: ${ruta}`);
+    
+    parts.push(`[L]Consec abono: ${consecutivoAbono || 'N/A'}`);if (ruta) parts.push(`[L]Ruta: ${ruta}`);
   
     const metodoTxt = metodo || 'N/A';
     parts.push(`[L]Método: ${metodoTxt}`);
@@ -1048,6 +1067,15 @@ return `
   
       const a = snap.data();
       const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
+      // ✅ Consecutivo del abono (persistido en Firestore)
+      let consecutivoAbono = a.consecutivoAbono || null;
+      if (!consecutivoAbono) {
+        consecutivoAbono = generateReference();
+      }
+      if (!a.consecutivoAbono) {
+        try { await abonoRef.update({ consecutivoAbono }); } catch (e) { /* ignore */ }
+      }
+
   
       const totalCliente = (a.saldoPendienteTotalCliente != null)
         ? a.saldoPendienteTotalCliente
@@ -1059,6 +1087,7 @@ return `
       const finalText = buildAbonoThermalText({
         clienteNombre,
         facturaId,
+        consecutivoAbono,
         fecha,
         ruta: a.route || '',
         metodo: a.metodoPago || 'N/A',
@@ -1580,6 +1609,7 @@ multiObserverAttached = true;
             referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null, // aplica si es transferencia
             notaCreditoId: null,          // no aplica en múltiple
             reference: `${refBase}-${String(i+1).padStart(2,'0')}`,
+            consecutivoAbono: `${refBase}-${String(i+1).padStart(2,'0')}`,
             usuario: {
               username: currentUser.username,
               fullName: currentUser.fullName
@@ -1706,7 +1736,9 @@ async function aplicarAbonos() {
           referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
           notaCreditoId: null,
           reference: `${refBase}-${String(i + 1).padStart(2, '0')}`,
-          usuario: {
+            consecutivoAbono: `${refBase}-${String(i + 1).padStart(2, '0')}`,
+                    consecutivoAbono: `${refBase}-${String(i + 1).padStart(2, '0')}`, 
+usuario: {
             username: currentUser.username,
             fullName: currentUser.fullName
           }
@@ -1880,3 +1912,5 @@ async function calcularSaldoPendienteTotalCliente(clienteId, {
   
 </body>
 </html>
+
+

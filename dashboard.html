@@ -44,6 +44,29 @@
       color: #666;
     }
 
+    /* Tiny toolbar inside cards */
+    .card-toolbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .card-toolbar .left{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .select{
+      padding:8px 10px;
+      border:1px solid #ddd;
+      border-radius:8px;
+      background:#fff;
+    }
+    .select:focus{ outline: none; border-color:#4CAF50; box-shadow:0 0 0 3px rgba(76,175,80,.15); }
+
     /* Modal */
     .modal-overlay{
       position:fixed;
@@ -98,7 +121,7 @@
   </style>
 </head>
 <body>
-  <h1>🚀 Dashboard de Ventas 🚀</h1>
+  <h1>🚀 Dashboard de Ventas🚀🚀🚀</h1>
 
   <!-- Filtros -->
   <div class="flex">
@@ -149,8 +172,18 @@
 
   <!-- Artículos vendidos por mes -->
   <div class="card" style="margin-top:20px;">
-    <h2>📦 Artículos vendidos por mes</h2>
-    <p class="hint">Tip: hacé click en una barra para ver el detalle por modelo 😉</p>
+    <div class="card-toolbar">
+      <div class="left">
+        <h2 style="margin:0;">📦 Artículos vendidos por mes</h2>
+      </div>
+      <div class="left">
+        <label for="yearSelect"><strong>Año:</strong></label>
+        <select id="yearSelect" class="select" title="Seleccioná el año"></select>
+      </div>
+    </div>
+
+    <p class="hint">Se muestran todos los meses del año seleccionado. Si es el año actual, llega hasta el mes vigente 😉 (click en una barra para ver detalle por modelo)</p>
+
     <div class="chart-container">
       <canvas id="monthlyItemsChart"></canvas>
     </div>
@@ -174,6 +207,10 @@
 
   <script>
     const db = firebase.firestore();
+
+    const NOW = new Date();
+    const CURRENT_YEAR  = NOW.getFullYear();
+    const CURRENT_MONTH = NOW.getMonth() + 1; // 1..12
 
     function obtenerLabelProducto(item) {
       if (item.brand || item.model) return `${item.brand||''} ${item.model||''}`.trim();
@@ -208,9 +245,17 @@
     function monthLabelFromKey(key){
       const [y, m] = key.split('-').map(Number);
       const dt = new Date(y, (m||1) - 1, 1);
-      // "ene 2025"
       const label = new Intl.DateTimeFormat('es-NI', { month: 'short', year: 'numeric' }).format(dt);
-      return capFirst(label.replace('.', '')); // algunas locales devuelven "ene."
+      return capFirst(label.replace('.', ''));
+    }
+
+    function buildMonthKeysForYear(year){
+      const maxMonth = (year === CURRENT_YEAR) ? CURRENT_MONTH : 12;
+      const keys = [];
+      for (let m = 1; m <= maxMonth; m++){
+        keys.push(`${year}-${String(m).padStart(2,'0')}`);
+      }
+      return keys;
     }
 
     async function generarDashboard() {
@@ -237,10 +282,6 @@
       const daily = {};
       const dailyCount = {};
 
-      // 👇 NUEVO: articulos por mes + detalle por modelo
-      const monthlyQty = {};        // { 'YYYY-MM': qtyTotal }
-      const monthlyByModel = {};    // { 'YYYY-MM': { 'Marca Modelo': qtyTotal } }
-
       snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total || 0;
@@ -262,61 +303,23 @@
           return;
         }
 
-        const invDate = getInvoiceDate(inv);
-        const mk = invDate ? monthKeyFromDate(invDate) : 'SIN_MES';
-
         inv.items.forEach(item => {
           const costo = Number(item.costo_compra) || 0;
           const descuento = Number(item.discount || 0);
           const price = Number(item.price || 0);
           const qty = Number(item.quantity || 0);
 
-          if (costo === 0 && price > 0) {
-            console.warn("💸 Item con costo_compra = 0 (revisar):", {
-              factura: doc.id, articleId: item.articleId, price, qty, item
-            });
-          }
-
           const gananciaUnit = (price - costo) * (1 - descuento / 100);
           const gananciaTotal = gananciaUnit * qty;
-
-          // (tu debug log actual)
-          console.log(`📄 Factura: ${doc.id}`);
-          console.log(`🛒 Artículo: ${item.articleId || 'SIN_ID'}`);
-          console.log(`   - Precio venta: $${price}`);
-          console.log(`   - Costo compra: $${costo}`);
-          console.log(`   - Descuento: ${descuento}%`);
-          console.log(`   - Cantidad: ${qty}`);
-          console.log(`   - Ganancia unit: $${gananciaUnit.toFixed(2)}`);
-          console.log(`   - Ganancia total: $${gananciaTotal.toFixed(2)}`);
-
           totalProfit += gananciaTotal;
-          console.log(`💰 Ganancia acumulada: $${totalProfit.toFixed(2)}
-`);
 
           daily[day].profit += gananciaTotal;
 
-          // Top productos (unidades)
           const key = item.articleId || `${item.brand || ''}-${item.model || ''}` || 'SIN_ID';
           if (!productStats[key]) {
             productStats[key] = { qty: 0, label: obtenerLabelProducto(item) };
           }
           productStats[key].qty += qty;
-
-          // 👇 NUEVO: Artículos vendidos por mes (unidades)
-          if (!monthlyQty[mk]) monthlyQty[mk] = 0;
-          monthlyQty[mk] += qty;
-
-          // 👇 NUEVO: Detalle por modelo (unidades)
-          const modelLabel = (
-            (item.brand || item.model)
-              ? `${item.brand || ''} ${item.model || ''}`.trim()
-              : (item.model || item.descripcion || item.articleId || 'SIN_MODELO')
-          );
-
-          if (!monthlyByModel[mk]) monthlyByModel[mk] = {};
-          if (!monthlyByModel[mk][modelLabel]) monthlyByModel[mk][modelLabel] = 0;
-          monthlyByModel[mk][modelLabel] += qty;
         });
 
       });
@@ -332,20 +335,13 @@
         .sort((a,b)=> b[1].qty - a[1].qty)
         .slice(0,5);
 
-      const labelsP = top5.map(([,v]) => v.label);
-      const dataP   = top5.map(([,v]) => v.qty);
-
       renderChart('topProductsChart', {
         type:'bar',
         data:{
-          labels: labelsP,
-          datasets:[{ label:'Unidades', data: dataP }]
+          labels: top5.map(([,v]) => v.label),
+          datasets:[{ label:'Unidades', data: top5.map(([,v]) => v.qty) }]
         },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          scales:{ y:{ beginAtZero:true } }
-        }
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
       });
 
       const days = Object.keys(daily).sort();
@@ -354,43 +350,79 @@
         data:{
           labels: days,
           datasets:[
-            { label:'# Ventas',     data: days.map(d=>dailyCount[d]) },
-            { label:'Ventas ($)',   data: days.map(d=>daily[d].ventas) },
-            { label:'Ganancia ($)', data: days.map(d=>daily[d].profit) }
+            { label:'# Ventas',     data: days.map(d=>dailyCount[d] || 0) },
+            { label:'Ventas ($)',   data: days.map(d=>daily[d]?.ventas || 0) },
+            { label:'Ganancia ($)', data: days.map(d=>daily[d]?.profit || 0) }
           ]
         },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          scales:{ y:{ beginAtZero:true } }
-        }
+        options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
       });
+    }
 
-      // ============================
-      // NUEVO CHART: artículos por mes
-      // ============================
-      const monthKeys = Object.keys(monthlyQty)
-        .filter(k => k !== 'SIN_MES')
-        .sort(); // 'YYYY-MM' => ordena bien
+    function renderChart(id, cfg) {
+      const ctx = document.getElementById(id).getContext('2d');
+      if (window[id + '_chart']) window[id + '_chart'].destroy();
+      window[id + '_chart'] = new Chart(ctx, cfg);
+    }
 
-      // guardamos para el click
-      window.__monthlyByModel = monthlyByModel;
-      window.__monthKeys = monthKeys;
+    async function loadMonthlyItemsChart(){
+      const year = Number(document.getElementById('yearSelect').value);
+      const numberFormatter = new Intl.NumberFormat('es-NI');
 
-      if (monthKeys.length === 0) {
-        // si no hay meses, limpiamos el chart (por si venía de una corrida anterior)
-        const ctx = document.getElementById('monthlyItemsChart').getContext('2d');
-        if (window['monthlyItemsChart_chart']) window['monthlyItemsChart_chart'].destroy();
-        window['monthlyItemsChart_chart'] = new Chart(ctx, {
+      const start = new Date(year, 0, 1, 0,0,0,0);
+      const end   = new Date(year, 11, 31, 23,59,59,999);
+
+      let snap;
+      try{
+        snap = await db.collection("facturas")
+          .where("fecha", ">=", start)
+          .where("fecha", "<=", end)
+          .where("anulada", "==", false)
+          .get();
+      }catch(err){
+        console.error("Error cargando mensual por año:", err);
+        renderChart('monthlyItemsChart', {
           type:'bar',
-          data:{ labels:['Sin datos'], datasets:[{ label:'Unidades', data:[0] }]},
+          data:{ labels:['Error'], datasets:[{ label:'Unidades vendidas', data:[0] }]},
           options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
         });
         return;
       }
 
+      const monthlyQty = {};
+      const monthlyByModel = {};
+
+      snap.docs.forEach(doc => {
+        const inv = doc.data();
+        if (!Array.isArray(inv.items)) return;
+
+        const invDate = getInvoiceDate(inv);
+        const mk = invDate ? monthKeyFromDate(invDate) : null;
+        if (!mk) return;
+
+        inv.items.forEach(item => {
+          const qty = Number(item.quantity || 0);
+          if (!monthlyQty[mk]) monthlyQty[mk] = 0;
+          monthlyQty[mk] += qty;
+
+          const modelLabel = (
+            (item.brand || item.model)
+              ? `${item.brand || ''} ${item.model || ''}`.trim()
+              : (item.model || item.descripcion || item.articleId || 'SIN_MODELO')
+          );
+
+          if (!monthlyByModel[mk]) monthlyByModel[mk] = {};
+          if (!monthlyByModel[mk][modelLabel]) monthlyByModel[mk][modelLabel] = 0;
+          monthlyByModel[mk][modelLabel] += qty;
+        });
+      });
+
+      const monthKeys = buildMonthKeysForYear(year);
       const monthLabels = monthKeys.map(monthLabelFromKey);
       const monthData   = monthKeys.map(k => monthlyQty[k] || 0);
+
+      window.__monthlyByModel = monthlyByModel;
+      window.__monthKeys = monthKeys;
 
       renderChart('monthlyItemsChart', {
         type:'bar',
@@ -424,12 +456,6 @@
       });
     }
 
-    function renderChart(id, cfg) {
-      const ctx = document.getElementById(id).getContext('2d');
-      if (window[id + '_chart']) window[id + '_chart'].destroy();
-      window[id + '_chart'] = new Chart(ctx, cfg);
-    }
-
     function openMonthModal(monthKey){
       const overlay = document.getElementById('monthModal');
       const title = document.getElementById('monthModalTitle');
@@ -442,14 +468,14 @@
       const entries = Object.entries(modelObj).sort((a,b) => (b[1]||0) - (a[1]||0));
 
       if (entries.length === 0) {
-        note.innerText = 'Sin detalle de modelos para este mes 😅';
+        note.innerText = 'Este mes no tiene ventas registradas 😅';
         renderChart('monthModelsChart', {
           type:'bar',
           data:{ labels:['Sin datos'], datasets:[{ label:'Unidades', data:[0] }] },
           options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
         });
       } else {
-        const TOP = 25;
+        const TOP = 60;
         const top = entries.slice(0, TOP);
 
         if (entries.length > TOP) {
@@ -458,23 +484,18 @@
           note.innerText = `Modelos distintos: ${entries.length}`;
         }
 
-        const labels = top.map(([k]) => k);
-        const data   = top.map(([,v]) => v);
-
         renderChart('monthModelsChart', {
           type:'bar',
           data:{
-            labels,
-            datasets:[{ label:'Unidades', data }]
+            labels: top.map(([k]) => k),
+            datasets:[{ label:'Unidades', data: top.map(([,v]) => v) }]
           },
           options:{
             responsive:true,
             maintainAspectRatio:false,
             scales:{
               y:{ beginAtZero:true },
-              x:{
-                ticks:{ autoSkip:false, maxRotation:45, minRotation:0 }
-              }
+              x:{ ticks:{ autoSkip:false, maxRotation:45, minRotation:0 } }
             }
           }
         });
@@ -490,14 +511,36 @@
       overlay.setAttribute('aria-hidden','true');
     }
 
-    // Cerrar modal al clickear fuera del contenido
     document.getElementById('monthModal').addEventListener('click', (e) => {
       if (e.target && e.target.id === 'monthModal') closeMonthModal();
     });
 
-    // Cerrar modal con ESC
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeMonthModal();
+    });
+
+    function initYearSelect(){
+      const sel = document.getElementById('yearSelect');
+      if (!sel) return;
+
+      const MIN_YEAR = 2018;
+      sel.innerHTML = '';
+
+      for (let y = CURRENT_YEAR; y >= MIN_YEAR; y--){
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        sel.appendChild(opt);
+      }
+      sel.value = String(CURRENT_YEAR);
+
+      sel.addEventListener('change', () => loadMonthlyItemsChart());
+
+      loadMonthlyItemsChart();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initYearSelect();
     });
   </script>
 

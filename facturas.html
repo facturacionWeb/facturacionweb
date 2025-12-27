@@ -136,12 +136,43 @@
         width: 100%;
       }
     }
+
+
+    /* Contador de IMEIs escaneados (previsualización) */
+    .preview-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-top: 10px;
+    }
+    .imei-count-badge{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
+      border:3px solid #d60000;
+      border-radius:4px;
+      font-weight:700;
+      background:#fff;
+      color:#111;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .imei-count-badge .badge-icon{
+      font-size:18px;
+      line-height:1;
+    }
+    .imei-count-badge #previewImeiCount{
+      font-size:18px;
+      line-height:1;
+    } 
   </style>
 </head>
 <body>
   <a href="index.html">Volver a la Página Principal</a>
   <div class="container">
-    <h1>💰 Facturación de Artículos 📄💰</h1>
+    <h1>💰 Facturación de Artículos 💰</h1>
     
     <!-- Sección: Crear Nueva Factura -->
     <h2>Crear Nueva Factura</h2>
@@ -196,7 +227,16 @@
     <button onclick="addInvoiceItemByScan()">Agregar IMEI</button>
 
     <!-- Tabla de previsualización de items escaneados -->
-    <h3>Previsualización de Items Escaneados 📋</h3>
+    <!--<h3>Previsualización de Items Escaneados 📋</h3>-->
+    <div class="preview-header">
+      <h3>Previsualización de Items Escaneados 📋</h3>
+      <div class="imei-count-badge" title="Total de IMEIs escaneados">
+        <span class="badge-icon">📋</span>
+        <span class="badge-label">Total:</span>
+        <span id="previewImeiCount">0</span>
+      </div>
+    </div>
+
     <table id="invoicePreviewTable">
       <thead>
         <tr>
@@ -484,6 +524,7 @@
       const totalCell = row.children[3];
       totalCell.textContent = calculateItemTotal(item).toFixed(2);
       recalcPreviewTotal();
+      updatePreviewImeiCount();
     }
 
     // Recalcula el total de todos los items en previsualización y lo muestra
@@ -1627,6 +1668,14 @@
         }
       });
   }
+
+    // Actualiza el contador "Total: X" de IMEIs escaneados
+    function updatePreviewImeiCount() {
+      const el = document.getElementById('previewImeiCount');
+      if (!el) return;
+      el.textContent = String(invoicePreviewItems.length);
+    }
+
  
   </script>
 

@@ -64,18 +64,18 @@
     body * {
       visibility: hidden;
     }
-  
+
     #reportSection, #reportSection * {
       visibility: visible;
     }
-  
+
     #reportSection {
       position: absolute;
       left: 0;
       top: 0;
       width: 100%;
     }
-  
+
     /* 🔥 Reset colores para impresión */
     #reportSection tr,
     #reportSection td,
@@ -84,12 +84,12 @@
       color: black !important;
     }
   }
-   
+
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Reporte de Estados de Cuenta 😎😎📊</h1>
+    <h1>Reporte de Estados de Cuenta 😎📊</h1>
 
     <label for="clientSelect">Selecciona Cliente:</label>
     <select id="clientSelect"></select>
@@ -143,6 +143,10 @@
 /* ========= FIREBASE ========= */
 var db = firebase.firestore();
 
+/* ========= CONFIG / REGLAS ========= */
+// 👇 Umbral de "próxima a vencerse"
+const PROXIMA_A_VENCER_DIAS = 5;
+
 /* ========= CARGA CLIENTES ========= */
 function loadClients(){
   db.collection("clientes").get().then(snap=>{
@@ -150,7 +154,7 @@ function loadClients(){
     snap.forEach(doc=>{
       const o=document.createElement("option");
       const d = doc.data();
-      o.value=doc.id; 
+      o.value=doc.id;
       o.textContent=(d.nombreCliente||"") + " - " + (d.nombreTienda||"");
       sel.appendChild(o);
     });
@@ -165,19 +169,63 @@ document.getElementById("generateReportBtn").onclick=()=>{
   generateReport(id);
 };
 
+/* ========= FECHAS ========= */
+function parseFechaStrEs(fechaStr){
+  if(!fechaStr) return null;
+
+  // 1) Intento directo (ISO o formatos que el navegador reconozca)
+  const direct = new Date(fechaStr);
+  if(!isNaN(direct.getTime())) return direct;
+
+  // 2) Intento dd/mm/yyyy o dd-mm-yyyy (con posible hora al final)
+  const m = String(fechaStr).trim().match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+.*)?$/);
+  if(m){
+    const day = parseInt(m[1],10);
+    const month = parseInt(m[2],10) - 1;
+    let year = parseInt(m[3],10);
+    if(year < 100) year += 2000;
+    const d = new Date(year, month, day);
+    if(!isNaN(d.getTime())) return d;
+  }
+
+  return null;
+}
+
+function getFechaEmision(inv){
+  if(inv?.fecha?.seconds) return new Date(inv.fecha.seconds * 1000);
+  const parsed = parseFechaStrEs(inv?.fechaStr);
+  if(parsed) return parsed;
+
+  // fallback (si no hay fecha, usamos hoy para no romper cálculos)
+  return new Date();
+}
+
 function getDiasRestantes(inv){
   let diasCredito = 0;
   const metodo = inv.paymentMethod || "";
   const match = metodo.match(/\d+/);
   if (match) diasCredito = parseInt(match[0]);
 
-  const fechaEmision = inv.fecha?.seconds ? new Date(inv.fecha.seconds * 1000) : new Date();
+  const fechaEmision = getFechaEmision(inv);
   const hoy = new Date();
   const vencimiento = new Date(fechaEmision.getTime());
   vencimiento.setDate(vencimiento.getDate() + diasCredito);
 
   const diferenciaMs = vencimiento - hoy;
   return Math.ceil(diferenciaMs / (1000 * 60 * 60 * 24));
+}
+
+/* ========= ORDEN POR GRUPOS =========
+  0 = vencidas (ROJO)
+  1 = próximas a vencer (AMARILLO)
+  2 = no pagadas normales (BLANCO)
+  3 = pagadas (VERDE)
+*/
+function getGroupRank(row){
+  if (row.isPaid) return 3;
+  if (row.diasRestantes < 0) return 0;
+  if (row.diasRestantes <= PROXIMA_A_VENCER_DIAS) return 1;
+  return 2;
 }
 
 async function generateReport(clientId){
@@ -208,6 +256,11 @@ async function generateReport(clientId){
       const abonosSnap = await doc.ref.collection("abonos").get();
       const abonos = abonosSnap.docs.map(a=>({...a.data(), _docId:a.id}));
 
+      // Fecha emisión (para ordenar por grupos)
+      const fechaEmision = getFechaEmision(inv);
+      const fechaEmisionMs = fechaEmision.getTime();
+      const fechaEmisionStr = inv.fechaStr || fechaEmision.toLocaleDateString('es-NI');
+
       // Cálculos
       const montoPagado = abonos.reduce((s,a)=>s + parseFloat(a.amount||0), 0);
       const total = parseFloat(inv.total||0);
@@ -222,28 +275,33 @@ async function generateReport(clientId){
       }
 
       return {
-        id, inv, abonos, montoPagado, saldo, diasRestantes, isPaid, 
-        estadoTexto
+        id,
+        inv,
+        abonos,
+        montoPagado,
+        saldo,
+        diasRestantes,
+        isPaid,
+        estadoTexto,
+        fechaEmision,
+        fechaEmisionMs,
+        fechaEmisionStr
       };
     }));
 
-    // ===== ORDENAMIENTO =====
-    // 1) No canceladas primero (saldo > 0), 2) entre no canceladas:
-    //    - vencidas/today primero (más cercanas a hoy primero), luego por días restantes,
-    // 3) canceladas al final.
+    // ===== ORDENAMIENTO NUEVO =====
+    // Mantener grupos (ROJO -> AMARILLO -> BLANCO -> VERDE)
+    // y dentro de cada grupo: Fecha Emisión DESC (más recientes primero)
     items.sort((a,b)=>{
-      if (a.isPaid !== b.isPaid) return a.isPaid ? 1 : -1; // no pagadas arriba
+      const ga = getGroupRank(a);
+      const gb = getGroupRank(b);
+      if (ga !== gb) return ga - gb;
 
-      if (a.isPaid && b.isPaid) return 0; // ambas pagadas: da igual el orden
+      // mismo grupo -> más reciente primero
+      if (a.fechaEmisionMs !== b.fechaEmisionMs) return b.fechaEmisionMs - a.fechaEmisionMs;
 
-      // Ambas no pagadas: priorizar vencidas/today (<=0), luego menor "distancia a hoy"
-      const aOver = a.diasRestantes <= 0 ? 0 : 1;
-      const bOver = b.diasRestantes <= 0 ? 0 : 1;
-      if (aOver !== bOver) return aOver - bOver;
-
-      const aKey = a.diasRestantes <= 0 ? Math.abs(a.diasRestantes) : a.diasRestantes;
-      const bKey = b.diasRestantes <= 0 ? Math.abs(b.diasRestantes) : b.diasRestantes;
-      return aKey - bKey;
+      // desempate estable (por id)
+      return String(b.id).localeCompare(String(a.id));
     });
 
     // ===== Render =====
@@ -261,7 +319,7 @@ async function generateReport(clientId){
       } else if (row.diasRestantes < 0){
         tr.style.backgroundColor = "#f44336"; // rojo
         tr.style.color = "white";
-      } else if (row.diasRestantes <= 5){
+      } else if (row.diasRestantes <= PROXIMA_A_VENCER_DIAS){
         tr.style.backgroundColor = "#ffeb3b"; // amarillo
       }
 
@@ -272,7 +330,7 @@ async function generateReport(clientId){
         <td>${row.id}</td>
         <td>${row.inv.currency || "N/A"}</td>
         <td>${row.inv.vendedor || "N/A"}</td>
-        <td>${row.inv.fechaStr || "N/A"}</td>
+        <td>${row.fechaEmisionStr || "N/A"}</td>
         <td>${(+row.inv.total).toFixed(2)}</td>
         <td>${row.montoPagado.toFixed(2)}</td>
         <td>${row.saldo.toFixed(2)}</td>
@@ -321,7 +379,7 @@ window.onload=loadClients;
 
 <script type="module">
   import {requireAccess} from './auth.js';
-  requireAccess('reporteestadoscuenta'); 
+  requireAccess('reporteestadoscuenta');
 </script>
 </body>
 </html>

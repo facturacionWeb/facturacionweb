@@ -33,15 +33,72 @@
     .chart-container { position:relative; max-width:600px; height:300px; margin:0 auto; }
 
     .card p {
-    font-size: 1.8em;
-    font-weight: bold;
-    color: #333;
+      font-size: 1.8em;
+      font-weight: bold;
+      color: #333;
     }
-    
+
+    .hint {
+      margin: 6px 0 0;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:9999;
+    }
+    .modal-overlay.show{ display:flex; }
+    .modal{
+      background:#fff;
+      width:min(980px, 96vw);
+      border-radius:12px;
+      box-shadow:0 15px 45px rgba(0,0,0,.25);
+      padding:14px;
+    }
+    .modal-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+      padding-bottom:8px;
+      border-bottom:1px solid #eee;
+    }
+    .modal-header h2{
+      margin:0;
+      font-size:1.1rem;
+      text-align:left;
+    }
+    .btn-close{
+      background:#e74c3c;
+      padding:8px 12px;
+      border-radius:8px;
+    }
+    .btn-close:hover{ background:#cf3e30; }
+
+    .modal-note{
+      text-align:left;
+      margin: 6px 0 0;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .chart-container.modal-chart{
+      max-width: 920px;
+      height: 420px;
+    }
   </style>
 </head>
 <body>
-  <h1>🚀 Dashboard de Ventas</h1>
+  <h1>🚀 Dashboard de Ventas 🚀</h1>
 
   <!-- Filtros -->
   <div class="flex">
@@ -90,6 +147,31 @@
     </div>
   </div>
 
+  <!-- Artículos vendidos por mes -->
+  <div class="card" style="margin-top:20px;">
+    <h2>📦 Artículos vendidos por mes</h2>
+    <p class="hint">Tip: hacé click en una barra para ver el detalle por modelo 😉</p>
+    <div class="chart-container">
+      <canvas id="monthlyItemsChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Modal: detalle por modelo -->
+  <div id="monthModal" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="monthModalTitle">
+      <div class="modal-header">
+        <h2 id="monthModalTitle">📦 Ventas por modelo</h2>
+        <button class="btn-close" onclick="closeMonthModal()">Cerrar ✖</button>
+      </div>
+
+      <div class="chart-container modal-chart">
+        <canvas id="monthModelsChart"></canvas>
+      </div>
+
+      <div id="monthModalNote" class="modal-note"></div>
+    </div>
+  </div>
+
   <script>
     const db = firebase.firestore();
 
@@ -97,6 +179,38 @@
       if (item.brand || item.model) return `${item.brand||''} ${item.model||''}`.trim();
       if (item.descripcion) return item.descripcion;
       return item.articleId || 'SIN_ID';
+    }
+
+    function capFirst(s){
+      if (!s) return s;
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    }
+
+    function getInvoiceDate(inv){
+      // 1) Timestamp de Firestore
+      if (inv && inv.fecha && typeof inv.fecha.toDate === 'function') return inv.fecha.toDate();
+      // 2) Date nativo
+      if (inv && inv.fecha instanceof Date) return inv.fecha;
+      // 3) fechaStr tipo 'YYYY-MM-DD'
+      if (inv && inv.fechaStr) {
+        const dt = new Date(inv.fechaStr + 'T00:00:00');
+        if (!isNaN(dt.getTime())) return dt;
+      }
+      return null;
+    }
+
+    function monthKeyFromDate(dt){
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    }
+
+    function monthLabelFromKey(key){
+      const [y, m] = key.split('-').map(Number);
+      const dt = new Date(y, (m||1) - 1, 1);
+      // "ene 2025"
+      const label = new Intl.DateTimeFormat('es-NI', { month: 'short', year: 'numeric' }).format(dt);
+      return capFirst(label.replace('.', '')); // algunas locales devuelven "ene."
     }
 
     async function generarDashboard() {
@@ -123,6 +237,10 @@
       const daily = {};
       const dailyCount = {};
 
+      // 👇 NUEVO: articulos por mes + detalle por modelo
+      const monthlyQty = {};        // { 'YYYY-MM': qtyTotal }
+      const monthlyByModel = {};    // { 'YYYY-MM': { 'Marca Modelo': qtyTotal } }
+
       snap.docs.forEach(doc => {
         const inv = doc.data();
         totalSales += inv.total || 0;
@@ -144,83 +262,71 @@
           return;
         }
 
-        /*inv.items.forEach(item => {
-          const costo = Number(item.costo_compra) || 0; // 👈 directo al campo asegurado
+        const invDate = getInvoiceDate(inv);
+        const mk = invDate ? monthKeyFromDate(invDate) : 'SIN_MES';
+
+        inv.items.forEach(item => {
+          const costo = Number(item.costo_compra) || 0;
           const descuento = Number(item.discount || 0);
           const price = Number(item.price || 0);
           const qty = Number(item.quantity || 0);
 
           if (costo === 0 && price > 0) {
-            console.warn("💸 Item con costo_compra = 0 (revisar):",
-              { factura: doc.id, articleId: item.articleId, price, qty, item });
+            console.warn("💸 Item con costo_compra = 0 (revisar):", {
+              factura: doc.id, articleId: item.articleId, price, qty, item
+            });
           }
 
-          const gananciaUnit = (price - costo) * (1 - descuento/100);
+          const gananciaUnit = (price - costo) * (1 - descuento / 100);
           const gananciaTotal = gananciaUnit * qty;
 
+          // (tu debug log actual)
+          console.log(`📄 Factura: ${doc.id}`);
+          console.log(`🛒 Artículo: ${item.articleId || 'SIN_ID'}`);
+          console.log(`   - Precio venta: $${price}`);
+          console.log(`   - Costo compra: $${costo}`);
+          console.log(`   - Descuento: ${descuento}%`);
+          console.log(`   - Cantidad: ${qty}`);
+          console.log(`   - Ganancia unit: $${gananciaUnit.toFixed(2)}`);
+          console.log(`   - Ganancia total: $${gananciaTotal.toFixed(2)}`);
+
           totalProfit += gananciaTotal;
+          console.log(`💰 Ganancia acumulada: $${totalProfit.toFixed(2)}
+`);
+
           daily[day].profit += gananciaTotal;
 
-          const key = item.articleId || `${item.brand||''}-${item.model||''}` || 'SIN_ID';
+          // Top productos (unidades)
+          const key = item.articleId || `${item.brand || ''}-${item.model || ''}` || 'SIN_ID';
           if (!productStats[key]) {
-            productStats[key] = {
-              qty: 0,
-              label: obtenerLabelProducto(item)
-            };
+            productStats[key] = { qty: 0, label: obtenerLabelProducto(item) };
           }
           productStats[key].qty += qty;
-        });*/
-        inv.items.forEach(item => {
-        const costo = Number(item.costo_compra) || 0;
-        const descuento = Number(item.discount || 0);
-        const price = Number(item.price || 0);
-        const qty = Number(item.quantity || 0);
-        
-        if (costo === 0 && price > 0) {
-        console.warn("💸 Item con costo_compra = 0 (revisar):", {
-        factura: doc.id, articleId: item.articleId, price, qty, item
-        });
-        }
-        
-        const gananciaUnit = (price - costo) * (1 - descuento / 100);
-        const gananciaTotal = gananciaUnit * qty;
-        
-        console.log(`📄 Factura: ${doc.id}`);
-        console.log(`🛒 Artículo: ${item.articleId || 'SIN_ID'}`);
-        console.log(`   - Precio venta: $${price}`);
-        console.log(`   - Costo compra: $${costo}`);
-        console.log(`   - Descuento: ${descuento}%`);
-        console.log(`   - Cantidad: ${qty}`);
-        console.log(`   - Ganancia unit: $${gananciaUnit.toFixed(2)}`);
-        console.log(`   - Ganancia total: $${gananciaTotal.toFixed(2)}`);
-        
-        totalProfit += gananciaTotal;
-        console.log(`💰 Ganancia acumulada: $${totalProfit.toFixed(2)}\n`);
-        
-        daily[day].profit += gananciaTotal;
-        
-        const key = item.articleId || `${item.brand || ''}-${item.model || ''}` || 'SIN_ID';
-        if (!productStats[key]) {
-        productStats[key] = {
-        qty: 0,
-        label: obtenerLabelProducto(item)
-        };
-        }
-        productStats[key].qty += qty;
+
+          // 👇 NUEVO: Artículos vendidos por mes (unidades)
+          if (!monthlyQty[mk]) monthlyQty[mk] = 0;
+          monthlyQty[mk] += qty;
+
+          // 👇 NUEVO: Detalle por modelo (unidades)
+          const modelLabel = (
+            (item.brand || item.model)
+              ? `${item.brand || ''} ${item.model || ''}`.trim()
+              : (item.model || item.descripcion || item.articleId || 'SIN_MODELO')
+          );
+
+          if (!monthlyByModel[mk]) monthlyByModel[mk] = {};
+          if (!monthlyByModel[mk][modelLabel]) monthlyByModel[mk][modelLabel] = 0;
+          monthlyByModel[mk][modelLabel] += qty;
         });
 
       });
 
       const formatter = new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'USD' });
       const numberFormatter = new Intl.NumberFormat('es-NI');
-      
+
       document.getElementById('totalSales').innerText  = formatter.format(totalSales);
       document.getElementById('countSales').innerText  = numberFormatter.format(countSales);
       document.getElementById('totalProfit').innerText = formatter.format(totalProfit);
-
-      /*document.getElementById('totalSales').innerText  = `$${totalSales.toFixed(2)}`;
-      document.getElementById('countSales').innerText  = countSales;
-      document.getElementById('totalProfit').innerText = `$${totalProfit.toFixed(2)}`;*/
 
       const top5 = Object.entries(productStats)
         .sort((a,b)=> b[1].qty - a[1].qty)
@@ -259,6 +365,63 @@
           scales:{ y:{ beginAtZero:true } }
         }
       });
+
+      // ============================
+      // NUEVO CHART: artículos por mes
+      // ============================
+      const monthKeys = Object.keys(monthlyQty)
+        .filter(k => k !== 'SIN_MES')
+        .sort(); // 'YYYY-MM' => ordena bien
+
+      // guardamos para el click
+      window.__monthlyByModel = monthlyByModel;
+      window.__monthKeys = monthKeys;
+
+      if (monthKeys.length === 0) {
+        // si no hay meses, limpiamos el chart (por si venía de una corrida anterior)
+        const ctx = document.getElementById('monthlyItemsChart').getContext('2d');
+        if (window['monthlyItemsChart_chart']) window['monthlyItemsChart_chart'].destroy();
+        window['monthlyItemsChart_chart'] = new Chart(ctx, {
+          type:'bar',
+          data:{ labels:['Sin datos'], datasets:[{ label:'Unidades', data:[0] }]},
+          options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+        });
+        return;
+      }
+
+      const monthLabels = monthKeys.map(monthLabelFromKey);
+      const monthData   = monthKeys.map(k => monthlyQty[k] || 0);
+
+      renderChart('monthlyItemsChart', {
+        type:'bar',
+        data:{
+          labels: monthLabels,
+          datasets:[{ label:'Unidades vendidas', data: monthData }]
+        },
+        options:{
+          responsive:true,
+          maintainAspectRatio:false,
+          scales:{ y:{ beginAtZero:true } },
+          plugins:{
+            tooltip:{
+              callbacks:{
+                label: (ctx) => ` ${ctx.dataset.label}: ${numberFormatter.format(ctx.raw)}`
+              }
+            }
+          },
+          onHover: (evt, els) => {
+            const target = evt?.native?.target;
+            if (target) target.style.cursor = els?.length ? 'pointer' : 'default';
+          },
+          onClick: (evt, els) => {
+            if (!els || !els.length) return;
+            const idx = els[0].index;
+            const key = window.__monthKeys[idx];
+            if (!key) return;
+            openMonthModal(key);
+          }
+        }
+      });
     }
 
     function renderChart(id, cfg) {
@@ -266,10 +429,81 @@
       if (window[id + '_chart']) window[id + '_chart'].destroy();
       window[id + '_chart'] = new Chart(ctx, cfg);
     }
+
+    function openMonthModal(monthKey){
+      const overlay = document.getElementById('monthModal');
+      const title = document.getElementById('monthModalTitle');
+      const note = document.getElementById('monthModalNote');
+
+      title.innerText = `📦 Ventas por modelo — ${monthLabelFromKey(monthKey)}`;
+      note.innerText = '';
+
+      const modelObj = (window.__monthlyByModel && window.__monthlyByModel[monthKey]) ? window.__monthlyByModel[monthKey] : {};
+      const entries = Object.entries(modelObj).sort((a,b) => (b[1]||0) - (a[1]||0));
+
+      if (entries.length === 0) {
+        note.innerText = 'Sin detalle de modelos para este mes 😅';
+        renderChart('monthModelsChart', {
+          type:'bar',
+          data:{ labels:['Sin datos'], datasets:[{ label:'Unidades', data:[0] }] },
+          options:{ responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+        });
+      } else {
+        const TOP = 25;
+        const top = entries.slice(0, TOP);
+
+        if (entries.length > TOP) {
+          note.innerText = `Mostrando Top ${TOP} de ${entries.length} modelos (para no saturar la gráfica).`;
+        } else {
+          note.innerText = `Modelos distintos: ${entries.length}`;
+        }
+
+        const labels = top.map(([k]) => k);
+        const data   = top.map(([,v]) => v);
+
+        renderChart('monthModelsChart', {
+          type:'bar',
+          data:{
+            labels,
+            datasets:[{ label:'Unidades', data }]
+          },
+          options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            scales:{
+              y:{ beginAtZero:true },
+              x:{
+                ticks:{ autoSkip:false, maxRotation:45, minRotation:0 }
+              }
+            }
+          }
+        });
+      }
+
+      overlay.classList.add('show');
+      overlay.setAttribute('aria-hidden','false');
+    }
+
+    function closeMonthModal(){
+      const overlay = document.getElementById('monthModal');
+      overlay.classList.remove('show');
+      overlay.setAttribute('aria-hidden','true');
+    }
+
+    // Cerrar modal al clickear fuera del contenido
+    document.getElementById('monthModal').addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'monthModal') closeMonthModal();
+    });
+
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeMonthModal();
+    });
   </script>
+
   <script type="module">
     import {requireAccess} from './auth.js';
-    requireAccess('dashboard');  
+    requireAccess('dashboard');
   </script>
 </body>
 </html>

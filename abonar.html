@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  💸 Registrar Abonos 💸</h1>
+  <h1>  💸 Registrar Abonos 💸💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -240,6 +240,38 @@
       <button id="btnDistribuir" style="height:38px;">Distribuir abonos</button>
       <div id="multiResumen" style="margin-left:auto; font-weight:600;">
         Total: C$0.00 • Distribuido: C$0.00 • Restante: C$0.00
+      </div>
+    </div>
+
+
+    <!-- Método de pago (aplica para TODOS los abonos del lote) -->
+    <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+      <div>
+        <label for="multiMetodoPago">Método de Pago:</label>
+        <select id="multiMetodoPago">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+        </select>
+      </div>
+
+      <!-- Info de Transferencia (multi) -->
+      <div id="multiInfoTransferencia" style="display:none; flex:1;">
+        <div class="flex-row">
+          <div>
+            <label for="multiBancoSelect">Banco:</label>
+            <select id="multiBancoSelect">
+              <option value="BAC">BAC</option>
+              <option value="LA FISE">LA FISE</option>
+              <option value="BANPRO">BANPRO</option>
+              <option value="AVANZ">AVANZ</option>
+              <option value="FICOHSA">FICOHSA</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label for="multiReferenciaBancaria"># Referencia:</label>
+            <input type="text" id="multiReferenciaBancaria" placeholder="Número / Código de referencia" />
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1141,7 +1173,16 @@ function setupHistorialInfiniteScroll() {
     if (tsOrDate && typeof tsOrDate.toDate === 'function') return tsOrDate.toDate();
     return new Date(tsOrDate);
   }
-  
+
+
+  /************* Método de Pago (multi) *************/
+  function toggleMultiMetodoPago() {
+    const metodo = document.getElementById('multiMetodoPago')?.value || 'Efectivo';
+    const info = document.getElementById('multiInfoTransferencia');
+    if (!info) return;
+    info.style.display = (metodo === 'Transferencia') ? 'block' : 'none';
+  }
+
   /************* Modal *************/
   function openMultiAbonoModal() {
     const clienteId = document.getElementById('clienteSelect').value;
@@ -1156,7 +1197,18 @@ function setupHistorialInfiniteScroll() {
     document.getElementById('multiMonto').value = '';
     updateMultiResumen(0, 0);
   
-    // Cargar facturas del cliente con saldo > 0 (más antiguas primero)
+    
+    // Reset método de pago multi (por defecto: efectivo)
+    const selMultiMetodo = document.getElementById('multiMetodoPago');
+    if (selMultiMetodo) selMultiMetodo.value = 'Efectivo';
+    const selMultiBanco = document.getElementById('multiBancoSelect');
+    if (selMultiBanco) selMultiBanco.value = 'BAC';
+    const inpMultiRef = document.getElementById('multiReferenciaBancaria');
+    if (inpMultiRef) inpMultiRef.value = '';
+    if (document.getElementById('multiInfoTransferencia')) {
+      document.getElementById('multiInfoTransferencia').style.display = 'none';
+    }
+// Cargar facturas del cliente con saldo > 0 (más antiguas primero)
     db.collection('facturas')
       .where('clientId', '==', clienteId)
       .where('paymentType', '==', 'Credito')
@@ -1211,10 +1263,16 @@ function setupHistorialInfiniteScroll() {
     if (!multiObserverAttached) {
       document.getElementById('btnDistribuir').addEventListener('click', distribuirAbonos);
       document.getElementById('btnAplicarAbonos').addEventListener('click', aplicarAbonos);
-      multiObserverAttached = true;
+      
+      const mp = document.getElementById('multiMetodoPago');
+      if (mp) mp.addEventListener('change', toggleMultiMetodoPago);
+multiObserverAttached = true;
     }
   
     document.getElementById('multiAbonoModal').style.display = 'block';
+
+    // Ajustar UI según método seleccionado
+    toggleMultiMetodoPago();
   }
   
   function closeMultiAbonoModal() {
@@ -1312,7 +1370,7 @@ function setupHistorialInfiniteScroll() {
             route: ruta,
             metodoPago: metodo,
             banco,
-            referenciaBancaria: null,     // no aplica
+            referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null, // aplica si es transferencia
             notaCreditoId: null,          // no aplica en múltiple
             reference: `${refBase}-${String(i+1).padStart(2,'0')}`,
             usuario: {
@@ -1355,8 +1413,20 @@ async function aplicarAbonos() {
 
   const clienteId = document.getElementById('clienteSelect').value;
   const ruta = document.getElementById('rutaAbono').value || 'SIN RUTA';
-  const metodo = 'Efectivo';
-  const banco = 'N/A';
+
+  // Método de pago para TODO el lote
+  const metodo = document.getElementById('multiMetodoPago')?.value || 'Efectivo';
+  let banco = 'N/A';
+  let referenciaBancaria = null;
+
+  if (metodo === 'Transferencia') {
+    banco = document.getElementById('multiBancoSelect')?.value || 'N/A';
+    referenciaBancaria = (document.getElementById('multiReferenciaBancaria')?.value || '').trim();
+    if (!referenciaBancaria) {
+      alert('Ingrese referencia bancaria');
+      return;
+    }
+  }
   const fecha = new Date();
   const refBase = generateReference();
 
@@ -1416,7 +1486,7 @@ async function aplicarAbonos() {
           route: ruta,
           metodoPago: metodo,
           banco,
-          referenciaBancaria: null,
+          referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
           notaCreditoId: null,
           reference: `${refBase}-${String(i + 1).padStart(2, '0')}`,
           usuario: {

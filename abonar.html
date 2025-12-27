@@ -108,7 +108,7 @@
 <body>
 <a href="index.html">⬅️ Volver a la Página Principal</a>
 <div class="container">
-  <h1>  💸 Registrar Abonos 💸</h1>
+  <h1>  💸💸 Registrar Abonos 💸💸</h1>
 
   <!-- Selección de Cliente -->
   <label for="clienteSelect">Selecciona Cliente:</label>
@@ -483,16 +483,21 @@
 
 
   /*********************** REGISTRAR ABONO *************************/
+  function generateReferenceFromDate(d) {
+    const now = (d instanceof Date) ? d : new Date(d);
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}${hh}${min}${ss}`;
+  }
+
+  // Mantengo esta por compatibilidad (pero ahora sí es “ahora” explícito)
   function generateReference() {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      const hh = String(now.getHours()).padStart(2, '0');
-      const min = String(now.getMinutes()).padStart(2, '0');
-      const ss = String(now.getSeconds()).padStart(2, '0');
-      return `${yyyy}${mm}${dd}${hh}${min}${ss}`;
-    }
+    return generateReferenceFromDate(new Date());
+  }
   
   async function registrarAbono() {
 
@@ -524,8 +529,8 @@
     if (metodo==='NotaCredito' && !notaCreditoId) return alert('Seleccione una nota de crédito');
 
     // ✅ Consecutivo único del abono (YYYYMMDDHHmmss)
-    const consecutivoAbono = generateReference();
-
+    const fechaAbono = new Date();
+    const consecutivoAbono = generateReferenceFromDate(fechaAbono);
     let createdAbonoPath = null;  
     
     try {
@@ -543,7 +548,7 @@
         }
         // Preparar datos abono
         const nuevoSaldo = saldoActual - monto;
-        const fecha = new Date();
+        const fecha = fechaAbono;
 const abonoRef = facturaRef.collection('abonos').doc();
         createdAbonoPath = abonoRef.path;         // 👈 NUEVO (guardamos la ruta del abono)
         const abonoData = {
@@ -556,7 +561,7 @@ const abonoRef = facturaRef.collection('abonos').doc();
           banco: banco,
           referenciaBancaria: (metodo==='Transferencia')? referenciaBancaria : null,
           notaCreditoId: (metodo==='NotaCredito')? notaCreditoId : null,
-          reference: generateReference(),
+          reference: consecutivoAbono,
           consecutivoAbono: consecutivoAbono,
           usuario: {
             username: currentUser.username,
@@ -596,7 +601,7 @@ const abonoRef = facturaRef.collection('abonos').doc();
         monto,
         saldoPendiente: (document.querySelector(`#facturaSelect option[value="${facturaId}"]`).dataset.saldo - monto),
         saldoPendienteTotalCliente: saldoTotalCliente,   // 👈 NUEVO
-        fecha: new Date(),
+        fecha: fechaAbono,
         ruta,
         metodo,
         banco,
@@ -928,17 +933,17 @@ return `
     const a = snap.data();
     const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
     // ✅ Consecutivo del abono (persistido en Firestore)
-    let consecutivoAbono = a.consecutivoAbono || null;
+    // Importante: NO lo generamos con “ahora”, sino con la fecha real en que se aplicó el abono.
+    let consecutivoAbono = a.consecutivoAbono || a.reference || null;
     if (!consecutivoAbono) {
-      consecutivoAbono = generateReference();
+      consecutivoAbono = generateReferenceFromDate(fecha);
     }
-    // Si el abono es antiguo y no tiene consecutivo, lo guardamos para futuras impresiones
+
+    // Backfill (1 sola vez): si el doc es viejo y no trae consecutivoAbono, lo guardamos sin alterar la fecha real.
     if (!a.consecutivoAbono) {
       try { await abonoRef.update({ consecutivoAbono }); } catch (e) { /* ignore */ }
     }
-
-
-    // ✅ Tomamos el snapshot si existe; si no, lo calculamos en vivo
+// ✅ Tomamos el snapshot si existe; si no, lo calculamos en vivo
     const totalCliente = (a.saldoPendienteTotalCliente != null)
     ? a.saldoPendienteTotalCliente
     : await calcularSaldoPendienteTotalCliente(a.clientId);
@@ -1024,7 +1029,8 @@ return `
     parts.push(`[L]Cliente: ${clienteNombre || 'N/A'}`);
     parts.push(`[L]Factura: ${facturaId || 'N/A'}`);
     
-    parts.push(`[L]Consec abono: ${consecutivoAbono || 'N/A'}`);if (ruta) parts.push(`[L]Ruta: ${ruta}`);
+    parts.push(`[L]Consec abono: ${consecutivoAbono || 'N/A'}`);
+    if (ruta) parts.push(`[L]Ruta: ${ruta}`);
   
     const metodoTxt = metodo || 'N/A';
     parts.push(`[L]Método: ${metodoTxt}`);
@@ -1068,16 +1074,15 @@ return `
       const a = snap.data();
       const fecha = (typeof a.dateTime?.toDate === 'function') ? a.dateTime.toDate() : new Date(a.dateTime);
       // ✅ Consecutivo del abono (persistido en Firestore)
-      let consecutivoAbono = a.consecutivoAbono || null;
+      // Importante: NO lo generamos con “ahora”, sino con la fecha real en que se aplicó el abono.
+      let consecutivoAbono = a.consecutivoAbono || a.reference || null;
       if (!consecutivoAbono) {
-        consecutivoAbono = generateReference();
+        consecutivoAbono = generateReferenceFromDate(fecha);
       }
       if (!a.consecutivoAbono) {
         try { await abonoRef.update({ consecutivoAbono }); } catch (e) { /* ignore */ }
       }
-
-  
-      const totalCliente = (a.saldoPendienteTotalCliente != null)
+const totalCliente = (a.saldoPendienteTotalCliente != null)
         ? a.saldoPendienteTotalCliente
         : await calcularSaldoPendienteTotalCliente(a.clientId);
   
@@ -1577,7 +1582,7 @@ multiObserverAttached = true;
     const banco = 'N/A';
     const referenciaBancaria = 'N/A';
     const fecha = new Date();            // Misma fecha/hora para todos
-    const refBase = generateReference(); // base legible (si querés)
+    const refBase = generateReferenceFromDate(fecha); // base legible (si querés)
   
     try {
       await db.runTransaction(async (tx) => {
@@ -1665,7 +1670,7 @@ async function aplicarAbonos() {
     }
   }
   const fecha = new Date();
-  const refBase = generateReference();
+  const refBase = generateReferenceFromDate(fecha);
 
   // Tomamos las facturas en el orden ya mostrado (asc por fecha)
   const targets = multiFacturas.map(f => ({ id: f.id }));
@@ -1912,5 +1917,3 @@ async function calcularSaldoPendienteTotalCliente(clienteId, {
   
 </body>
 </html>
-
-

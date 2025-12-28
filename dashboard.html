@@ -202,7 +202,7 @@
   </style>
 </head>
 <body>
-  <h1>🚀 Dashboard de Ventas 🚀</h1>
+  <h1>🚀🚀 Dashboard de Ventas 🚀🚀</h1>
 
   <!-- Filtros -->
   <div class="flex">
@@ -791,6 +791,73 @@
     document.addEventListener('DOMContentLoaded', () => {
       initYearSelect();
     });
+
+/**
+ * Devuelve el total de artículos vendidos en un mes/año.
+ * - Suma item.quantity de todas las facturas del rango.
+ * - Por defecto EXCLUYE facturas anuladas.
+ *
+ * @param {number} anio  Ej: 2025
+ * @param {number} mes   1-12 (Ej: mayo = 5)
+ * @param {object} opts  { incluirAnuladas?: boolean }
+ * @returns {Promise<number>} total de artículos vendidos
+ */
+async function getTotalArticulosVendidos(anio, mes, opts = {}) {
+  const incluirAnuladas = !!opts.incluirAnuladas;
+
+  // Validaciones rápidas
+  const y = Number(anio);
+  const m = Number(mes);
+
+  if (!Number.isInteger(y) || y < 2000 || y > 3000) {
+    throw new Error("Año inválido. Ej: 2025");
+  }
+  if (!Number.isInteger(m) || m < 1 || m > 12) {
+    throw new Error("Mes inválido. Debe ser 1-12 (Ej: mayo = 5)");
+  }
+
+  // Rango: [primer día del mes, primer día del siguiente mes)
+  const start = new Date(y, m - 1, 1, 0, 0, 0, 0);
+  const end = new Date(y, m, 1, 0, 0, 0, 0);
+
+  try {
+    // Query por rango de fecha
+    let q = db.collection("facturas")
+      .where("fecha", ">=", start)
+      .where("fecha", "<", end);
+
+    // Si querés excluir anuladas (default), lo hacemos aquí
+    // OJO: Firestore puede pedirte crear un índice compuesto (te sale un link en consola).
+    if (!incluirAnuladas) {
+      q = q.where("anulada", "==", false);
+    }
+
+    const snap = await q.get();
+
+    let total = 0;
+
+    snap.forEach(doc => {
+      const invoice = doc.data();
+      const items = Array.isArray(invoice.items) ? invoice.items : [];
+
+      items.forEach(it => {
+        // quantity viene de tu tabla (row.children[1]) y se guarda en items :contentReference[oaicite:2]{index=2}
+        const qty = Number(it.quantity);
+        total += Number.isFinite(qty) && qty > 0 ? qty : 0;
+      });
+    });
+
+    return total;
+
+  } catch (err) {
+    console.error("Error calculando artículos vendidos:", err);
+
+    // Tip común: si te pide índice compuesto, Firestore te muestra un link en la consola para crearlo.
+    throw err;
+  }
+}
+
+    
   </script>
 
   <script type="module">

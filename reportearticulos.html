@@ -44,34 +44,139 @@
     .modal {
       display: none; /* Se oculta por defecto */
       position: fixed;
-      z-index: 1;
+      z-index: 1000;
       left: 0;
       top: 0;
       width: 100%;
       height: 100%;
       overflow: auto;
-      background-color: rgba(0,0,0,0.5); /* Fondo semi-transparente */
+      background-color: rgba(0,0,0,0.55); /* Fondo semi-transparente */
     }
     .modal-content {
       background-color: #fff;
-      margin: 10% auto;
-      padding: 20px;
-      border: 1px solid #888;
-      width: 80%;
-      max-width: 500px;
+      margin: 5% auto;
+      padding: 0;
+      border: 0;
+      border-radius: 10px;
+      width: 92%;
+      max-width: 920px;
       position: relative;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+      overflow: hidden;
     }
     .close {
-      color: #aaa;
-      float: right;
+      color: #666;
+      position: absolute;
+      top: 14px;
+      right: 18px;
       font-size: 28px;
       font-weight: bold;
       cursor: pointer;
+      line-height: 1;
     }
     .close:hover,
     .close:focus {
       color: black;
       text-decoration: none;
+    }
+    .modal-header {
+      padding: 24px 28px 18px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f8fafc;
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+    .modal-subtitle {
+      margin-top: 6px;
+      color: #666;
+      font-size: 14px;
+    }
+    .modal-body {
+      padding: 18px 28px 26px;
+      max-height: 65vh;
+      overflow-y: auto;
+    }
+    .imei-list {
+      display: grid;
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .imei-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .imei-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #f0f0f0;
+      padding-bottom: 10px;
+    }
+    .imei-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #111;
+      word-break: break-word;
+    }
+    .invoice-badge {
+      background: #eef2ff;
+      color: #3730a3;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .imei-details {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .detail-item {
+      background: #f9fafb;
+      border-radius: 6px;
+      padding: 10px;
+      min-width: 0;
+    }
+    .detail-label {
+      display: block;
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .detail-value {
+      color: #111;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .empty-state {
+      padding: 22px;
+      text-align: center;
+      color: #666;
+      background: #f9fafb;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+    }
+    @media (max-width: 720px) {
+      .modal-content {
+        margin: 4% auto;
+        width: 96%;
+      }
+      .imei-card-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .imei-details {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
   
@@ -263,6 +368,93 @@
     }
 
 
+    function escapeHtml(value) {
+      return String(value ?? 'N/D')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showIMEIModal(articleId) {
+      const list = document.getElementById('imeiList');
+      document.getElementById('modalArticleId').innerText = articleId;
+      document.getElementById('modalImeiCount').innerText = 'Cargando IMEIs...';
+      list.innerHTML = '<div class="empty-state">Cargando informacion de inventario...</div>';
+      document.getElementById('imeiModal').style.display = 'block';
+
+      db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
+        .then(async (querySnapshot) => {
+          list.innerHTML = '';
+
+          if (querySnapshot.empty) {
+            document.getElementById('modalImeiCount').innerText = '0 IMEIs registrados';
+            list.innerHTML = '<div class="empty-state">No hay IMEI registrados para este articulo.</div>';
+            return;
+          }
+
+          document.getElementById('modalImeiCount').innerText = `${querySnapshot.size} IMEIs registrados`;
+
+          for (const doc of querySnapshot.docs) {
+            const data = doc.data();
+            const proveedorId = data.distribuidorId || data.proveedorId;
+            let proveedorNombre = data.distribuidorNombre || "N/D";
+
+            if ((!proveedorNombre || proveedorNombre === "N/D") && proveedorId) {
+              try {
+                const provDoc = await db.collection("proveedores").doc(proveedorId).get();
+                if (provDoc.exists) {
+                  proveedorNombre = provDoc.data().nombreProveedor || "Desconocido";
+                }
+              } catch (err) {
+                console.warn("Error obteniendo proveedor:", err);
+              }
+            }
+
+            const tipoFactura = data.tipoFacturaProveedor || 'N/D';
+            const fechaVencimiento = data.fechaVencimientoProveedor || (tipoFactura === 'Credito' ? 'Sin fecha' : 'No aplica');
+            const facturaProveedor = data.facturaDistribuidor || 'N/D';
+
+            const card = document.createElement('div');
+            card.className = 'imei-card';
+            card.innerHTML = `
+              <div class="imei-card-header">
+                <div>
+                  <span class="detail-label">IMEI</span>
+                  <div class="imei-value">${escapeHtml(data.imei)}</div>
+                </div>
+                <span class="invoice-badge">Factura: ${escapeHtml(facturaProveedor)}</span>
+              </div>
+              <div class="imei-details">
+                <div class="detail-item">
+                  <span class="detail-label">Distribuidor</span>
+                  <span class="detail-value">${escapeHtml(proveedorNombre)}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Factura proveedor</span>
+                  <span class="detail-value">${escapeHtml(facturaProveedor)}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Tipo factura</span>
+                  <span class="detail-value">${escapeHtml(tipoFactura)}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Vencimiento</span>
+                  <span class="detail-value">${escapeHtml(fechaVencimiento)}</span>
+                </div>
+              </div>
+            `;
+            list.appendChild(card);
+          }
+        })
+        .catch((error) => {
+          console.error("Error al cargar los IMEI: ", error);
+          document.getElementById('modalImeiCount').innerText = 'Error al cargar IMEIs';
+          list.innerHTML = '<div class="empty-state">Ocurrio un error al cargar la informacion.</div>';
+        });
+    }
+
     // Función para cerrar el modal
     function closeModal() {
       document.getElementById('imeiModal').style.display = 'none';
@@ -305,10 +497,15 @@
   <div id="imeiModal" class="modal">
     <div class="modal-content">
       <span class="close" id="closeModal" onclick="closeModal()">&times;</span>
-      <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
-      <ul id="imeiList">
-        <!-- Aquí se listan los IMEI -->
-      </ul>
+      <div class="modal-header">
+        <h2>IMEI para el artículo <span id="modalArticleId"></span></h2>
+        <div class="modal-subtitle" id="modalImeiCount">Seleccione un artículo para ver sus IMEIs.</div>
+      </div>
+      <div class="modal-body">
+        <div id="imeiList" class="imei-list">
+          <!-- Aquí se listan los IMEI -->
+        </div>
+      </div>
     </div>
   </div>
 </body>

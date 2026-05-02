@@ -96,6 +96,41 @@
     .muted {
       color: #666; font-size: 0.9rem;
     }
+
+    #imeiSection .select2-container {
+      display: block;
+      width: 100% !important;
+      margin: 10px 0 6px 0;
+    }
+    #imeiSection .select2-container--default .select2-selection--single {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    #imeiSection .select2-container--default .select2-selection--single .select2-selection__rendered {
+      line-height: 34px;
+      padding-left: 12px;
+      padding-right: 44px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #imeiSection .select2-container--default .select2-selection--single .select2-selection__arrow {
+      height: 34px;
+      right: 6px;
+    }
+    #imeiSection .select2-container--default .select2-selection--single .select2-selection__clear {
+      position: absolute;
+      right: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+      margin: 0;
+      line-height: 1;
+      z-index: 2;
+    }
+    #articleSelectorStatus:empty {
+      display: none;
+    }
   </style>
 
   <script>
@@ -165,10 +200,11 @@
   <div class="container" id="imeiSection">
     <h2>Gestión de Existencias (IMEI)</h2>
     <!-- Selector para elegir un Artículo -->
-    <select id="articleSelector">
-      <option value="">Seleccione un Artículo</option>
+    <select id="articleSelector" style="width: 100%;" disabled>
+      <option value="">Cargando artículos...</option>
       <!-- Opciones cargadas dinámicamente -->
     </select>
+    <div id="articleSelectorStatus" class="muted" style="margin-top:6px;">Cargando artículos...</div>
     <!-- Formulario para agregar IMEI -->
     <input type="text" id="imei" placeholder="IMEI" />
     <button onclick="addIMEI()">Agregar IMEI</button>
@@ -195,6 +231,10 @@
         <tr>
           <th>ID (Registro)</th>
           <th>IMEI</th>
+          <th>Distribuidor</th>
+          <th>Factura Distribuidor</th>
+          <th>Tipo Factura</th>
+          <th>Vencimiento</th>
           <th>Acciones</th>
         </tr>
       </thead>
@@ -277,13 +317,24 @@
     async function loadArticles() {
       const articleTable = document.getElementById('articleTable');
       const articleSelector = document.getElementById('articleSelector');
+      const articleSelectorStatus = document.getElementById('articleSelectorStatus');
       const quickEdit = document.getElementById('articleQuickEdit');
+      const selectedArticleId = articleSelector.value;
+
+      if ($('#articleSelector').data('select2')) {
+        $('#articleSelector').select2('destroy');
+      }
 
       articleTable.innerHTML = '';
       articleSelector.innerHTML = '<option value="">Seleccione un Artículo</option>';
       quickEdit.innerHTML = '<option value="">Escribe ID, marca o modelo…</option>';
 
+      articleSelector.disabled = true;
+      articleSelector.innerHTML = '<option value="">Cargando articulos...</option>';
+      articleSelectorStatus.textContent = 'Cargando articulos...';
+
       const querySnapshot = await db.collection("Articulos").get();
+      articleSelector.innerHTML = '<option value="">Seleccione un Articulo</option>';
 
       for (const doc of querySnapshot.docs) {
         const article = doc.data();
@@ -316,8 +367,10 @@
         articleTable.innerHTML += row;
 
         // Selector IMEI
-        const option = `<option value="${article.id}">${article.id} - ${article.marca} ${article.modelo}</option>`;
-        articleSelector.innerHTML += option;
+        const option = document.createElement('option');
+        option.value = article.id;
+        option.textContent = `${article.id} - ${article.marca} ${article.modelo}`;
+        articleSelector.appendChild(option);
 
         // 🔎 Nuevo: opciones para el buscador rápido de edición
         const quickOpt = document.createElement('option');
@@ -327,6 +380,13 @@
       }
 
       // Refrescar Select2 de edición rápida tras recargar datos
+      if (selectedArticleId && Array.from(articleSelector.options).some(opt => opt.value === selectedArticleId)) {
+        articleSelector.value = selectedArticleId;
+      }
+
+      articleSelector.disabled = false;
+      articleSelectorStatus.textContent = querySnapshot.empty ? 'No hay articulos registrados.' : '';
+      initArticleSelectorSelect2();
       $('#articleQuickEdit').trigger('change.select2');
     }
 
@@ -453,6 +513,13 @@
     function cargarProveedoresEnModal() {
       const select = document.getElementById("modalProveedorSelect");
       select.innerHTML = '<option value="">Seleccione un proveedor</option>';
+      document.getElementById("modalFacturaDistribuidor").value = '';
+      document.getElementById("modalTipoFacturaProveedor").value = 'Contado';
+      document.getElementById("modalFechaVencimientoProveedor").value = '';
+      toggleFechaVencimientoProveedor();
+      if ($('#modalProveedorSelect').data('select2')) {
+        $('#modalProveedorSelect').select2('destroy');
+      }
       db.collection("proveedores").get().then((snapshot) => {
         snapshot.forEach((doc) => {
           const opt = document.createElement("option");
@@ -471,8 +538,19 @@
       document.getElementById("modalProveedor").style.display = "none";
     }
 
+    function toggleFechaVencimientoProveedor() {
+      const tipoFactura = document.getElementById("modalTipoFacturaProveedor").value;
+      const vencimientoWrap = document.getElementById("modalFechaVencimientoWrap");
+      vencimientoWrap.style.display = tipoFactura === 'Credito' ? 'block' : 'none';
+    }
+
     function confirmarGuardadoIMEIs() {
       const proveedorId = document.getElementById("modalProveedorSelect").value;
+      const proveedorSelect = document.getElementById("modalProveedorSelect");
+      const proveedorNombre = proveedorSelect.options[proveedorSelect.selectedIndex]?.text || '';
+      const facturaDistribuidor = document.getElementById("modalFacturaDistribuidor").value.trim();
+      const tipoFacturaProveedor = document.getElementById("modalTipoFacturaProveedor").value;
+      const fechaVencimientoProveedor = document.getElementById("modalFechaVencimientoProveedor").value;
       const articleId = document.getElementById("articleSelector").value;
       
       if (!articleId) {
@@ -481,6 +559,14 @@
       }
       if (!proveedorId) {
         alert("Selecciona un proveedor válido 😬");
+        return;
+      }
+      if (!facturaDistribuidor) {
+        alert("Ingresa la factura del distribuidor para asociar estos IMEIs.");
+        return;
+      }
+      if (tipoFacturaProveedor === 'Credito' && !fechaVencimientoProveedor) {
+        alert("Ingresa la fecha de vencimiento para la factura de crédito.");
         return;
       }
       
@@ -495,14 +581,38 @@
               return db.collection("Articulos_X_IMEI").add({
                 articleId,
                 imei,
-                proveedorId
-              });
+                proveedorId,
+                distribuidorId: proveedorId,
+                distribuidorNombre: proveedorNombre,
+                facturaDistribuidor,
+                tipoFacturaProveedor,
+                fechaVencimientoProveedor: tipoFacturaProveedor === 'Credito' ? fechaVencimientoProveedor : null,
+                fechaIngreso: firebase.firestore.FieldValue.serverTimestamp()
+              }).then((docRef) => ({
+                docId: docRef.id,
+                articleId,
+                imei
+              }));
             }
           });
         promises.push(promise);
       });
       
       Promise.all(promises)
+      .then((results) => {
+        const imeisGuardados = results.filter(Boolean);
+        if (imeisGuardados.length > 0) {
+          return registrarFacturaDistribuidor({
+            proveedorId,
+            proveedorNombre,
+            facturaDistribuidor,
+            tipoFacturaProveedor,
+            fechaVencimientoProveedor,
+            articleId,
+            imeisGuardados
+          });
+        }
+      })
       .then(() => {
         alert("Todos los IMEIs se guardaron exitosamente 🎉");
         pendingIMEIs = [];
@@ -515,19 +625,56 @@
       });
     }
 
+    function buildFacturaDistribuidorId(proveedorId, facturaDistribuidor) {
+      return `${proveedorId}_${facturaDistribuidor}`.replace(/[\/\\.#$\[\]]/g, '_').trim();
+    }
+
+    function registrarFacturaDistribuidor({ proveedorId, proveedorNombre, facturaDistribuidor, tipoFacturaProveedor, fechaVencimientoProveedor, articleId, imeisGuardados }) {
+      const facturaId = buildFacturaDistribuidorId(proveedorId, facturaDistribuidor);
+      return db.collection("Facturas_Distribuidor").doc(facturaId).set({
+        proveedorId,
+        distribuidorId: proveedorId,
+        proveedorNombre,
+        distribuidorNombre: proveedorNombre,
+        facturaDistribuidor,
+        tipoFacturaProveedor,
+        fechaVencimientoProveedor: tipoFacturaProveedor === 'Credito' ? fechaVencimientoProveedor : null,
+        articleIds: firebase.firestore.FieldValue.arrayUnion(articleId),
+        fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
+        imeis: firebase.firestore.FieldValue.arrayUnion(...imeisGuardados)
+      }, { merge: true });
+    }
+
     function loadIMEIs(articleId) {
       db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
       .then((querySnapshot) => {
         const imeiTable = document.getElementById('imeiTable');
         imeiTable.innerHTML = '';
-        querySnapshot.forEach((doc) => {
+        const rows = [];
+        const proveedorPromises = querySnapshot.docs.map(async (doc) => {
           const imeiData = doc.data();
-          const row = `<tr>
+          let distribuidorNombre = imeiData.distribuidorNombre || '';
+          if (!distribuidorNombre && imeiData.proveedorId) {
+            try {
+              const provDoc = await db.collection("proveedores").doc(imeiData.proveedorId).get();
+              distribuidorNombre = provDoc.exists ? (provDoc.data().nombreProveedor || 'N/D') : 'N/D';
+            } catch (err) {
+              console.warn("Error obteniendo distribuidor:", err);
+              distribuidorNombre = 'N/D';
+            }
+          }
+          rows.push(`<tr>
                         <td>${doc.id}</td>
                         <td>${imeiData.imei}</td>
+                        <td>${distribuidorNombre || 'N/D'}</td>
+                        <td>${imeiData.facturaDistribuidor || 'N/D'}</td>
+                        <td>${imeiData.tipoFacturaProveedor || 'N/D'}</td>
+                        <td>${imeiData.fechaVencimientoProveedor || 'N/D'}</td>
                         <td><button onclick="deleteIMEI('${doc.id}', '${articleId}')">Eliminar</button></td>
-                      </tr>`;
-          imeiTable.innerHTML += row;
+                      </tr>`);
+        });
+        return Promise.all(proveedorPromises).then(() => {
+          imeiTable.innerHTML = rows.join('');
         });
       })
       .catch((error) => {
@@ -577,9 +724,22 @@
     }
 
     // Cargar los artículos al iniciar la página
+    function initArticleSelectorSelect2() {
+      const $articleSelector = $('#articleSelector');
+      if ($articleSelector.data('select2')) {
+        $articleSelector.select2('destroy');
+      }
+      $articleSelector.select2({
+        placeholder: 'Seleccione un Articulo',
+        allowClear: true,
+        width: '100%'
+      });
+    }
+
     window.onload = function() {
       // Inicializar select2
       $('#proveedorSelect').select2({ placeholder: 'Seleccione un proveedor', allowClear: true, width: '100%' });
+      initArticleSelectorSelect2();
       $('#articleQuickEdit').select2({ placeholder: 'Buscar artículo…', allowClear: true, width: '100%' });
 
       wireQuickEdit();
@@ -636,16 +796,22 @@
               inventario[clave] = { cantidad: 0, imeis: [] };
             }
             inventario[clave].cantidad++;
-            inventario[clave].imeis.push(i.imei);
+            inventario[clave].imeis.push({
+              imei: i.imei,
+              distribuidor: i.distribuidorNombre || i.proveedorId || '',
+              facturaDistribuidor: i.facturaDistribuidor || '',
+              tipoFacturaProveedor: i.tipoFacturaProveedor || '',
+              fechaVencimientoProveedor: i.fechaVencimientoProveedor || ''
+            });
           }
         });
     
-        let hoja = [["Marca Modelo", "Cantidad"]];
+        let hoja = [["Marca Modelo", "Cantidad", "Distribuidor", "Factura Distribuidor", "Tipo Factura", "Vencimiento"]];
         for (const key in inventario) {
-          hoja.push([key, inventario[key].cantidad]);
-          hoja.push(["IMEIS", ""]);
+          hoja.push([key, inventario[key].cantidad, "", "", "", ""]);
+          hoja.push(["IMEIS", "", "", "", "", ""]);
           for (const imei of inventario[key].imeis) {
-            hoja.push([imei, ""]);
+            hoja.push([imei.imei, "", imei.distribuidor, imei.facturaDistribuidor, imei.tipoFacturaProveedor, imei.fechaVencimientoProveedor]);
           }
           hoja.push([]); // línea en blanco entre grupos
         }
@@ -678,8 +844,20 @@
   <div id="modalProveedor" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
     background-color:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
     <div style="background:white; padding:20px; border-radius:8px; max-width:400px; width:100%;">
-      <h3>Selecciona un proveedor</h3>
+      <h3>Selecciona distribuidor y factura</h3>
+      <label for="modalProveedorSelect">Distribuidor</label>
       <select id="modalProveedorSelect" style="width:100%; padding:10px; margin-top:10px;"></select>
+      <label for="modalFacturaDistribuidor" style="display:block; margin-top:12px;">Factura del distribuidor</label>
+      <input type="text" id="modalFacturaDistribuidor" placeholder="Numero de factura" style="width:100%; padding:10px; box-sizing:border-box; margin-top:6px;">
+      <label for="modalTipoFacturaProveedor" style="display:block; margin-top:12px;">Tipo de factura</label>
+      <select id="modalTipoFacturaProveedor" onchange="toggleFechaVencimientoProveedor()" style="width:100%; padding:10px; margin-top:6px;">
+        <option value="Contado">Contado</option>
+        <option value="Credito">Credito</option>
+      </select>
+      <div id="modalFechaVencimientoWrap" style="display:none;">
+        <label for="modalFechaVencimientoProveedor" style="display:block; margin-top:12px;">Fecha de vencimiento</label>
+        <input type="date" id="modalFechaVencimientoProveedor" style="width:100%; padding:10px; box-sizing:border-box; margin-top:6px;">
+      </div>
       <button onclick="confirmarGuardadoIMEIs()" style="margin-top:15px;">Confirmar y Guardar</button>
       <button onclick="cerrarModalProveedor()" style="margin-top:10px;">Cancelar</button>
     </div>

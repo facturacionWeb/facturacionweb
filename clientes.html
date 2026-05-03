@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,31 +13,163 @@
     <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
     
     <style>
+        * {
+            box-sizing: border-box;
+        }
         body {
             font-family: Arial, sans-serif;
-            padding: 20px;
+            margin: 0;
+            padding: 24px;
+            background: #f4f6f8;
+            color: #111827;
+        }
+        a {
+            color: #0f5fa8;
+            font-weight: 700;
+            text-decoration: none;
         }
         .container {
-            max-width: 800px;
-            margin: 0 auto;
+            max-width: 1120px;
+            margin: 18px auto 0;
         }
-        input, button, label {
-            margin: 10px 0;
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+        .page-header h1 {
+            margin: 0;
+            font-size: 30px;
+        }
+        .page-header p {
+            margin: 6px 0 0;
+            color: #667085;
+        }
+        .card {
+            background: #fff;
+            border: 1px solid #d8dee9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+            margin-bottom: 20px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+        .field label {
             display: block;
+            margin-bottom: 7px;
+            font-weight: 700;
+            color: #344054;
+        }
+        input, select {
             width: 100%;
-            padding: 10px;
+            padding: 11px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 15px;
+            background: #fff;
+        }
+        input:focus, select:focus {
+            outline: 2px solid #b9d7ff;
+            border-color: #2f80ed;
+        }
+        .credit-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .toggle-field {
+            min-height: 43px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #f8fafc;
+        }
+        .toggle-field input {
+            width: auto;
+            margin: 0;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+        button {
+            border: 1px solid #b8c2d0;
+            border-radius: 6px;
+            background: #fff;
+            color: #111827;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+        button.primary {
+            background: #0f5fa8;
+            border-color: #0f5fa8;
+            color: #fff;
+            font-weight: 700;
+        }
+        button.danger {
+            background: #fef3f2;
+            border-color: #fecdca;
+            color: #b42318;
+        }
+        .table-wrap {
+            overflow-x: auto;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-        }
-        table, th, td {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: left;
+            background: #fff;
         }
         th, td {
-            text-align: center;
+            border: 1px solid #d8dee9;
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th {
+            background: #eef2f7;
+            font-weight: 700;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .status-credit {
+            background: #ecfdf3;
+            color: #027a48;
+        }
+        .status-cash {
+            background: #f2f4f7;
+            color: #475467;
+        }
+        @media (max-width: 760px) {
+            body {
+                padding: 14px;
+            }
+            .page-header, .form-grid, .credit-row {
+                display: block;
+            }
+            .field, .toggle-field {
+                margin-bottom: 14px;
+            }
+            .actions button {
+                width: 100%;
+            }
         }
     </style>
     <script>
@@ -75,33 +207,78 @@
     <a href="index.html">Volver a la Página Principal</a>
     
     <div class="container">
-        <h1>Gestión de Clientes</h1>
+        <div class="page-header">
+            <div>
+                <h1>Gestión de Clientes</h1>
+                <p>Registra datos comerciales y define si el cliente puede comprar a crédito.</p>
+            </div>
+        </div>
 
-        <!-- Form to create or update a client -->
-        <input type="text" id="nombreCliente" placeholder="Nombre del Cliente" />
-        <input type="text" id="nombreTienda" placeholder="Nombre de la Tienda" />
-        <input type="text" id="direccion" placeholder="Dirección" />
-        <input type="text" id="telefono" placeholder="Teléfono" />
-        <button onclick="addOrUpdateClient()">Agregar/Actualizar Cliente</button>
-        <button onclick="clearFields()">Limpiar Campos</button>
+        <section class="card">
+            <h2>Datos del cliente</h2>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="nombreCliente">Nombre del Cliente</label>
+                    <input type="text" id="nombreCliente" placeholder="Nombre del Cliente" />
+                </div>
+                <div class="field">
+                    <label for="nombreTienda">Nombre de la Tienda</label>
+                    <input type="text" id="nombreTienda" placeholder="Nombre de la Tienda" />
+                </div>
+                <div class="field">
+                    <label for="direccion">Dirección</label>
+                    <input type="text" id="direccion" placeholder="Dirección" />
+                </div>
+                <div class="field">
+                    <label for="telefono">Teléfono</label>
+                    <input type="text" id="telefono" placeholder="Teléfono" />
+                </div>
+            </div>
+
+            <div class="credit-row">
+                <label class="toggle-field" for="clienteCredito">
+                    <input type="checkbox" id="clienteCredito" onchange="toggleCreditDays()" />
+                    Cliente de crédito
+                </label>
+                <div class="field" id="diasCreditoField" style="display:none;">
+                    <label for="diasCredito">Días de crédito</label>
+                    <select id="diasCredito">
+                        <option value="10">10 días</option>
+                        <option value="15">15 días</option>
+                        <option value="30">30 días</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="primary" onclick="addOrUpdateClient()">Agregar/Actualizar Cliente</button>
+                <button onclick="clearFields()">Limpiar Campos</button>
+            </div>
+        </section>
 
         <!-- Table to display clients -->
-        <h2>Clientes Existentes</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Cliente</th>
-                    <th>Nombre del Cliente</th>
-                    <th>Nombre de la Tienda</th>
-                    <th>Dirección</th>
-                    <th>Teléfono</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="clientTable">
-                <!-- Client rows will be populated here -->
-            </tbody>
-        </table>
+        <section class="card">
+            <h2>Clientes Existentes</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID Cliente</th>
+                            <th>Nombre del Cliente</th>
+                            <th>Nombre de la Tienda</th>
+                            <th>Dirección</th>
+                            <th>Teléfono</th>
+                            <th>Crédito</th>
+                            <th>Días</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTable">
+                        <!-- Client rows will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <script>
@@ -111,12 +288,33 @@
         // Variable global para almacenar el ID del cliente que se está editando
         let idClienteActual = null;
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function toggleCreditDays() {
+            const isCredit = document.getElementById('clienteCredito').checked;
+            const diasField = document.getElementById('diasCreditoField');
+            const diasSelect = document.getElementById('diasCredito');
+            diasField.style.display = isCredit ? 'block' : 'none';
+            diasSelect.disabled = !isCredit;
+            if (!isCredit) diasSelect.value = '10';
+        }
+
         // Function to clear input fields
         function clearFields() {
             document.getElementById('nombreCliente').value = '';
             document.getElementById('nombreTienda').value = '';
             document.getElementById('direccion').value = '';
             document.getElementById('telefono').value = '';
+            document.getElementById('clienteCredito').checked = false;
+            document.getElementById('diasCredito').value = '10';
+            toggleCreditDays();
             idClienteActual = null;  // Limpiar el ID actual cuando se limpian los campos
         }
 
@@ -126,15 +324,30 @@
             const nombreTienda = document.getElementById('nombreTienda').value.trim();
             const direccion = document.getElementById('direccion').value.trim();
             const telefono = document.getElementById('telefono').value.trim();
+            const clienteCredito = document.getElementById('clienteCredito').checked;
+            const diasCredito = clienteCredito ? parseInt(document.getElementById('diasCredito').value, 10) : 0;
+
+            if (!nombreCliente) {
+                alert("Ingrese el nombre del cliente.");
+                return;
+            }
+            if (clienteCredito && ![10, 15, 30].includes(diasCredito)) {
+                alert("Seleccione días de crédito válidos.");
+                return;
+            }
+
+            const payload = {
+                nombreCliente: nombreCliente,
+                nombreTienda: nombreTienda,
+                direccion: direccion,
+                telefono: telefono,
+                clienteCredito: clienteCredito,
+                diasCredito: diasCredito
+            };
 
             if (idClienteActual) {
                 // Si hay un ID de cliente actual, actualizamos el cliente existente
-                db.collection("clientes").doc(idClienteActual).set({
-                    nombreCliente: nombreCliente,
-                    nombreTienda: nombreTienda,
-                    direccion: direccion,
-                    telefono: telefono
-                }).then(() => {
+                db.collection("clientes").doc(idClienteActual).set(payload, { merge: true }).then(() => {
                     alert("Cliente actualizado con éxito");
                     loadClients();
                     clearFields(); // Limpiar los campos después de actualizar
@@ -143,12 +356,7 @@
                 });
             } else {
                 // Si no hay ID de cliente actual, agregamos un nuevo cliente
-                db.collection("clientes").add({
-                    nombreCliente: nombreCliente,
-                    nombreTienda: nombreTienda,
-                    direccion: direccion,
-                    telefono: telefono
-                }).then(() => {
+                db.collection("clientes").add(payload).then(() => {
                     alert("Cliente agregado con éxito");
                     loadClients();
                     clearFields(); // Limpiar los campos después de agregar
@@ -165,15 +373,21 @@
                 clientTable.innerHTML = '';
                 querySnapshot.forEach((doc) => {
                     const client = doc.data();
+                    const esCredito = !!client.clienteCredito;
+                    const creditoLabel = esCredito
+                        ? '<span class="status-pill status-credit">Crédito</span>'
+                        : '<span class="status-pill status-cash">Contado</span>';
                     const row = `<tr>
-                                    <td><a href="invoices.html?clientId=${doc.id}">${doc.id || 'N/A'}</a></td> 
-                                    <td>${client.nombreCliente || 'N/A'}</td>
-                                    <td>${client.nombreTienda || 'N/A'}</td>
-                                    <td>${client.direccion || 'N/A'}</td>
-                                    <td>${client.telefono || 'N/A'}</td>
+                                    <td><a href="invoices.html?clientId=${doc.id}">${escapeHtml(doc.id || 'N/A')}</a></td>
+                                    <td>${escapeHtml(client.nombreCliente || 'N/A')}</td>
+                                    <td>${escapeHtml(client.nombreTienda || 'N/A')}</td>
+                                    <td>${escapeHtml(client.direccion || 'N/A')}</td>
+                                    <td>${escapeHtml(client.telefono || 'N/A')}</td>
+                                    <td>${creditoLabel}</td>
+                                    <td>${esCredito ? `${Number(client.diasCredito || 0)} días` : 'N/A'}</td>
                                     <td>
                                         <button onclick="editClient('${doc.id}')">Editar</button>
-                                        <button onclick="deleteClient('${doc.id}')">Eliminar</button>
+                                        <button class="danger" onclick="deleteClient('${doc.id}')">Eliminar</button>
                                     </td>
                                  </tr>`;
                     clientTable.innerHTML += row;
@@ -192,6 +406,9 @@
                     document.getElementById('nombreTienda').value = client.nombreTienda;
                     document.getElementById('direccion').value = client.direccion;
                     document.getElementById('telefono').value = client.telefono;
+                    document.getElementById('clienteCredito').checked = !!client.clienteCredito;
+                    document.getElementById('diasCredito').value = String(client.diasCredito || 10);
+                    toggleCreditDays();
                     idClienteActual = idCliente;  // Guardar el ID del cliente que se está editando
                 } else {
                     alert("El cliente no existe");
@@ -203,6 +420,7 @@
 
         // Function to delete client
         function deleteClient(idCliente) {
+            if (!confirm("¿Desea eliminar este cliente?")) return;
             db.collection("clientes").doc(idCliente).delete().then(() => {
                 alert("Cliente eliminado con éxito");
                 loadClients();
@@ -223,6 +441,7 @@
                 loadClients();
             }*/
             
+            toggleCreditDays();
             loadClients();
             
         };

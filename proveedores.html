@@ -161,6 +161,72 @@
     .summary-box strong {
       font-size: 22px;
     }
+    .debt-dashboard {
+      display: none;
+      margin: 18px 0 6px;
+      border: 1px solid #d8dee9;
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+    .debt-dashboard.active {
+      display: block;
+    }
+    .debt-dashboard h3 {
+      margin: 0 0 6px;
+    }
+    .debt-chart {
+      margin-top: 16px;
+    }
+    .debt-chart-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #475467;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .debt-bar {
+      display: flex;
+      height: 28px;
+      overflow: hidden;
+      border-radius: 6px;
+      background: #f2f4f7;
+      border: 1px solid #d8dee9;
+    }
+    .debt-bar-paid {
+      background: #12b76a;
+      min-width: 0;
+    }
+    .debt-bar-pending {
+      background: #f79009;
+      min-width: 0;
+    }
+    .debt-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .debt-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #475467;
+      font-size: 13px;
+    }
+    .debt-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .debt-dot-paid {
+      background: #12b76a;
+    }
+    .debt-dot-pending {
+      background: #f79009;
+    }
     .select2-container {
       width: 100% !important;
     }
@@ -258,6 +324,9 @@
     @media (max-width: 760px) {
       .grid, .grid-3, .summary-row, .invoice-print-header {
         grid-template-columns: 1fr;
+      }
+      .debt-chart-header {
+        display: block;
       }
       .actions button {
         width: 100%;
@@ -427,6 +496,30 @@
       <div class="actions">
         <button class="primary" onclick="loadProviderInvoices()">Aplicar filtros</button>
         <button onclick="clearInvoiceFilters()">Limpiar filtros</button>
+      </div>
+
+      <div id="creditDebtDashboard" class="debt-dashboard">
+        <h3>Resumen de deuda de credito pendiente</h3>
+        <div class="muted">Totales calculados con las facturas visibles en el listado.</div>
+        <div class="summary-row">
+          <div class="summary-box"><span>Total deuda</span><strong id="creditDebtTotal">0.00</strong></div>
+          <div class="summary-box"><span>Total abonado</span><strong id="creditDebtPaid">0.00</strong></div>
+          <div class="summary-box"><span>Saldo por pagar</span><strong id="creditDebtBalance">0.00</strong></div>
+        </div>
+        <div class="debt-chart">
+          <div class="debt-chart-header">
+            <span>Distribucion de la deuda</span>
+            <span id="creditDebtPendingPercent">0.00% pendiente</span>
+          </div>
+          <div class="debt-bar" aria-label="Grafico de deuda abonada y pendiente">
+            <div id="creditDebtPaidBar" class="debt-bar-paid" style="width:0%"></div>
+            <div id="creditDebtPendingBar" class="debt-bar-pending" style="width:0%"></div>
+          </div>
+          <div class="debt-legend">
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-paid"></span>Abonado</span>
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-pending"></span>Pendiente</span>
+          </div>
+        </div>
       </div>
 
       <table>
@@ -854,6 +947,35 @@
       loadProviderInvoices();
     }
 
+    function renderCreditDebtDashboard(invoices, creditStatusFilter) {
+      const dashboard = document.getElementById('creditDebtDashboard');
+      if (creditStatusFilter !== 'pendientes') {
+        dashboard.classList.remove('active');
+        return;
+      }
+
+      const totals = invoices.reduce((acc, inv) => {
+        const total = Number(inv.orderTotal || 0);
+        const abonado = Number(inv.totalAbonado || 0);
+        const saldo = Math.max(total - abonado, 0);
+        acc.total += total;
+        acc.abonado += abonado;
+        acc.saldo += saldo;
+        return acc;
+      }, { total: 0, abonado: 0, saldo: 0 });
+
+      const paidPercent = totals.total > 0 ? Math.min((totals.abonado / totals.total) * 100, 100) : 0;
+      const pendingPercent = totals.total > 0 ? Math.min((totals.saldo / totals.total) * 100, 100) : 0;
+
+      document.getElementById('creditDebtTotal').textContent = money(totals.total);
+      document.getElementById('creditDebtPaid').textContent = money(totals.abonado);
+      document.getElementById('creditDebtBalance').textContent = money(totals.saldo);
+      document.getElementById('creditDebtPendingPercent').textContent = `${pendingPercent.toFixed(2)}% pendiente`;
+      document.getElementById('creditDebtPaidBar').style.width = `${paidPercent}%`;
+      document.getElementById('creditDebtPendingBar').style.width = `${pendingPercent}%`;
+      dashboard.classList.add('active');
+    }
+
     async function loadProviderInvoices() {
       const providerFilter = document.getElementById('filterProviderSelect').value;
       const typeFilter = document.getElementById('filterInvoiceType').value;
@@ -890,6 +1012,7 @@
         }
 
         invoices.sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
+        renderCreditDebtDashboard(invoices, creditStatusFilter);
         tbody.innerHTML = '';
 
         if (invoices.length === 0) {
@@ -929,6 +1052,7 @@
         });
       } catch (error) {
         console.error("Error cargando facturas de proveedores:", error);
+        renderCreditDebtDashboard([], '');
         tbody.innerHTML = '<tr><td colspan="10">Error al cargar facturas.</td></tr>';
       }
     }

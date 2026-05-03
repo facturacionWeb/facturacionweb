@@ -14,6 +14,7 @@
   <!-- Select2 CSS y JS -->
   <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     /* Estilos básicos */
     body {
@@ -202,6 +203,10 @@
       border-color: #fecdca;
       background: #fef3f2;
       color: #b42318;
+    }
+    .sharing-invoice .invoice-edit-panel,
+    .sharing-invoice .invoice-modal-actions {
+      display: none !important;
     }
   </style>
 </head>
@@ -1135,6 +1140,11 @@
           removeItemFromInvoice(this.dataset.invoiceId, Number(this.dataset.index), this.dataset.imei);
         });
       });
+      document.querySelectorAll('.share-invoice-whatsapp-btn').forEach((button) => {
+        button.addEventListener('click', function() {
+          shareInvoiceByWhatsapp(this.dataset.invoiceId, this.dataset.consecutivo);
+        });
+      });
     }
 
     async function removeItemFromInvoice(invoiceId, itemIndex, expectedImei) {
@@ -1368,11 +1378,10 @@
               </div>
               ${renderInvoiceEditPanel(invoiceId, invoice)}
               <!-- Botón para imprimir SOLO esta factura -->
-              <div style="text-align:center; margin-top:20px;">
+              <div class="invoice-modal-actions" style="text-align:center; margin-top:20px;">
+                <button type="button" class="share-invoice-whatsapp-btn" data-invoice-id="${escapeHtml(invoiceId)}" data-consecutivo="${escapeHtml(invoice.consecutivo || '')}">Compartir por WhatsApp</button>
                 <button onclick="printModalInvoice()">Imprimir Factura 🖨️</button>
-              </div>
-              <div style="text-align:center; margin-top:10px;">
-                  <button onclick="printThermalFromModal()">Impresión Móvil 🖨️📲</button>
+                <button onclick="printThermalFromModal()">Impresión Móvil 🖨️📲</button>
               </div>
             `;
             document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
@@ -1442,6 +1451,66 @@
       printWindow.focus();
       printWindow.print();
       printWindow.close();
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    async function shareInvoiceByWhatsapp(invoiceId, consecutivo) {
+      const invoiceNode = document.getElementById('modalInvoiceContent');
+      if (!invoiceNode) {
+        alert("No se encontró la factura para compartir.");
+        return;
+      }
+      if (typeof html2canvas === 'undefined') {
+        alert("No se pudo cargar el generador de imagen. Intente de nuevo con conexión a internet.");
+        return;
+      }
+
+      const filename = `factura-${consecutivo || invoiceId}.png`;
+      const text = `Factura ${consecutivo || invoiceId}`;
+
+      try {
+        invoiceNode.classList.add('sharing-invoice');
+        const canvas = await html2canvas(invoiceNode, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          useCORS: true
+        });
+        invoiceNode.classList.remove('sharing-invoice');
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            alert("No se pudo generar la imagen de la factura.");
+            return;
+          }
+
+          const file = new File([blob], filename, { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+            await navigator.share({
+              title: text,
+              text,
+              files: [file]
+            });
+            return;
+          }
+
+          downloadBlob(blob, filename);
+          window.open(`https://wa.me/?text=${encodeURIComponent(text + ' - Se descargó la imagen para adjuntarla.')}`, '_blank');
+        }, 'image/png');
+      } catch (error) {
+        invoiceNode.classList.remove('sharing-invoice');
+        console.error("Error compartiendo factura por WhatsApp:", error);
+        alert("No se pudo generar la imagen para WhatsApp: " + error.message);
+      }
     }
 
   /*function printThermalFromModal() {

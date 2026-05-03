@@ -74,6 +74,27 @@
     .invoice-body {
       margin-bottom: 20px;
     }
+    .invoice-edit-panel {
+      margin-top: 20px;
+      padding: 14px;
+      border: 1px solid #ddd;
+      background: #f8fafc;
+      border-radius: 6px;
+    }
+    .invoice-edit-panel h3 {
+      margin-top: 0;
+    }
+    .invoice-edit-panel .muted {
+      color: #666;
+      font-size: 13px;
+    }
+    .danger-btn {
+      background: #fef3f2;
+      color: #b42318;
+      border: 1px solid #fecdca;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
     .details-table, .items-table {
       width: 100%;
       border-collapse: collapse;
@@ -357,6 +378,19 @@
     // Arreglo para acumular los items escaneados en la previsualización
     let invoicePreviewItems = [];
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function normalizeMoney(value) {
+      return Number((Number(value) || 0).toFixed(2));
+    }
+
     // Mostrar u ocultar información adicional para transferencia
     document.getElementById('paymentType').addEventListener('change', function() {
       if (this.value === "Transferencia") {
@@ -428,6 +462,7 @@
             imei: scannedImei,
             precioVenta: articleData.precioVenta || 0,
             imeiDocId: doc.id,
+            imeiDocData: imeiData,
             discount: 0,
             total: parseFloat(articleData.precioVenta || 0),
             costo_compra: articleData.precioCompra || 0,
@@ -714,8 +749,10 @@
         const imeiDocId = parsedValue.imeiDocId;
 
         const imeiDocData = {
+          ...(parsedValue.imeiDocData || {}),
           articleId: articleId,
-          imei: imei
+          imei: imei,
+          proveedorId: parsedValue.proveedorId || parsedValue.imeiDocData?.proveedorId || null
         };
 
         items.push({
@@ -984,6 +1021,117 @@
       }
     }
 
+    function renderInvoiceEditPanel(invoiceId, invoice) {
+      if (invoice.anulada) return '';
+
+      const rows = (invoice.items || []).map((item, index) => `
+        <tr>
+          <td>${escapeHtml(item.brand || '')} ${escapeHtml(item.model || '')}</td>
+          <td>${escapeHtml(item.imei || 'N/A')}</td>
+          <td>${Number(item.price || 0).toFixed(2)}</td>
+          <td>${Number(item.discount || 0)}%</td>
+          <td>${Number(item.total || 0).toFixed(2)}</td>
+          <td>
+            <button type="button" class="danger-btn remove-invoice-item-btn" data-invoice-id="${escapeHtml(invoiceId)}" data-index="${index}" data-imei="${escapeHtml(item.imei || '')}">Quitar</button>
+          </td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="invoice-edit-panel">
+          <h3>Editar items de factura</h3>
+          <p class="muted">Al quitar un IMEI, el producto vuelve al inventario y el monto se descuenta del total y del saldo de la factura.</p>
+          <table class="items-table">
+            <tr>
+              <th>Articulo</th>
+              <th>IMEI</th>
+              <th>Precio</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Acciones</th>
+            </tr>
+            ${rows || '<tr><td colspan="6">Esta factura no tiene items.</td></tr>'}
+          </table>
+        </div>
+      `;
+    }
+
+    function bindInvoiceEditButtons() {
+      document.querySelectorAll('.remove-invoice-item-btn').forEach((button) => {
+        button.addEventListener('click', function() {
+          removeItemFromInvoice(this.dataset.invoiceId, Number(this.dataset.index), this.dataset.imei);
+        });
+      });
+    }
+
+    async function removeItemFromInvoice(invoiceId, itemIndex, expectedImei) {
+      if (!confirm(`¿Desea quitar el IMEI ${expectedImei} de esta factura y devolverlo al inventario?`)) return;
+
+      const invoiceRef = db.collection("facturas").doc(invoiceId);
+
+      try {
+        await db.runTransaction(async (transaction) => {
+          const invoiceSnap = await transaction.get(invoiceRef);
+          if (!invoiceSnap.exists) throw new Error("La factura no existe.");
+
+          const invoice = invoiceSnap.data();
+          if (invoice.anulada) throw new Error("No se puede editar una factura anulada.");
+
+          const items = invoice.items || [];
+          const item = items[itemIndex];
+          if (!item) throw new Error("El item seleccionado ya no existe en la factura.");
+          if (String(item.imei || '') !== String(expectedImei || '')) {
+            throw new Error("La factura cambió. Abra el detalle nuevamente e intente otra vez.");
+          }
+          if (!item.imei || !item.articleId) {
+            throw new Error("El item no tiene IMEI o articulo asociado para devolverlo al inventario.");
+          }
+
+          const inventoryDocId = item.imeiDocId || item.imei;
+          const inventoryRef = db.collection("Articulos_X_IMEI").doc(inventoryDocId);
+          const inventorySnap = await transaction.get(inventoryRef);
+          if (inventorySnap.exists) {
+            const currentInventory = inventorySnap.data();
+            if (String(currentInventory.imei || '') !== String(item.imei || '')) {
+              throw new Error(`El documento de inventario ${inventoryDocId} ya pertenece a otro IMEI.`);
+            }
+          }
+
+          const newItems = items.filter((_, index) => index !== itemIndex);
+          const newItemsTotal = newItems.reduce((sum, row) => sum + Number(row.total || 0), 0);
+          const shipping = Number(invoice.shipping || 0);
+          const newTotal = normalizeMoney(newItemsTotal + shipping);
+          const removedTotal = Number(item.total || 0);
+          const currentSaldo = invoice.saldo !== undefined ? Number(invoice.saldo || 0) : Number(invoice.total || 0);
+          const newSaldo = normalizeMoney(Math.max(currentSaldo - removedTotal, 0));
+          const restoredImei = {
+            ...(item.imeiDocData || {}),
+            imei: item.imei,
+            articleId: item.articleId,
+            proveedorId: item.proveedorId || item.imeiDocData?.proveedorId || null
+          };
+
+          if (!inventorySnap.exists) {
+            transaction.set(inventoryRef, restoredImei);
+          }
+          transaction.update(invoiceRef, {
+            items: newItems,
+            total: newTotal,
+            saldo: newSaldo,
+            updatedAt: new Date()
+          });
+        });
+
+        alert("Item removido de la factura y devuelto al inventario.");
+        await viewInvoiceDetail(invoiceId);
+        loadInvoices();
+        loadCreditInvoicesForAbonos();
+      } catch (error) {
+        console.error("Error removiendo item de factura:", error);
+        alert("No se pudo remover el item: " + error.message);
+      }
+    }
+
     // Filtros de facturas
     function filterInvoices() {
       const filterDate = document.getElementById('filterDate').value;
@@ -1144,6 +1292,7 @@
                   <p>Firma del Cliente</p>
                 </div>
               </div>
+              ${renderInvoiceEditPanel(invoiceId, invoice)}
               <!-- Botón para imprimir SOLO esta factura -->
               <div style="text-align:center; margin-top:20px;">
                 <button onclick="printModalInvoice()">Imprimir Factura 🖨️</button>
@@ -1153,6 +1302,7 @@
               </div>
             `;
             document.getElementById('modalInvoiceContent').innerHTML = invoiceHTML;
+            bindInvoiceEditButtons();
             document.getElementById('invoiceModal').style.display = 'block';
           });
         }
@@ -1203,6 +1353,9 @@
               text-align: center;
               border-bottom: 2px solid #000;
               margin-bottom: 20px;
+            }
+            .invoice-edit-panel {
+              display: none !important;
             }
           </style>
         </head>

@@ -974,7 +974,8 @@
                 <td><strong>${currencySymbol}${(invoice.shipping || 0).toFixed(2)}</strong></td>
               </tr>
               <tr>
-                <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
+                <td style="text-align:center;"><strong>Total IMEIs:</strong><br>${(invoice.items || []).length}</td>
+                <td colspan="3" style="text-align: right;"><strong>Total a Pagar:</strong></td>
                 <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
               </tr>
             </table>
@@ -1355,7 +1356,8 @@
                     <td><strong>${currencySymbol}${(invoice.shipping || 0).toFixed(2)}</strong></td>
                   </tr>
                   <tr>
-                    <td colspan="4" style="text-align: right;"><strong>Total a Pagar:</strong></td>
+                    <td style="text-align:center;"><strong>Total IMEIs:</strong><br>${(invoice.items || []).length}</td>
+                    <td colspan="3" style="text-align: right;"><strong>Total a Pagar:</strong></td>
                     <td><strong>${currencySymbol}${invoice.total.toFixed(2)}</strong></td>
                   </tr>
                 </table>
@@ -1543,13 +1545,14 @@
           textParts.push(`[L]Total: ${total}\n`);
         });
     
-        // 5) Línea final: Total a Pagar (fila con sólo 2 td y que incluye "Total a Pagar")
+        // 5) Línea final: Total a Pagar
         const totalRow = allRows.find(row => {
           const tds = row.querySelectorAll('td');
-          return tds.length === 2 && tds[0].innerText.includes('Total a Pagar');
+          return Array.from(tds).some(td => td.innerText.includes('Total a Pagar'));
         });
         if (totalRow) {
-          const totalValue = totalRow.querySelectorAll('td')[1].innerText.trim();
+          const tds = totalRow.querySelectorAll('td');
+          const totalValue = tds[tds.length - 1].innerText.trim();
           textParts.push("[C]------------------------------");
           textParts.push(`[C]<b>Total: ${totalValue}</b>`);
           textParts.push("[C]==============================");

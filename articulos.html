@@ -131,6 +131,43 @@
     #articleSelectorStatus:empty {
       display: none;
     }
+    #modalProveedor label {
+      display: block;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      font-weight: bold;
+    }
+    #modalProveedor .select2-container {
+      display: block;
+      width: 100% !important;
+      margin: 0 0 12px 0;
+    }
+    #modalProveedor .select2-container--default .select2-selection--single {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    #modalProveedor .select2-container--default .select2-selection--single .select2-selection__rendered {
+      line-height: 34px;
+      padding-left: 10px;
+      padding-right: 44px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #modalProveedor .select2-container--default .select2-selection--single .select2-selection__arrow {
+      height: 34px;
+      right: 6px;
+    }
+    #modalProveedor .select2-container--default .select2-selection--single .select2-selection__clear {
+      position: absolute;
+      right: 28px;
+      top: 50%;
+      transform: translateY(-50%);
+      margin: 0;
+      line-height: 1;
+      z-index: 2;
+    }
   </style>
 
   <script>
@@ -231,8 +268,8 @@
         <tr>
           <th>ID (Registro)</th>
           <th>IMEI</th>
-          <th>Distribuidor</th>
-          <th>Factura Distribuidor</th>
+          <th>Proveedor</th>
+          <th>Factura Proveedor</th>
           <th>Tipo Factura</th>
           <th>Vencimiento</th>
           <th>Acciones</th>
@@ -259,6 +296,7 @@
 
     // Arreglo para acumular los IMEIs pendientes
     let pendingIMEIs = [];
+    let facturasProveedorModal = [];
 
     /* =============================
        Funciones para Artículos
@@ -512,13 +550,16 @@
 
     function cargarProveedoresEnModal() {
       const select = document.getElementById("modalProveedorSelect");
+      const facturaSelect = document.getElementById("modalFacturaDistribuidor");
       select.innerHTML = '<option value="">Seleccione un proveedor</option>';
-      document.getElementById("modalFacturaDistribuidor").value = '';
-      document.getElementById("modalTipoFacturaProveedor").value = 'Contado';
-      document.getElementById("modalFechaVencimientoProveedor").value = '';
-      toggleFechaVencimientoProveedor();
+      facturaSelect.innerHTML = '<option value="">Seleccione primero un proveedor</option>';
+      facturaSelect.disabled = true;
+      facturasProveedorModal = [];
       if ($('#modalProveedorSelect').data('select2')) {
         $('#modalProveedorSelect').select2('destroy');
+      }
+      if ($('#modalFacturaDistribuidor').data('select2')) {
+        $('#modalFacturaDistribuidor').select2('destroy');
       }
       db.collection("proveedores").get().then((snapshot) => {
         snapshot.forEach((doc) => {
@@ -529,7 +570,19 @@
         });
         // Inicializar Select2 dentro del modal
         $('#modalProveedorSelect').select2({
-          dropdownParent: $('#modalProveedor')
+          dropdownParent: $('#modalProveedor'),
+          placeholder: 'Seleccione un proveedor',
+          allowClear: true,
+          width: '100%'
+        }).off('change.modalFacturasProveedor')
+          .on('change.modalFacturasProveedor', function() {
+            cargarFacturasProveedorEnModal(this.value);
+          });
+        $('#modalFacturaDistribuidor').select2({
+          dropdownParent: $('#modalProveedor'),
+          placeholder: 'Seleccione una factura',
+          allowClear: true,
+          width: '100%'
         });
       });
     }
@@ -538,19 +591,106 @@
       document.getElementById("modalProveedor").style.display = "none";
     }
 
-    function toggleFechaVencimientoProveedor() {
-      const tipoFactura = document.getElementById("modalTipoFacturaProveedor").value;
-      const vencimientoWrap = document.getElementById("modalFechaVencimientoWrap");
-      vencimientoWrap.style.display = tipoFactura === 'Credito' ? 'block' : 'none';
+    function cargarFacturasProveedorEnModal(proveedorId) {
+      const facturaSelect = document.getElementById("modalFacturaDistribuidor");
+      facturaSelect.innerHTML = '<option value="">Cargando facturas...</option>';
+      facturaSelect.disabled = true;
+      facturasProveedorModal = [];
+
+      if ($('#modalFacturaDistribuidor').data('select2')) {
+        $('#modalFacturaDistribuidor').select2('destroy');
+      }
+
+      if (!proveedorId) {
+        facturaSelect.innerHTML = '<option value="">Seleccione primero un proveedor</option>';
+        facturaSelect.disabled = true;
+        $('#modalFacturaDistribuidor').select2({
+          dropdownParent: $('#modalProveedor'),
+          placeholder: 'Seleccione una factura',
+          allowClear: true,
+          width: '100%'
+        });
+        return;
+      }
+
+      db.collection("Facturas_Proveedores").get()
+        .then((snapshot) => {
+          facturaSelect.innerHTML = '<option value="">Seleccione una factura</option>';
+          const facturas = snapshot.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .filter((factura) => String(factura.proveedorId || '') === String(proveedorId))
+            .sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
+
+          facturas.forEach((factura) => {
+            facturasProveedorModal.push(factura);
+            const opt = document.createElement("option");
+            opt.value = factura.id;
+            opt.textContent = `${factura.orderNumber || factura.id} - ${factura.orderDate || 'Sin fecha'} - Total: ${Number(factura.orderTotal || 0).toFixed(2)}`;
+            facturaSelect.appendChild(opt);
+          });
+          if (facturas.length === 0) {
+            facturaSelect.innerHTML = '<option value="">Este proveedor no tiene facturas</option>';
+            facturaSelect.disabled = true;
+          } else {
+            facturaSelect.disabled = false;
+          }
+          $('#modalFacturaDistribuidor').select2({
+            dropdownParent: $('#modalProveedor'),
+            placeholder: 'Seleccione una factura',
+            allowClear: true,
+            width: '100%'
+          });
+        })
+        .catch((error) => {
+          console.error("Error cargando facturas del proveedor:", error);
+          facturaSelect.innerHTML = '<option value="">Error cargando facturas</option>';
+          facturaSelect.disabled = true;
+        });
     }
 
-    function confirmarGuardadoIMEIs() {
+    function obtenerItemFacturaProveedor(factura, articleId) {
+      return (factura.items || []).find(item => item.articleId === articleId);
+    }
+
+    async function contarImeisCargadosFacturaArticulo(facturaProveedorId, articleId) {
+      const snapshot = await db.collection("Articulos_X_IMEI")
+        .where("facturaProveedorId", "==", facturaProveedorId)
+        .where("articleId", "==", articleId)
+        .get();
+      return snapshot.size;
+    }
+
+    async function validarImeisPendientesDisponibles({ facturaProveedorId, articleId }) {
+      for (const imei of pendingIMEIs) {
+        const snap = await db.collection("Articulos_X_IMEI").where("imei", "==", imei).get();
+        if (!snap.empty) {
+          const existente = snap.docs[0].data();
+          if (existente.facturaProveedorId === facturaProveedorId && existente.articleId === articleId) {
+            throw new Error(`El IMEI ${imei} ya fue cargado para esta factura y articulo.`);
+          }
+          throw new Error(`El IMEI ${imei} ya existe en inventario. No se puede cargar nuevamente.`);
+        }
+      }
+    }
+
+    function calcularFechaVencimientoFactura(orderDate, terms) {
+      if (!orderDate) return null;
+      const fecha = new Date(orderDate + 'T00:00:00');
+      fecha.setDate(fecha.getDate() + Number(terms || 0));
+      return fecha.toISOString().slice(0, 10);
+    }
+
+    async function confirmarGuardadoIMEIs() {
       const proveedorId = document.getElementById("modalProveedorSelect").value;
       const proveedorSelect = document.getElementById("modalProveedorSelect");
       const proveedorNombre = proveedorSelect.options[proveedorSelect.selectedIndex]?.text || '';
-      const facturaDistribuidor = document.getElementById("modalFacturaDistribuidor").value.trim();
-      const tipoFacturaProveedor = document.getElementById("modalTipoFacturaProveedor").value;
-      const fechaVencimientoProveedor = document.getElementById("modalFechaVencimientoProveedor").value;
+      const facturaProveedorId = document.getElementById("modalFacturaDistribuidor").value;
+      const facturaProveedor = facturasProveedorModal.find(f => f.id === facturaProveedorId);
+      const facturaDistribuidor = facturaProveedor?.orderNumber || '';
+      const tipoFacturaProveedor = facturaProveedor?.invoiceType || 'N/D';
+      const fechaVencimientoProveedor = facturaProveedor?.invoiceType === 'Credito'
+        ? calcularFechaVencimientoFactura(facturaProveedor.orderDate, facturaProveedor.terms || 0)
+        : null;
       const articleId = document.getElementById("articleSelector").value;
       
       if (!articleId) {
@@ -562,7 +702,7 @@
         return;
       }
       if (!facturaDistribuidor) {
-        alert("Ingresa la factura del distribuidor para asociar estos IMEIs.");
+        alert("Selecciona la factura del proveedor para asociar estos IMEIs.");
         return;
       }
       if (tipoFacturaProveedor === 'Credito' && !fechaVencimientoProveedor) {
@@ -570,6 +710,37 @@
         return;
       }
       
+      if (!facturaProveedorId || !facturaProveedor) {
+        alert("Selecciona una factura del proveedor.");
+        return;
+      }
+      const itemFactura = obtenerItemFacturaProveedor(facturaProveedor, articleId);
+      if (!itemFactura) {
+        alert("El articulo seleccionado no esta presente en el detalle de la factura del proveedor.");
+        return;
+      }
+      const cantidadFactura = Number(itemFactura.quantity || 0);
+      const imeisYaCargados = await contarImeisCargadosFacturaArticulo(facturaProveedorId, articleId);
+      const cargaRegistradaEnFactura = Math.max(Number(itemFactura.loadedQuantity || 0), (itemFactura.loadedImeis || []).length);
+      const totalYaCargado = Math.max(imeisYaCargados, cargaRegistradaEnFactura);
+      const pendientesPorCargar = Math.max(cantidadFactura - totalYaCargado, 0);
+
+      if (pendientesPorCargar <= 0) {
+        alert("Este articulo ya fue cargado completamente para la factura seleccionada.");
+        return;
+      }
+      if (pendingIMEIs.length !== pendientesPorCargar) {
+        alert(`La factura indica ${cantidadFactura} piezas para este articulo. Ya hay ${totalYaCargado} cargadas y faltan ${pendientesPorCargar}. Debes registrar exactamente ${pendientesPorCargar} IMEIs en esta carga. Actualmente tienes ${pendingIMEIs.length}.`);
+        return;
+      }
+
+      try {
+        await validarImeisPendientesDisponibles({ facturaProveedorId, articleId });
+      } catch (error) {
+        alert(error.message);
+        return;
+      }
+
       let promises = [];
       pendingIMEIs.forEach((imei) => {
         let promise = db.collection("Articulos_X_IMEI").where("imei", "==", imei).get()
@@ -584,6 +755,7 @@
                 proveedorId,
                 distribuidorId: proveedorId,
                 distribuidorNombre: proveedorNombre,
+                facturaProveedorId,
                 facturaDistribuidor,
                 tipoFacturaProveedor,
                 fechaVencimientoProveedor: tipoFacturaProveedor === 'Credito' ? fechaVencimientoProveedor : null,
@@ -602,15 +774,23 @@
       .then((results) => {
         const imeisGuardados = results.filter(Boolean);
         if (imeisGuardados.length > 0) {
-          return registrarFacturaDistribuidor({
-            proveedorId,
-            proveedorNombre,
-            facturaDistribuidor,
-            tipoFacturaProveedor,
-            fechaVencimientoProveedor,
-            articleId,
-            imeisGuardados
-          });
+          return Promise.all([
+            registrarFacturaDistribuidor({
+              proveedorId,
+              proveedorNombre,
+              facturaProveedorId,
+              facturaDistribuidor,
+              tipoFacturaProveedor,
+              fechaVencimientoProveedor,
+              articleId,
+              imeisGuardados
+            }),
+            actualizarCargaArticuloEnFacturaProveedor({
+              facturaProveedorId,
+              articleId,
+              imeisGuardados
+            })
+          ]);
         }
       })
       .then(() => {
@@ -629,13 +809,14 @@
       return `${proveedorId}_${facturaDistribuidor}`.replace(/[\/\\.#$\[\]]/g, '_').trim();
     }
 
-    function registrarFacturaDistribuidor({ proveedorId, proveedorNombre, facturaDistribuidor, tipoFacturaProveedor, fechaVencimientoProveedor, articleId, imeisGuardados }) {
+    function registrarFacturaDistribuidor({ proveedorId, proveedorNombre, facturaProveedorId, facturaDistribuidor, tipoFacturaProveedor, fechaVencimientoProveedor, articleId, imeisGuardados }) {
       const facturaId = buildFacturaDistribuidorId(proveedorId, facturaDistribuidor);
       return db.collection("Facturas_Distribuidor").doc(facturaId).set({
         proveedorId,
         distribuidorId: proveedorId,
         proveedorNombre,
         distribuidorNombre: proveedorNombre,
+        facturaProveedorId,
         facturaDistribuidor,
         tipoFacturaProveedor,
         fechaVencimientoProveedor: tipoFacturaProveedor === 'Credito' ? fechaVencimientoProveedor : null,
@@ -643,6 +824,37 @@
         fechaRegistro: firebase.firestore.FieldValue.serverTimestamp(),
         imeis: firebase.firestore.FieldValue.arrayUnion(...imeisGuardados)
       }, { merge: true });
+    }
+
+    async function actualizarCargaArticuloEnFacturaProveedor({ facturaProveedorId, articleId, imeisGuardados }) {
+      const facturaRef = db.collection("Facturas_Proveedores").doc(facturaProveedorId);
+      const facturaDoc = await facturaRef.get();
+      if (!facturaDoc.exists) return;
+
+      const factura = facturaDoc.data();
+      const items = (factura.items || []).map((item) => {
+        if (item.articleId !== articleId) return item;
+        const loadedImeis = Array.from(new Set([
+          ...(item.loadedImeis || []),
+          ...imeisGuardados.map((row) => row.imei)
+        ]));
+        return {
+          ...item,
+          loadedQuantity: loadedImeis.length,
+          loadedImeis,
+          loadedAt: new Date()
+        };
+      });
+
+      const totalPiezas = Number(factura.totalPiezas || 0);
+      const totalCargado = items.reduce((sum, item) => sum + Number(item.loadedQuantity || 0), 0);
+
+      return facturaRef.update({
+        items,
+        inventoryLoadedPieces: totalCargado,
+        inventoryPendingPieces: Math.max(totalPiezas - totalCargado, 0),
+        inventoryStatus: totalCargado >= totalPiezas ? 'Cargada' : 'Pendiente'
+      });
     }
 
     function loadIMEIs(articleId) {
@@ -806,7 +1018,7 @@
           }
         });
     
-        let hoja = [["Marca Modelo", "Cantidad", "Distribuidor", "Factura Distribuidor", "Tipo Factura", "Vencimiento"]];
+        let hoja = [["Marca Modelo", "Cantidad", "Proveedor", "Factura Proveedor", "Tipo Factura", "Vencimiento"]];
         for (const key in inventario) {
           hoja.push([key, inventario[key].cantidad, "", "", "", ""]);
           hoja.push(["IMEIS", "", "", "", "", ""]);
@@ -844,20 +1056,11 @@
   <div id="modalProveedor" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
     background-color:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
     <div style="background:white; padding:20px; border-radius:8px; max-width:400px; width:100%;">
-      <h3>Selecciona distribuidor y factura</h3>
-      <label for="modalProveedorSelect">Distribuidor</label>
+      <h3>Selecciona proveedor y factura</h3>
+      <label for="modalProveedorSelect">Proveedor</label>
       <select id="modalProveedorSelect" style="width:100%; padding:10px; margin-top:10px;"></select>
-      <label for="modalFacturaDistribuidor" style="display:block; margin-top:12px;">Factura del distribuidor</label>
-      <input type="text" id="modalFacturaDistribuidor" placeholder="Numero de factura" style="width:100%; padding:10px; box-sizing:border-box; margin-top:6px;">
-      <label for="modalTipoFacturaProveedor" style="display:block; margin-top:12px;">Tipo de factura</label>
-      <select id="modalTipoFacturaProveedor" onchange="toggleFechaVencimientoProveedor()" style="width:100%; padding:10px; margin-top:6px;">
-        <option value="Contado">Contado</option>
-        <option value="Credito">Credito</option>
-      </select>
-      <div id="modalFechaVencimientoWrap" style="display:none;">
-        <label for="modalFechaVencimientoProveedor" style="display:block; margin-top:12px;">Fecha de vencimiento</label>
-        <input type="date" id="modalFechaVencimientoProveedor" style="width:100%; padding:10px; box-sizing:border-box; margin-top:6px;">
-      </div>
+      <label for="modalFacturaDistribuidor" style="display:block; margin-top:12px;">Factura del proveedor</label>
+      <select id="modalFacturaDistribuidor" style="width:100%; padding:10px; margin-top:6px;"></select>
       <button onclick="confirmarGuardadoIMEIs()" style="margin-top:15px;">Confirmar y Guardar</button>
       <button onclick="cerrarModalProveedor()" style="margin-top:10px;">Cancelar</button>
     </div>

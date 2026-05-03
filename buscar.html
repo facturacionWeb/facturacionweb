@@ -21,6 +21,10 @@
     .invoice-header h2 { margin: 0; }
     .signature { margin-top: 30px; text-align: center; }
     small { color:#333 }
+    .result-section { margin-top: 24px; padding-top: 16px; border-top: 2px solid #ddd; }
+    .result-section:first-child { border-top: 0; padding-top: 0; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-weight:bold; font-size:12px; }
+    .not-found { color:#b42318; background:#fef3f2; border:1px solid #fecdca; padding:12px; border-radius:6px; }
   </style>
 </head>
 <body>
@@ -86,6 +90,8 @@
       const imei = document.getElementById('imeiInput').value.trim();
       if (!imei) return alert('Debés ingresar un IMEI válido 😅');
 
+      document.getElementById('facturaResultado').innerHTML = '<p>Buscando IMEI...</p>';
+
       // Buscamos entre facturas no anuladas
       const snapshot = await db.collection("facturas").where("anulada", "==", false).get();
       let facturaEncontrada = null;
@@ -102,8 +108,10 @@
       }
 
       if (!facturaEncontrada) {
+        const facturaProveedorHtml = await buscarFacturaProveedorPorIMEI(imei);
         document.getElementById('facturaResultado').innerHTML =
-          `<p style="color:red;">No se encontró ninguna factura con ese IMEI 😢</p>`;
+          `<div class="result-section"><h2>Factura de cliente</h2><p class="not-found">No se encontro factura de cliente con este IMEI.</p></div>` +
+          facturaProveedorHtml;
         return;
       }
 
@@ -131,10 +139,12 @@
       const itemsAgrupados = agruparItemsFactura(facturaEncontrada.items || []);
 
       const html = `
+        <div class="result-section">
         <div class="invoice-header">
-          <h2>Factura - ${facturaId}</h2>
+          <h2>Factura de cliente - ${facturaId}</h2>
           <p><strong>Consecutivo:</strong> ${facturaEncontrada.consecutivo || ''}</p>
           <p><strong>Ruta:</strong> ${facturaEncontrada.route || ''}</p>
+          <span class="badge">Cliente</span>
         </div>
         <div class="invoice-body">
           <table class="details-table">
@@ -188,9 +198,126 @@
             <p>Firma del Cliente</p>
           </div>
         </div>
+        </div>
       `;
 
-      document.getElementById('facturaResultado').innerHTML = html;
+      const facturaProveedorHtml = await buscarFacturaProveedorPorIMEI(imei);
+      document.getElementById('facturaResultado').innerHTML = html + facturaProveedorHtml;
+    }
+
+    async function buscarFacturaProveedorPorIMEI(imei) {
+      const imeiSnap = await db.collection("Articulos_X_IMEI").where("imei", "==", imei).get();
+      const imeiData = imeiSnap.empty ? null : imeiSnap.docs[0].data();
+      let proveedorNombre = imeiData?.distribuidorNombre || "N/D";
+
+      if ((!proveedorNombre || proveedorNombre === "N/D") && imeiData?.proveedorId) {
+        try {
+          const provDoc = await db.collection("proveedores").doc(imeiData.proveedorId).get();
+          if (provDoc.exists) proveedorNombre = provDoc.data().nombreProveedor || "N/D";
+        } catch (e) {
+          proveedorNombre = "N/D";
+        }
+      }
+
+      let facturaProveedor = null;
+      let itemRelacionado = null;
+      const facturaProveedorId = imeiData?.facturaProveedorId || null;
+
+      if (facturaProveedorId) {
+        const facturaDoc = await db.collection("Facturas_Proveedores").doc(facturaProveedorId).get();
+        if (facturaDoc.exists) {
+          facturaProveedor = { id: facturaDoc.id, ...facturaDoc.data() };
+          itemRelacionado = (facturaProveedor.items || []).find(item => item.articleId === imeiData?.articleId) || null;
+        }
+      }
+
+      if (!facturaProveedor || !itemRelacionado) {
+        const facturaSnap = await db.collection("Facturas_Proveedores").get();
+        for (const doc of facturaSnap.docs) {
+          const factura = { id: doc.id, ...doc.data() };
+          const item = (factura.items || []).find(detalle =>
+            (detalle.loadedImeis || []).map(String).includes(String(imei))
+          );
+
+          if (item) {
+            facturaProveedor = factura;
+            itemRelacionado = item;
+            proveedorNombre = factura.proveedorNombre || proveedorNombre;
+            break;
+          }
+        }
+      }
+
+      if (!facturaProveedor) {
+        if (!imeiData) {
+          return `<div class="result-section"><h2>Factura de proveedor</h2><p class="not-found">No se encontro factura de proveedor con este IMEI.</p></div>`;
+        }
+
+        return `
+          <div class="result-section">
+            <h2>Factura de proveedor</h2>
+            <table class="details-table">
+              <tr>
+                <td><strong>IMEI:</strong><br>${imei}</td>
+                <td><strong>Proveedor:</strong><br>${proveedorNombre}</td>
+              </tr>
+              <tr>
+                <td><strong>Factura proveedor:</strong><br>${imeiData.facturaDistribuidor || 'N/D'}</td>
+                <td><strong>Tipo:</strong><br>${imeiData.tipoFacturaProveedor || 'N/D'}</td>
+              </tr>
+            </table>
+            <p class="not-found">El IMEI tiene datos de proveedor, pero no tiene una factura de proveedor enlazada.</p>
+          </div>
+        `;
+      }
+
+      itemRelacionado = itemRelacionado || {};
+      const total = Number(facturaProveedor.orderTotal || 0);
+      const abonado = Number(facturaProveedor.totalAbonado || 0);
+      const saldo = Math.max(total - abonado, 0);
+
+      return `
+        <div class="result-section">
+          <div class="invoice-header">
+            <h2>Factura de proveedor - ${facturaProveedor.orderNumber || facturaProveedor.id}</h2>
+            <p><strong>Proveedor:</strong> ${facturaProveedor.proveedorNombre || proveedorNombre}</p>
+            <span class="badge">Proveedor</span>
+          </div>
+          <div class="invoice-body">
+            <table class="details-table">
+              <tr>
+                <td><strong>Order Date:</strong><br>${facturaProveedor.orderDate || 'N/D'}</td>
+                <td><strong>Tipo:</strong><br>${facturaProveedor.invoiceType || 'N/D'}</td>
+              </tr>
+              <tr>
+                <td><strong>Terms:</strong><br>${facturaProveedor.terms || 0} dias</td>
+                <td><strong>IMEI encontrado:</strong><br>${imei}</td>
+              </tr>
+              <tr>
+                <td><strong>Total:</strong><br>${total.toFixed(2)}</td>
+                <td><strong>Saldo:</strong><br>${saldo.toFixed(2)}</td>
+              </tr>
+            </table>
+
+            <table class="items-table">
+              <tr>
+                <th>Articulo</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Total</th>
+                <th>IMEI</th>
+              </tr>
+              <tr>
+                <td>${itemRelacionado.description || imeiData?.articleId || 'N/D'}</td>
+                <td>${itemRelacionado.quantity || 'N/D'}</td>
+                <td>${Number(itemRelacionado.price || 0).toFixed(2)}</td>
+                <td>${Number(itemRelacionado.total || 0).toFixed(2)}</td>
+                <td>${imei}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      `;
     }
   </script>
 

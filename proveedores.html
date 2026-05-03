@@ -1,204 +1,1112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Proveedores</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion de Proveedores</title>
 
-    <!-- Import Firebase SDK (v8 with namespaced API) -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-    <!-- Import Firebase configuration -->
-    <script src="https://facturacionweb.github.io/facturacionweb/firebase-config.js"></script>
-    
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        input, button, label {
-            margin: 10px 0;
-            display: block;
-            width: 100%;
-            padding: 10px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        table, th, td {
-            border: 1px solid black;
-            padding: 10px;
-            text-align: left;
-        }
-        th, td {
-            text-align: center;
-        }
-    </style>
-    <script>
-        // Cargar dinámicamente el script version.js con un parámetro de tiempo para evitar caché
-        (function loadVersionScript() {
-            const versionScript = document.createElement('script');
-            versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
-            document.head.appendChild(versionScript);
-        })();
-    </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f5f7fb;
+      color: #111;
+    }
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    a {
+      color: #0f4c81;
+    }
+    h1, h2, h3 {
+      text-align: center;
+    }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 20px 0;
+      border-bottom: 1px solid #d8dee9;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      border: 1px solid #d8dee9;
+      border-bottom: 0;
+      background: #eef2f7;
+      padding: 12px 16px;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      width: auto;
+      margin: 0;
+      font-weight: 700;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: #0f4c81;
+    }
+    .tab-panel {
+      display: none;
+      background: #fff;
+      border: 1px solid #d8dee9;
+      border-radius: 0 6px 6px 6px;
+      padding: 18px;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .field label {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 10px;
+      font-size: 15px;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid #b8c2cc;
+      background: #eef2f7;
+      border-radius: 5px;
+    }
+    button.primary {
+      background: #0f4c81;
+      color: #fff;
+      border-color: #0f4c81;
+    }
+    button.danger {
+      background: #b42318;
+      color: #fff;
+      border-color: #b42318;
+    }
+    button.link {
+      background: transparent;
+      color: #0f4c81;
+      border: 0;
+      padding: 6px 4px;
+      width: auto;
+      text-decoration: underline;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+      flex-wrap: wrap;
+    }
+    .actions button {
+      width: auto;
+      min-width: 160px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      background: #fff;
+    }
+    th, td {
+      border: 1px solid #d8dee9;
+      padding: 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2f7;
+      font-weight: 700;
+    }
+    .number {
+      text-align: right;
+      white-space: nowrap;
+    }
+    .muted {
+      color: #667085;
+      font-size: 13px;
+    }
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .summary-box {
+      background: #f8fafc;
+      border: 1px solid #d8dee9;
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .summary-box span {
+      display: block;
+      color: #667085;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .summary-box strong {
+      font-size: 22px;
+    }
+    .select2-container {
+      width: 100% !important;
+    }
+    .select2-container--default .select2-selection--single {
+      height: 39px;
+      display: flex;
+      align-items: center;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+      line-height: 37px;
+      width: 100%;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+      height: 37px;
+    }
+    .invoice-row {
+      cursor: pointer;
+    }
+    .invoice-row:hover {
+      background: #f8fafc;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #eef2ff;
+      color: #3730a3;
+    }
+    .status-paid {
+      background: #ecfdf3;
+      color: #027a48;
+    }
+    .status-pending {
+      background: #fff7ed;
+      color: #b54708;
+    }
+    .status-missing {
+      background: #fef3f2;
+      color: #b42318;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: rgba(0,0,0,0.55);
+    }
+    .modal-content {
+      background: #fff;
+      margin: 4% auto;
+      width: 92%;
+      max-width: 920px;
+      border-radius: 8px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      overflow: hidden;
+      position: relative;
+    }
+    .modal-header {
+      padding: 22px 26px;
+      background: #f8fafc;
+      border-bottom: 1px solid #d8dee9;
+    }
+    .modal-body {
+      padding: 24px 26px;
+      max-height: 72vh;
+      overflow-y: auto;
+    }
+    .close {
+      position: absolute;
+      right: 18px;
+      top: 12px;
+      font-size: 30px;
+      color: #667085;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .invoice-print {
+      border: 1px solid #d8dee9;
+      padding: 20px;
+    }
+    .invoice-print-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      border-bottom: 2px solid #111;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 760px) {
+      .grid, .grid-3, .summary-row, .invoice-print-header {
+        grid-template-columns: 1fr;
+      }
+      .actions button {
+        width: 100%;
+      }
+      .tab-btn {
+        width: 100%;
+      }
+    }
+  </style>
+  <script>
+    (function loadVersionScript() {
+      const versionScript = document.createElement('script');
+      versionScript.src = 'https://facturacionweb.github.io/facturacionweb/version.js?v=' + new Date().getTime();
+      document.head.appendChild(versionScript);
+    })();
+  </script>
 </head>
 <body>
-    
-    <a href="index.html">Volver a la Página Principal</a>
-    
-    <div class="container">
-        <h1>Gestión de Proveedores</h1>
+  <a href="index.html">Volver a la Pagina Principal</a>
 
-        <!-- Form to create or update a supplier -->
-        <input type="text" id="nombreProveedor" placeholder="Nombre del Proveedor" />
-        <input type="text" id="telefono" placeholder="Teléfono" />
-        <input type="text" id="direccion" placeholder="Dirección" />
-        <button onclick="addOrUpdateProveedor()">Agregar/Actualizar Proveedor</button>
-        <button onclick="clearFields()">Limpiar Campos</button>
+  <div class="container">
+    <h1>Gestion de Proveedores</h1>
 
-        <!-- Table to display suppliers -->
-        <h2>Proveedores Existentes</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>ID Proveedor</th>
-                    <th>Nombre del Proveedor</th>
-                    <th>Teléfono</th>
-                    <th>Dirección</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="proveedorTable">
-                <!-- Supplier rows will be populated here -->
-            </tbody>
-        </table>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="tabProveedores" onclick="showTab('tabProveedores')">Gestion de Proveedores</button>
+      <button class="tab-btn" data-tab="tabRegistroFacturas" onclick="showTab('tabRegistroFacturas')">Registro de Facturas de Proveedores</button>
+      <button class="tab-btn" data-tab="tabListadoFacturas" onclick="showTab('tabListadoFacturas')">Listado de facturas de proveedores</button>
     </div>
 
-    <script>
-        // Initialize Firestore
-        const db = firebase.firestore();
+    <section id="tabProveedores" class="tab-panel active">
+      <h2>Gestion de Proveedores</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="nombreProveedor">Nombre del Proveedor</label>
+          <input type="text" id="nombreProveedor" placeholder="Nombre del Proveedor">
+        </div>
+        <div class="field">
+          <label for="telefono">Telefono</label>
+          <input type="text" id="telefono" placeholder="Telefono">
+        </div>
+        <div class="field">
+          <label for="direccion">Direccion</label>
+          <input type="text" id="direccion" placeholder="Direccion">
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" onclick="addOrUpdateProveedor()">Agregar/Actualizar Proveedor</button>
+        <button onclick="clearFields()">Limpiar Campos</button>
+      </div>
 
-        // Variable global para almacenar el ID del proveedor que se está editando
-        let idProveedorActual = null;
+      <h3>Proveedores Existentes</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID Proveedor</th>
+            <th>Nombre del Proveedor</th>
+            <th>Telefono</th>
+            <th>Direccion</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="proveedorTable"></tbody>
+      </table>
+    </section>
 
-        // Function to clear input fields
-        function clearFields() {
-            document.getElementById('nombreProveedor').value = '';
-            document.getElementById('telefono').value = '';
-            document.getElementById('direccion').value = '';
-            idProveedorActual = null;  // Limpiar el ID actual cuando se limpian los campos
+    <section id="tabRegistroFacturas" class="tab-panel">
+      <h2>Registro de Facturas de Proveedores</h2>
+      <div class="grid-3">
+        <div class="field">
+          <label for="invoiceProviderSelect">Proveedor</label>
+          <select id="invoiceProviderSelect"></select>
+        </div>
+        <div class="field">
+          <label for="orderNumber">Order Number</label>
+          <input type="text" id="orderNumber" placeholder="Codigo de factura">
+        </div>
+        <div class="field">
+          <label for="orderDate">Order Date</label>
+          <input type="date" id="orderDate">
+        </div>
+        <div class="field">
+          <label for="invoiceType">Tipo de Factura</label>
+          <select id="invoiceType" onchange="toggleTerms()">
+            <option value="Contado">Contado</option>
+            <option value="Credito">Credito</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="invoiceTerms">Terms</label>
+          <input type="number" id="invoiceTerms" value="0" min="0" step="1" disabled>
+        </div>
+      </div>
+
+      <h3>Detalle de articulos</h3>
+      <div class="grid-3">
+        <div class="field">
+          <label for="invoiceArticleSelect">Articulo</label>
+          <select id="invoiceArticleSelect"></select>
+        </div>
+        <div class="field">
+          <label for="itemQty">Cantidad</label>
+          <input type="number" id="itemQty" min="1" step="1" value="1">
+        </div>
+        <div class="field">
+          <label for="itemPrice">Precio</label>
+          <input type="number" id="itemPrice" min="0" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="actions">
+        <button onclick="addInvoiceItem()">Agregar articulo</button>
+        <button onclick="clearInvoiceItemFields()">Limpiar articulo</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Articulo</th>
+            <th class="number">Cantidad</th>
+            <th class="number">Precio</th>
+            <th class="number">Total</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="invoiceItemsTable"></tbody>
+      </table>
+
+      <div class="summary-row">
+        <div class="summary-box"><span>Total articulos</span><strong id="summaryArticles">0</strong></div>
+        <div class="summary-box"><span>Total piezas</span><strong id="summaryPieces">0</strong></div>
+        <div class="summary-box"><span>Order Total</span><strong id="summaryTotal">0.00</strong></div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" onclick="saveProviderInvoice()">Guardar factura</button>
+        <button onclick="clearProviderInvoiceForm()">Limpiar factura</button>
+      </div>
+    </section>
+
+    <section id="tabListadoFacturas" class="tab-panel">
+      <h2>Listado de facturas de proveedores</h2>
+      <div class="grid-3">
+        <div class="field">
+          <label for="filterProviderSelect">Proveedor</label>
+          <select id="filterProviderSelect"></select>
+        </div>
+        <div class="field">
+          <label for="filterInvoiceType">Tipo de Factura</label>
+          <select id="filterInvoiceType">
+            <option value="">Todas</option>
+            <option value="Contado">Contado</option>
+            <option value="Credito">Credito</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filterOrderDate">Order Date</label>
+          <input type="date" id="filterOrderDate">
+        </div>
+        <div class="field">
+          <label for="filterCreditStatus">Estado de credito</label>
+          <select id="filterCreditStatus">
+            <option value="">Todas</option>
+            <option value="pendientes">Credito no pagadas</option>
+            <option value="pagadas">Credito pagadas</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" onclick="loadProviderInvoices()">Aplicar filtros</button>
+        <button onclick="clearInvoiceFilters()">Limpiar filtros</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Order Number</th>
+            <th>Proveedor</th>
+            <th>Order Date</th>
+            <th>Tipo</th>
+            <th class="number">Total factura</th>
+            <th class="number">Total abonado</th>
+            <th class="number">Saldo</th>
+            <th>Estado</th>
+            <th>Carga inventario</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="providerInvoicesTable"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <div id="invoiceDetailModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal('invoiceDetailModal')">&times;</span>
+      <div class="modal-header">
+        <h2>Factura de proveedor</h2>
+      </div>
+      <div class="modal-body" id="invoiceDetailContent"></div>
+    </div>
+  </div>
+
+  <div id="paymentModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal('paymentModal')">&times;</span>
+      <div class="modal-header">
+        <h2>Registrar abono</h2>
+        <div class="muted" id="paymentInvoiceInfo"></div>
+      </div>
+      <div class="modal-body">
+        <div class="grid">
+          <div class="field">
+            <label for="paymentAmount">Monto</label>
+            <input type="number" id="paymentAmount" min="0" step="0.01">
+          </div>
+          <div class="field">
+            <label for="paymentReference">Referencia</label>
+            <input type="text" id="paymentReference" placeholder="Referencia del abono">
+          </div>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="saveProviderInvoicePayment()">Guardar abono</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="paymentsHistoryModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal('paymentsHistoryModal')">&times;</span>
+      <div class="modal-header">
+        <h2>Historial de abonos</h2>
+        <div class="muted" id="paymentsHistoryInfo"></div>
+      </div>
+      <div class="modal-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th class="number">Monto</th>
+              <th>Referencia</th>
+            </tr>
+          </thead>
+          <tbody id="paymentsHistoryTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const db = firebase.firestore();
+    let idProveedorActual = null;
+    let proveedoresCache = [];
+    let articulosCache = [];
+    let invoiceItems = [];
+    let selectedInvoiceForPayment = null;
+
+    function money(value) {
+      return (Number(value) || 0).toFixed(2);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function todayStr() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+      if (tabId === 'tabListadoFacturas') loadProviderInvoices();
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    window.addEventListener('click', function(event) {
+      ['invoiceDetailModal', 'paymentModal', 'paymentsHistoryModal'].forEach(id => {
+        if (event.target === document.getElementById(id)) closeModal(id);
+      });
+    });
+
+    function initSelect2(selector, placeholder) {
+      const $el = $(selector);
+      if ($el.data('select2')) $el.select2('destroy');
+      $el.select2({ placeholder, allowClear: true, width: '100%' });
+    }
+
+    function populateProviderSelects() {
+      const selects = ['invoiceProviderSelect', 'filterProviderSelect'];
+      selects.forEach(id => {
+        const select = document.getElementById(id);
+        const allOption = id === 'filterProviderSelect' ? '<option value="">Todos</option>' : '<option value="">Seleccione un proveedor</option>';
+        select.innerHTML = allOption;
+        proveedoresCache.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.nombreProveedor || p.id;
+          select.appendChild(opt);
+        });
+      });
+      initSelect2('#invoiceProviderSelect', 'Seleccione un proveedor');
+      initSelect2('#filterProviderSelect', 'Todos los proveedores');
+    }
+
+    function populateArticleSelect() {
+      const select = document.getElementById('invoiceArticleSelect');
+      select.innerHTML = '<option value="">Seleccione un articulo</option>';
+      articulosCache.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = `${a.id} - ${a.marca || ''} ${a.modelo || ''}`;
+        opt.dataset.precioCompra = a.precioCompra || 0;
+        select.appendChild(opt);
+      });
+      initSelect2('#invoiceArticleSelect', 'Seleccione un articulo');
+    }
+
+    async function loadCatalogs() {
+      const [proveedoresSnap, articulosSnap] = await Promise.all([
+        db.collection("proveedores").get(),
+        db.collection("Articulos").get()
+      ]);
+      proveedoresCache = proveedoresSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      articulosCache = articulosSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      populateProviderSelects();
+      populateArticleSelect();
+    }
+
+    function clearFields() {
+      document.getElementById('nombreProveedor').value = '';
+      document.getElementById('telefono').value = '';
+      document.getElementById('direccion').value = '';
+      idProveedorActual = null;
+    }
+
+    function addOrUpdateProveedor() {
+      const nombreProveedor = document.getElementById('nombreProveedor').value.trim();
+      const telefono = document.getElementById('telefono').value.trim();
+      const direccion = document.getElementById('direccion').value.trim();
+
+      if (!nombreProveedor) {
+        alert("Ingrese el nombre del proveedor.");
+        return;
+      }
+
+      const payload = { nombreProveedor, telefono, direccion };
+      const action = idProveedorActual
+        ? db.collection("proveedores").doc(idProveedorActual).set(payload)
+        : db.collection("proveedores").add(payload);
+
+      action.then(async () => {
+        alert(idProveedorActual ? "Proveedor actualizado con exito" : "Proveedor agregado con exito");
+        clearFields();
+        await loadProveedores();
+        await loadCatalogs();
+      }).catch((error) => {
+        console.error("Error al guardar el proveedor: ", error);
+      });
+    }
+
+    function loadProveedores() {
+      return db.collection("proveedores").get().then((querySnapshot) => {
+        const proveedorTable = document.getElementById('proveedorTable');
+        proveedorTable.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+          const proveedor = doc.data();
+          const row = `<tr>
+            <td>${escapeHtml(doc.id || 'N/A')}</td>
+            <td>${escapeHtml(proveedor.nombreProveedor || 'N/A')}</td>
+            <td>${escapeHtml(proveedor.telefono || 'N/A')}</td>
+            <td>${escapeHtml(proveedor.direccion || 'N/A')}</td>
+            <td>
+              <button onclick="editProveedor('${doc.id}')">Editar</button>
+              <button class="danger" onclick="deleteProveedor('${doc.id}')">Eliminar</button>
+            </td>
+          </tr>`;
+          proveedorTable.innerHTML += row;
+        });
+      }).catch((error) => {
+        console.error("Error al cargar los proveedores: ", error);
+      });
+    }
+
+    function editProveedor(idProveedor) {
+      db.collection("proveedores").doc(idProveedor).get().then((doc) => {
+        if (doc.exists) {
+          const proveedor = doc.data();
+          document.getElementById('nombreProveedor').value = proveedor.nombreProveedor || '';
+          document.getElementById('telefono').value = proveedor.telefono || '';
+          document.getElementById('direccion').value = proveedor.direccion || '';
+          idProveedorActual = idProveedor;
+          showTab('tabProveedores');
+        } else {
+          alert("El proveedor no existe");
         }
+      }).catch((error) => {
+        console.error("Error editando proveedor: ", error);
+      });
+    }
 
-        // Function to add or update supplier
-        function addOrUpdateProveedor() {
-            const nombreProveedor = document.getElementById('nombreProveedor').value.trim();
-            const telefono = document.getElementById('telefono').value.trim();
-            const direccion = document.getElementById('direccion').value.trim();
+    function deleteProveedor(idProveedor) {
+      if (!confirm("Desea eliminar este proveedor?")) return;
+      db.collection("proveedores").doc(idProveedor).delete().then(async () => {
+        alert("Proveedor eliminado con exito");
+        await loadProveedores();
+        await loadCatalogs();
+      }).catch((error) => {
+        console.error("Error al eliminar el proveedor: ", error);
+      });
+    }
 
-            if (idProveedorActual) {
-                // Si hay un ID de proveedor actual, actualizamos el proveedor existente
-                db.collection("proveedores").doc(idProveedorActual).set({
-                    nombreProveedor: nombreProveedor,
-                    telefono: telefono,
-                    direccion: direccion
-                }).then(() => {
-                    alert("Proveedor actualizado con éxito");
-                    loadProveedores();
-                    clearFields(); // Limpiar los campos después de actualizar
-                }).catch((error) => {
-                    console.error("Error al actualizar el proveedor: ", error);
-                });
-            } else {
-                // Si no hay ID de proveedor actual, agregamos un nuevo proveedor
-                db.collection("proveedores").add({
-                    nombreProveedor: nombreProveedor,
-                    telefono: telefono,
-                    direccion: direccion
-                }).then(() => {
-                    alert("Proveedor agregado con éxito");
-                    loadProveedores();
-                    clearFields(); // Limpiar los campos después de agregar
-                }).catch((error) => {
-                    console.error("Error al agregar el proveedor: ", error);
-                });
-            }
-        }
+    function toggleTerms() {
+      const type = document.getElementById('invoiceType').value;
+      const terms = document.getElementById('invoiceTerms');
+      if (type === 'Credito') {
+        terms.disabled = false;
+        if (!terms.value || Number(terms.value) <= 0) terms.value = 15;
+      } else {
+        terms.value = 0;
+        terms.disabled = true;
+      }
+    }
 
-        // Function to load suppliers
-        function loadProveedores() {
-            db.collection("proveedores").get().then((querySnapshot) => {
-                const proveedorTable = document.getElementById('proveedorTable');
-                proveedorTable.innerHTML = '';
-                querySnapshot.forEach((doc) => {
-                    const proveedor = doc.data();
-                    const row = `<tr>
-                                    <td>${doc.id || 'N/A'}</td>
-                                    <td>${proveedor.nombreProveedor || 'N/A'}</td>
-                                    <td>${proveedor.telefono || 'N/A'}</td>
-                                    <td>${proveedor.direccion || 'N/A'}</td>
-                                    <td>
-                                        <button onclick="editProveedor('${doc.id}')">Editar</button>
-                                        <button onclick="deleteProveedor('${doc.id}')">Eliminar</button>
-                                    </td>
-                                 </tr>`;
-                    proveedorTable.innerHTML += row;
-                });
-            }).catch((error) => {
-                console.error("Error al cargar los proveedores: ", error);
-            });
-        }
+    document.getElementById('invoiceArticleSelect').addEventListener('change', function() {
+      const opt = this.options[this.selectedIndex];
+      if (opt && opt.dataset.precioCompra) {
+        document.getElementById('itemPrice').value = money(opt.dataset.precioCompra);
+      }
+    });
 
-        // Function to edit supplier
-        function editProveedor(idProveedor) {
-            db.collection("proveedores").doc(idProveedor).get().then((doc) => {
-                if (doc.exists) {
-                    const proveedor = doc.data();
-                    document.getElementById('nombreProveedor').value = proveedor.nombreProveedor;
-                    document.getElementById('telefono').value = proveedor.telefono;
-                    document.getElementById('direccion').value = proveedor.direccion;
-                    idProveedorActual = idProveedor;  // Guardar el ID del proveedor que se está editando
-                } else {
-                    alert("El proveedor no existe");
-                }
-            }).catch((error) => {
-                console.error("Error editando proveedor: ", error);
-            });
-        }
+    function addInvoiceItem() {
+      const select = document.getElementById('invoiceArticleSelect');
+      const articleId = select.value;
+      const articleText = select.options[select.selectedIndex]?.text || '';
+      const cantidad = parseInt(document.getElementById('itemQty').value, 10);
+      const precio = parseFloat(document.getElementById('itemPrice').value);
 
-        // Function to delete supplier
-        function deleteProveedor(idProveedor) {
-            db.collection("proveedores").doc(idProveedor).delete().then(() => {
-                alert("Proveedor eliminado con éxito");
-                loadProveedores();
-            }).catch((error) => {
-                console.error("Error al eliminar el proveedor: ", error);
-            });
-        }
+      if (!articleId) return alert("Seleccione un articulo.");
+      if (!cantidad || cantidad <= 0) return alert("Ingrese una cantidad valida.");
+      if (isNaN(precio) || precio < 0) return alert("Ingrese un precio valido.");
 
-        // Load suppliers when the page loads
-        window.onload = function() {
-            // Check if the user is already authenticated
-            /*const isAuthenticated = sessionStorage.getItem('isAuthenticated');
-            if (!isAuthenticated) {
-                alert("Debe autenticarse primero");
-                window.location.href = "index.html"; // Redirigir a la página de inicio de sesión si no está autenticado
-            }else{
-                loadProveedores();
-            }*/
-            loadProveedores();
+      const existing = invoiceItems.find(item => item.articleId === articleId);
+      if (existing) {
+        alert("Este articulo ya esta en el detalle de la factura. Si necesita corregirlo, elimine la linea existente y agreguelo nuevamente.");
+        return;
+      }
+
+      invoiceItems.push({
+        articleId,
+        description: articleText,
+        quantity: cantidad,
+        price: precio,
+        total: cantidad * precio
+      });
+      renderInvoiceItems();
+      clearInvoiceItemFields();
+    }
+
+    function removeInvoiceItem(index) {
+      invoiceItems.splice(index, 1);
+      renderInvoiceItems();
+    }
+
+    function clearInvoiceItemFields() {
+      $('#invoiceArticleSelect').val(null).trigger('change');
+      document.getElementById('itemQty').value = 1;
+      document.getElementById('itemPrice').value = '0.00';
+    }
+
+    function getInvoiceTotals() {
+      return {
+        totalArticulos: invoiceItems.length,
+        totalPiezas: invoiceItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+        orderTotal: invoiceItems.reduce((sum, item) => sum + Number(item.total || 0), 0)
+      };
+    }
+
+    function calcularCargaInventario(inv, imeisFactura = []) {
+      const items = inv.items || [];
+      const rows = items.map(item => {
+        const imeis = imeisFactura.filter(imei => imei.articleId === item.articleId);
+        const cantidad = Number(item.quantity || 0);
+        const imeisFromDocs = imeis.map(row => row.imei).filter(Boolean);
+        const imeisFromInvoice = (item.loadedImeis || []).filter(Boolean);
+        const imeisUnicos = Array.from(new Set([...imeisFromInvoice, ...imeisFromDocs]));
+        const cargados = Math.max(imeis.length, Number(item.loadedQuantity || 0), imeisUnicos.length);
+        return {
+          ...item,
+          loadedQuantityCalc: cargados,
+          pendingQuantityCalc: Math.max(cantidad - cargados, 0),
+          isLoadedCalc: cargados >= cantidad && cantidad > 0,
+          loadedImeisCalc: imeisUnicos
         };
-    </script>
-    <script type="module">
-        import {requireAccess} from './auth.js';
-        requireAccess('proveedores');  
-    </script>
+      });
+      const totalPiezas = Number(inv.totalPiezas || rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+      const cargadas = rows.reduce((sum, item) => sum + Number(item.loadedQuantityCalc || 0), 0);
+      const pendientes = Math.max(totalPiezas - cargadas, 0);
+      return {
+        items: rows,
+        totalPiezas,
+        cargadas,
+        pendientes,
+        completa: totalPiezas > 0 && pendientes === 0
+      };
+    }
+
+    function renderInvoiceItems() {
+      const tbody = document.getElementById('invoiceItemsTable');
+      tbody.innerHTML = '';
+      invoiceItems.forEach((item, index) => {
+        tbody.innerHTML += `<tr>
+          <td>${escapeHtml(item.description)}</td>
+          <td class="number">${item.quantity}</td>
+          <td class="number">${money(item.price)}</td>
+          <td class="number">${money(item.total)}</td>
+          <td><button class="danger" onclick="removeInvoiceItem(${index})">Eliminar</button></td>
+        </tr>`;
+      });
+      const totals = getInvoiceTotals();
+      document.getElementById('summaryArticles').textContent = totals.totalArticulos;
+      document.getElementById('summaryPieces').textContent = totals.totalPiezas;
+      document.getElementById('summaryTotal').textContent = money(totals.orderTotal);
+    }
+
+    function clearProviderInvoiceForm() {
+      $('#invoiceProviderSelect').val(null).trigger('change');
+      document.getElementById('orderNumber').value = '';
+      document.getElementById('orderDate').value = todayStr();
+      document.getElementById('invoiceType').value = 'Contado';
+      toggleTerms();
+      invoiceItems = [];
+      renderInvoiceItems();
+      clearInvoiceItemFields();
+    }
+
+    function saveProviderInvoice() {
+      const proveedorId = document.getElementById('invoiceProviderSelect').value;
+      const proveedor = proveedoresCache.find(p => p.id === proveedorId);
+      const orderNumber = document.getElementById('orderNumber').value.trim();
+      const orderDate = document.getElementById('orderDate').value;
+      const invoiceType = document.getElementById('invoiceType').value;
+      const terms = invoiceType === 'Credito' ? parseInt(document.getElementById('invoiceTerms').value, 10) || 0 : 0;
+
+      if (!proveedorId) return alert("Seleccione un proveedor.");
+      if (!orderNumber) return alert("Ingrese el Order Number.");
+      if (!orderDate) return alert("Seleccione el Order Date.");
+      if (invoiceType === 'Credito' && terms <= 0) return alert("Ingrese Terms valido para la factura de credito.");
+      if (invoiceItems.length === 0) return alert("Agregue al menos un articulo al detalle.");
+
+      const totals = getInvoiceTotals();
+      const payload = {
+        proveedorId,
+        proveedorNombre: proveedor?.nombreProveedor || '',
+        orderNumber,
+        orderDate,
+        invoiceType,
+        terms,
+        items: invoiceItems,
+        totalArticulos: totals.totalArticulos,
+        totalPiezas: totals.totalPiezas,
+        orderTotal: totals.orderTotal,
+        totalAbonado: 0,
+        saldo: totals.orderTotal,
+        estado: invoiceType === 'Credito' ? 'Pendiente' : 'Pagada',
+        fechaRegistro: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      db.collection("Facturas_Proveedores").add(payload).then(() => {
+        alert("Factura de proveedor registrada con exito.");
+        clearProviderInvoiceForm();
+        loadProviderInvoices();
+        showTab('tabListadoFacturas');
+      }).catch((error) => {
+        console.error("Error al registrar factura de proveedor:", error);
+        alert("Error al registrar factura: " + error.message);
+      });
+    }
+
+    function clearInvoiceFilters() {
+      $('#filterProviderSelect').val(null).trigger('change');
+      document.getElementById('filterInvoiceType').value = '';
+      document.getElementById('filterOrderDate').value = '';
+      document.getElementById('filterCreditStatus').value = '';
+      loadProviderInvoices();
+    }
+
+    async function loadProviderInvoices() {
+      const providerFilter = document.getElementById('filterProviderSelect').value;
+      const typeFilter = document.getElementById('filterInvoiceType').value;
+      const dateFilter = document.getElementById('filterOrderDate').value;
+      const creditStatusFilter = document.getElementById('filterCreditStatus').value;
+      const tbody = document.getElementById('providerInvoicesTable');
+      tbody.innerHTML = '<tr><td colspan="10">Cargando facturas...</td></tr>';
+
+      try {
+        const [snap, imeisSnap] = await Promise.all([
+          db.collection("Facturas_Proveedores").get(),
+          db.collection("Articulos_X_IMEI").get()
+        ]);
+        let invoices = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const imeisPorFactura = {};
+        imeisSnap.forEach(doc => {
+          const data = doc.data();
+          if (!data.facturaProveedorId) return;
+          if (!imeisPorFactura[data.facturaProveedorId]) imeisPorFactura[data.facturaProveedorId] = [];
+          imeisPorFactura[data.facturaProveedorId].push(data);
+        });
+
+        if (providerFilter) invoices = invoices.filter(inv => inv.proveedorId === providerFilter);
+        if (typeFilter) invoices = invoices.filter(inv => inv.invoiceType === typeFilter);
+        if (dateFilter) invoices = invoices.filter(inv => inv.orderDate === dateFilter);
+        if (creditStatusFilter) {
+          invoices = invoices.filter(inv => inv.invoiceType === 'Credito');
+          invoices = invoices.filter(inv => {
+            const total = Number(inv.orderTotal || 0);
+            const abonado = Number(inv.totalAbonado || 0);
+            const pagada = abonado >= total && total > 0;
+            return creditStatusFilter === 'pagadas' ? pagada : !pagada;
+          });
+        }
+
+        invoices.sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
+        tbody.innerHTML = '';
+
+        if (invoices.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10">No hay facturas para los filtros seleccionados.</td></tr>';
+          return;
+        }
+
+        invoices.forEach(inv => {
+          const total = Number(inv.orderTotal || 0);
+          const abonado = Number(inv.totalAbonado || 0);
+          const saldo = Math.max(total - abonado, 0);
+          const isCredit = inv.invoiceType === 'Credito';
+          const paid = !isCredit || (abonado >= total && total > 0);
+          const statusClass = paid ? 'status-paid' : 'status-pending';
+          const statusText = paid ? 'Pagada' : 'Pendiente';
+          const carga = calcularCargaInventario(inv, imeisPorFactura[inv.id] || []);
+          const cargaClass = carga.completa ? 'status-paid' : (carga.cargadas > 0 ? 'status-pending' : 'status-missing');
+          const cargaText = carga.completa ? 'Completa' : `${carga.pendientes} pendientes`;
+          const payButton = isCredit && !paid ? `<button onclick="openPaymentModal(event, '${inv.id}')">Abonar</button>` : '';
+          const historyButton = isCredit ? `<button onclick="openPaymentsHistory(event, '${inv.id}')">Ver abonos</button>` : '';
+
+          tbody.innerHTML += `<tr class="invoice-row" onclick="showInvoiceDetail('${inv.id}')">
+            <td>${escapeHtml(inv.orderNumber)}</td>
+            <td>${escapeHtml(inv.proveedorNombre)}</td>
+            <td>${escapeHtml(inv.orderDate)}</td>
+            <td>${escapeHtml(inv.invoiceType)}</td>
+            <td class="number">${money(total)}</td>
+            <td class="number">${isCredit ? money(abonado) : 'N/A'}</td>
+            <td class="number">${isCredit ? money(saldo) : '0.00'}</td>
+            <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+            <td><span class="status-pill ${cargaClass}">${cargaText}</span><div class="muted">${carga.cargadas}/${carga.totalPiezas} piezas</div></td>
+            <td onclick="event.stopPropagation()">
+              ${payButton}
+              ${historyButton}
+            </td>
+          </tr>`;
+        });
+      } catch (error) {
+        console.error("Error cargando facturas de proveedores:", error);
+        tbody.innerHTML = '<tr><td colspan="10">Error al cargar facturas.</td></tr>';
+      }
+    }
+
+    async function showInvoiceDetail(invoiceId) {
+      const [doc, imeisSnap] = await Promise.all([
+        db.collection("Facturas_Proveedores").doc(invoiceId).get(),
+        db.collection("Articulos_X_IMEI").where("facturaProveedorId", "==", invoiceId).get()
+      ]);
+      if (!doc.exists) return alert("Factura no encontrada.");
+      const inv = { id: doc.id, ...doc.data() };
+      const total = Number(inv.orderTotal || 0);
+      const abonado = Number(inv.totalAbonado || 0);
+      const saldo = Math.max(total - abonado, 0);
+      const imeisFactura = imeisSnap.docs.map(row => row.data());
+      const carga = calcularCargaInventario(inv, imeisFactura);
+
+      const rows = carga.items.map(item => `<tr>
+        <td>${escapeHtml(item.description)}</td>
+        <td class="number">${item.quantity}</td>
+        <td class="number">${money(item.price)}</td>
+        <td class="number">${money(item.total)}</td>
+        <td class="number">${item.loadedQuantityCalc}/${item.quantity}</td>
+        <td>
+          <span class="status-pill ${item.isLoadedCalc ? 'status-paid' : 'status-missing'}">${item.isLoadedCalc ? 'Cargado' : `${item.pendingQuantityCalc} pendientes`}</span>
+          ${item.loadedImeisCalc.length ? `<div class="muted">IMEIs: ${item.loadedImeisCalc.map(escapeHtml).join(', ')}</div>` : ''}
+        </td>
+      </tr>`).join('');
+
+      document.getElementById('invoiceDetailContent').innerHTML = `
+        <div class="invoice-print">
+          <div class="invoice-print-header">
+            <div>
+              <h2>Factura de proveedor</h2>
+              <p><strong>Proveedor:</strong> ${escapeHtml(inv.proveedorNombre)}</p>
+              <p><strong>Order Number:</strong> ${escapeHtml(inv.orderNumber)}</p>
+            </div>
+            <div>
+              <p><strong>Order Date:</strong> ${escapeHtml(inv.orderDate)}</p>
+              <p><strong>Tipo:</strong> ${escapeHtml(inv.invoiceType)}</p>
+              <p><strong>Terms:</strong> ${inv.terms || 0} dias</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Articulo</th>
+                <th class="number">Cantidad</th>
+                <th class="number">Precio</th>
+                <th class="number">Total</th>
+                <th class="number">Cargados</th>
+                <th>Inventario</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="summary-row">
+            <div class="summary-box"><span>Total articulos</span><strong>${inv.totalArticulos || 0}</strong></div>
+            <div class="summary-box"><span>Total piezas</span><strong>${inv.totalPiezas || 0}</strong></div>
+            <div class="summary-box"><span>Order Total</span><strong>${money(total)}</strong></div>
+          </div>
+          <div class="summary-row">
+            <div class="summary-box"><span>Piezas cargadas</span><strong>${carga.cargadas}</strong></div>
+            <div class="summary-box"><span>Piezas pendientes</span><strong>${carga.pendientes}</strong></div>
+            <div class="summary-box"><span>Estado inventario</span><strong>${carga.completa ? 'Completa' : 'Pendiente'}</strong></div>
+          </div>
+          ${inv.invoiceType === 'Credito' ? `
+            <div class="summary-row">
+              <div class="summary-box"><span>Total abonado</span><strong>${money(abonado)}</strong></div>
+              <div class="summary-box"><span>Saldo</span><strong>${money(saldo)}</strong></div>
+              <div class="summary-box"><span>Estado</span><strong>${saldo <= 0 ? 'Pagada' : 'Pendiente'}</strong></div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+      document.getElementById('invoiceDetailModal').style.display = 'block';
+    }
+
+    async function openPaymentModal(event, invoiceId) {
+      event.stopPropagation();
+      const doc = await db.collection("Facturas_Proveedores").doc(invoiceId).get();
+      if (!doc.exists) return alert("Factura no encontrada.");
+      const inv = { id: doc.id, ...doc.data() };
+      selectedInvoiceForPayment = inv;
+      const saldo = Math.max(Number(inv.orderTotal || 0) - Number(inv.totalAbonado || 0), 0);
+      document.getElementById('paymentInvoiceInfo').textContent = `${inv.orderNumber} - ${inv.proveedorNombre} | Saldo: ${money(saldo)}`;
+      document.getElementById('paymentAmount').value = money(saldo);
+      document.getElementById('paymentReference').value = '';
+      document.getElementById('paymentModal').style.display = 'block';
+    }
+
+    async function saveProviderInvoicePayment() {
+      if (!selectedInvoiceForPayment) return;
+      const amount = parseFloat(document.getElementById('paymentAmount').value);
+      const reference = document.getElementById('paymentReference').value.trim();
+      const inv = selectedInvoiceForPayment;
+      const saldo = Math.max(Number(inv.orderTotal || 0) - Number(inv.totalAbonado || 0), 0);
+
+      if (isNaN(amount) || amount <= 0) return alert("Ingrese un monto valido.");
+      if (amount > saldo) return alert("El monto no puede ser mayor que el saldo.");
+      if (!reference) return alert("Ingrese la referencia del abono.");
+
+      const invoiceRef = db.collection("Facturas_Proveedores").doc(inv.id);
+      const payment = {
+        amount,
+        reference,
+        date: new Date(),
+        dateStr: todayStr()
+      };
+
+      try {
+        await db.runTransaction(async tx => {
+          const snap = await tx.get(invoiceRef);
+          if (!snap.exists) throw new Error("La factura ya no existe.");
+          const data = snap.data();
+          const currentPaid = Number(data.totalAbonado || 0);
+          const orderTotal = Number(data.orderTotal || 0);
+          const newPaid = currentPaid + amount;
+          const newSaldo = Math.max(orderTotal - newPaid, 0);
+          const estado = newSaldo <= 0 ? 'Pagada' : 'Pendiente';
+          const paymentRef = invoiceRef.collection("abonos").doc();
+          tx.set(paymentRef, payment);
+          tx.update(invoiceRef, {
+            totalAbonado: newPaid,
+            saldo: newSaldo,
+            estado
+          });
+        });
+        alert("Abono registrado con exito.");
+        closeModal('paymentModal');
+        selectedInvoiceForPayment = null;
+        loadProviderInvoices();
+      } catch (error) {
+        console.error("Error registrando abono:", error);
+        alert("Error registrando abono: " + error.message);
+      }
+    }
+
+    async function openPaymentsHistory(event, invoiceId) {
+      event.stopPropagation();
+      const invDoc = await db.collection("Facturas_Proveedores").doc(invoiceId).get();
+      if (!invDoc.exists) return alert("Factura no encontrada.");
+      const inv = invDoc.data();
+      document.getElementById('paymentsHistoryInfo').textContent = `${inv.orderNumber} - ${inv.proveedorNombre}`;
+      const tbody = document.getElementById('paymentsHistoryTable');
+      tbody.innerHTML = '<tr><td colspan="3">Cargando abonos...</td></tr>';
+      document.getElementById('paymentsHistoryModal').style.display = 'block';
+
+      const snap = await db.collection("Facturas_Proveedores").doc(invoiceId).collection("abonos").orderBy("date", "desc").get();
+      tbody.innerHTML = '';
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="3">No hay abonos registrados.</td></tr>';
+        return;
+      }
+      snap.forEach(doc => {
+        const p = doc.data();
+        const date = p.date && typeof p.date.toDate === 'function' ? p.date.toDate().toLocaleString() : (p.dateStr || 'N/A');
+        tbody.innerHTML += `<tr>
+          <td>${escapeHtml(date)}</td>
+          <td class="number">${money(p.amount)}</td>
+          <td>${escapeHtml(p.reference)}</td>
+        </tr>`;
+      });
+    }
+
+    window.onload = async function() {
+      document.getElementById('orderDate').value = todayStr();
+      toggleTerms();
+      await loadProveedores();
+      await loadCatalogs();
+      renderInvoiceItems();
+      loadProviderInvoices();
+    };
+  </script>
+
+  <script type="module">
+    import {requireAccess} from './auth.js';
+    requireAccess('proveedores');
+  </script>
 </body>
 </html>
-

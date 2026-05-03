@@ -188,6 +188,21 @@
       font-size:18px;
       line-height:1;
     } 
+    .credit-info {
+      display: none;
+      margin: 8px 0 12px;
+      padding: 10px 12px;
+      border: 1px solid #b7e4c7;
+      border-radius: 6px;
+      background: #ecfdf3;
+      color: #027a48;
+      font-weight: 700;
+    }
+    .credit-info.warning {
+      border-color: #fecdca;
+      background: #fef3f2;
+      color: #b42318;
+    }
   </style>
 </head>
 <body>
@@ -222,8 +237,8 @@
     <select id="paymentType">
       <option value="Efectivo">Efectivo</option>
       <option value="Transferencia">Transferencia</option>
-      <option value="Credito">Crédito</option>
     </select>
+    <div id="creditDaysInfo" class="credit-info"></div>
       
     <!-- Información adicional para Transferencia -->
     <div id="transferInfo" style="display: none;">
@@ -375,6 +390,7 @@
     // Inicializar Firestore
     const db = firebase.firestore();
     let invoiceTotal = 0;
+    const clientCreditConfigMap = {};
     // Arreglo para acumular los items escaneados en la previsualización
     let invoicePreviewItems = [];
 
@@ -391,14 +407,63 @@
       return Number((Number(value) || 0).toFixed(2));
     }
 
-    // Mostrar u ocultar información adicional para transferencia
-    document.getElementById('paymentType').addEventListener('change', function() {
-      if (this.value === "Transferencia") {
-        document.getElementById('transferInfo').style.display = 'block';
-      } else {
-        document.getElementById('transferInfo').style.display = 'none';
+    function getSelectedClientCreditConfig() {
+      const clientId = document.getElementById('clientSelect').value;
+      const option = document.getElementById('clientSelect').selectedOptions[0];
+      return clientCreditConfigMap[clientId] || {
+        clienteCredito: option?.dataset?.clienteCredito === 'true',
+        diasCredito: Number(option?.dataset?.diasCredito || 0)
+      };
+    }
+
+    function isTruthyCreditValue(value) {
+      return value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true' || String(value).toLowerCase() === 'si' || String(value).toLowerCase() === 'sí';
+    }
+
+    function renderPaymentOptions() {
+      const paymentTypeSelect = document.getElementById('paymentType');
+      const previousValue = paymentTypeSelect.value;
+      const config = getSelectedClientCreditConfig();
+      const options = [
+        { value: 'Efectivo', text: 'Efectivo' },
+        { value: 'Transferencia', text: 'Transferencia' }
+      ];
+
+      if (config.clienteCredito) {
+        options.push({ value: 'Credito', text: 'Crédito' });
       }
-    });
+
+      paymentTypeSelect.innerHTML = options.map(option =>
+        `<option value="${option.value}">${option.text}</option>`
+      ).join('');
+
+      paymentTypeSelect.value = options.some(option => option.value === previousValue)
+        ? previousValue
+        : 'Efectivo';
+
+      updatePaymentUi();
+    }
+
+    function updatePaymentUi() {
+      const paymentType = document.getElementById('paymentType').value;
+      const transferInfo = document.getElementById('transferInfo');
+      const creditDaysInfo = document.getElementById('creditDaysInfo');
+      const config = getSelectedClientCreditConfig();
+
+      transferInfo.style.display = paymentType === "Transferencia" ? 'block' : 'none';
+
+      if (paymentType === "Credito") {
+        creditDaysInfo.classList.remove('warning');
+        creditDaysInfo.textContent = `Días de crédito configurados: ${config.diasCredito || 0} días`;
+        creditDaysInfo.style.display = 'block';
+      } else {
+        creditDaysInfo.style.display = 'none';
+        creditDaysInfo.textContent = '';
+      }
+    }
+
+    document.getElementById('paymentType').addEventListener('change', updatePaymentUi);
+    document.getElementById('clientSelect').addEventListener('change', renderPaymentOptions);
 
     // Cargar clientes en el select de facturación
    /* function loadClients() {
@@ -713,18 +778,24 @@
 
       let paymentType = document.getElementById('paymentType').value;
       let paymentMethod;
+      let diasCreditoFactura = 0;
       if (paymentType === "Transferencia") {
         let bank = document.getElementById('bankSelect').value;
         let bankReference = document.getElementById('bankReference').value;
         paymentMethod = `Transferencia - Banco: ${bank} (#Ref: ${bankReference})`;
       } else if (paymentType === "Credito") {
-        const diasCredito = prompt("¿Cuántos días de crédito desea asignar?", "30");
-        if (!diasCredito || isNaN(diasCredito) || diasCredito <= 0) {
-          alert("Número de días inválido. Por defecto se asignarán 30 días.");
-          paymentMethod = "Crédito a 30 días";
-        } else {
-          paymentMethod = `Crédito a ${parseInt(diasCredito)} días`;
+        const creditConfig = getSelectedClientCreditConfig();
+        const diasCredito = Number(creditConfig.diasCredito || 0);
+        if (!creditConfig.clienteCredito || !diasCredito) {
+          alert("El cliente seleccionado no tiene crédito configurado.");
+          creatingInvoice = false;
+          btn.disabled = false;
+          btn.innerText = "Crear Factura 💵";
+          renderPaymentOptions();
+          return;
         }
+        diasCreditoFactura = diasCredito;
+        paymentMethod = `Crédito a ${diasCredito} días`;
       } else {
         paymentMethod = "Efectivo";
       }
@@ -786,6 +857,7 @@
         currency,
         paymentType,
         paymentMethod,
+        diasCredito: diasCreditoFactura,
         items,
         shipping,
         total: invoiceTotal,
@@ -1774,19 +1846,30 @@
     });
   }*/
   function loadClients() {
-  db.collection("clientes").get().then((querySnapshot) => {
+      db.collection("clientes").get().then((querySnapshot) => {
     const select = document.getElementById("clientSelect");
     select.innerHTML = '';
+    Object.keys(clientCreditConfigMap).forEach(key => delete clientCreditConfigMap[key]);
     querySnapshot.forEach((doc) => {
       const cliente = doc.data();
       const fullName = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
       clientNameMap[doc.id] = fullName;
+      const clienteCredito = isTruthyCreditValue(cliente.clienteCredito ?? cliente.esClienteCredito ?? cliente.credito ?? cliente.cliente_credito);
+      const diasCredito = Number(cliente.diasCredito ?? cliente.dias_credito ?? cliente.termsCredito ?? 0);
+      clientCreditConfigMap[doc.id] = {
+        clienteCredito,
+        diasCredito
+      };
       const option = document.createElement("option");
       option.value = doc.id;
       option.text = `${cliente.nombreCliente} - ${cliente.nombreTienda}`;
+      option.dataset.clienteCredito = clienteCredito ? 'true' : 'false';
+      option.dataset.diasCredito = String(diasCredito || 0);
       select.appendChild(option);
     });
     $('#clientSelect').select2(); // 🎯 Activar búsqueda después de llenar
+    $('#clientSelect').off('change.creditOptions').on('change.creditOptions', renderPaymentOptions);
+    renderPaymentOptions();
   });
 }
 

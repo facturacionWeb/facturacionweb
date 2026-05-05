@@ -905,9 +905,7 @@
       }
     }
 
-    // Evento para cargar los IMEIs guardados al seleccionar un artículo
-    document.getElementById('articleSelector').addEventListener('change', function() {
-      const articleId = this.value;
+    function handleArticleSelectorChange(articleId) {
       // Limpiar la previsualización cuando se cambia de artículo
       pendingIMEIs = [];
       updatePreviewTable();
@@ -916,6 +914,11 @@
       } else {
         document.getElementById('imeiTable').innerHTML = '';
       }
+    }
+
+    // Evento para cargar los IMEIs guardados al seleccionar un artículo
+    document.getElementById('articleSelector').addEventListener('change', function() {
+      handleArticleSelectorChange(this.value);
     });
 
     // Evento para permitir agregar IMEI con la tecla Enter
@@ -945,6 +948,9 @@
         placeholder: 'Seleccione un Articulo',
         allowClear: true,
         width: '100%'
+      });
+      $articleSelector.off('change.loadImeis').on('change.loadImeis', function() {
+        handleArticleSelectorChange(this.value);
       });
     }
 

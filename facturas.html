@@ -396,6 +396,7 @@
     const db = firebase.firestore();
     let invoiceTotal = 0;
     const clientCreditConfigMap = {};
+    let invoicesFiltered = false;
     // Arreglo para acumular los items escaneados en la previsualización
     let invoicePreviewItems = [];
 
@@ -410,6 +411,21 @@
 
     function normalizeMoney(value) {
       return Number((Number(value) || 0).toFixed(2));
+    }
+
+    function clearInvoicesTable(message = "Use los filtros para consultar facturas.") {
+      const tbody = document.querySelector('#invoicesTable tbody');
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="8">${message}</td></tr>`;
+      }
+    }
+
+    function refreshFilteredInvoices() {
+      if (invoicesFiltered) {
+        filterInvoices();
+      } else {
+        clearInvoicesTable();
+      }
     }
 
     function getSelectedClientCreditConfig() {
@@ -895,7 +911,7 @@
         btn.disabled = false;
         btn.innerText = "Crear Factura 💵";
         
-        loadInvoices();
+        refreshFilteredInvoices();
         document.querySelector('#invoiceItemsTable tbody').innerHTML = '';
         document.getElementById('invoiceTotal').textContent = "0.00";
         document.getElementById('shippingAmount').value = "0";
@@ -1091,7 +1107,7 @@
           })
           .then(() => {
             alert("Factura ANULADA con éxito. IMEIs restaurados.");
-            loadInvoices();
+            refreshFilteredInvoices();
           })
           .catch((error) => {
             console.error("Error al anular factura:", error);
@@ -1207,7 +1223,7 @@
 
         alert("Item removido de la factura y devuelto al inventario.");
         await viewInvoiceDetail(invoiceId);
-        loadInvoices();
+        refreshFilteredInvoices();
         loadCreditInvoicesForAbonos();
       } catch (error) {
         console.error("Error removiendo item de factura:", error);
@@ -1217,6 +1233,7 @@
 
     // Filtros de facturas
     function filterInvoices() {
+      invoicesFiltered = true;
       const filterDate = document.getElementById('filterDate').value;
       const filterRoute = document.getElementById('filterRoute').value;
       const filterAnulada = document.getElementById('filterAnulada').value;
@@ -1870,7 +1887,7 @@
     // Inicializar la página
     window.onload = function() {
       loadClients();          // Para facturación
-      loadInvoices();         // Para listado de facturas
+      clearInvoicesTable();   // El listado solo se muestra al filtrar
       $('#clientSelect').select2(); // 🪄 Activar Select2
       loadClientsFilter();
       

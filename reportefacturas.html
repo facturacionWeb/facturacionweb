@@ -19,12 +19,101 @@
     .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; align-items: end; }
     .filter-field { min-width: 0; }
     #estadoFacturaGroup { display: none; }
+    .debt-dashboard {
+      display: none;
+      margin: 18px 0 6px;
+      border: 1px solid #d8dee9;
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+    .debt-dashboard.active { display: block; }
+    .debt-dashboard h3 { margin: 0 0 6px; }
+    .muted {
+      color: #667085;
+      font-size: 13px;
+    }
+    .debt-chart-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+      gap: 14px;
+      margin-top: 16px;
+      align-items: stretch;
+    }
+    .debt-chart {
+      border: 1px solid #d8dee9;
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 14px;
+    }
+    .debt-chart-global {
+      padding: 18px;
+    }
+    .debt-chart-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: #475467;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .debt-chart-total {
+      color: #101828;
+      font-size: 24px;
+      font-weight: 700;
+      margin: 8px 0 12px;
+    }
+    .debt-chart-global .debt-chart-total {
+      font-size: 31px;
+    }
+    .debt-bar {
+      display: flex;
+      height: 28px;
+      overflow: hidden;
+      border-radius: 6px;
+      background: #f2f4f7;
+      border: 1px solid #d8dee9;
+    }
+    .debt-chart-global .debt-bar {
+      height: 38px;
+    }
+    .debt-bar-paid {
+      background: #12b76a;
+      min-width: 0;
+    }
+    .debt-bar-pending {
+      background: #f79009;
+      min-width: 0;
+    }
+    .debt-legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .debt-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #475467;
+      font-size: 13px;
+    }
+    .debt-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+    .debt-dot-paid { background: #12b76a; }
+    .debt-dot-pending { background: #f79009; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
     th { background-color: #333; color: white; }
     tr.factura-vencida td { background-color: #ffe0e0; color: #8a1f1f; font-weight: 600; }
     @media (max-width: 700px) {
       .filters { grid-template-columns: 1fr; }
+      .debt-chart-grid { grid-template-columns: 1fr; }
+      .debt-chart-header { display: block; }
     }
   </style>
 </head>
@@ -65,6 +154,44 @@
 
     <button onclick="generarReporte()">Generar Reporte 📊</button>
     <button id="btnExportar" onclick="exportarExcel()">Exportar a Excel 📥</button>
+
+    <div id="creditDebtDashboard" class="debt-dashboard">
+      <h3>Resumen de deuda de credito</h3>
+      <div class="muted">Totales calculados con facturas de credito no anuladas.</div>
+      <div class="debt-chart-grid">
+        <div class="debt-chart">
+          <div class="debt-chart-header">
+            <span>Distribucion de la deuda del rango</span>
+            <span id="rangeDebtPendingPercent">0.00% pendiente</span>
+          </div>
+          <div class="debt-chart-total" id="rangeDebtTotal">0.00</div>
+          <div class="debt-bar" aria-label="Grafico de deuda abonada y pendiente del rango">
+            <div id="rangeDebtPaidBar" class="debt-bar-paid" style="width:0%"></div>
+            <div id="rangeDebtPendingBar" class="debt-bar-pending" style="width:0%"></div>
+          </div>
+          <div class="debt-legend">
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-paid"></span>Abonado: <strong id="rangeDebtPaid">0.00</strong></span>
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-pending"></span>Pendiente: <strong id="rangeDebtBalance">0.00</strong></span>
+          </div>
+        </div>
+
+        <div class="debt-chart debt-chart-global">
+          <div class="debt-chart-header">
+            <span>Distribucion global de la deuda</span>
+            <span id="globalDebtPendingPercent">0.00% pendiente</span>
+          </div>
+          <div class="debt-chart-total" id="globalDebtTotal">0.00</div>
+          <div class="debt-bar" aria-label="Grafico global de deuda abonada y pendiente">
+            <div id="globalDebtPaidBar" class="debt-bar-paid" style="width:0%"></div>
+            <div id="globalDebtPendingBar" class="debt-bar-pending" style="width:0%"></div>
+          </div>
+          <div class="debt-legend">
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-paid"></span>Abonado: <strong id="globalDebtPaid">0.00</strong></span>
+            <span class="debt-legend-item"><span class="debt-dot debt-dot-pending"></span>Pendiente: <strong id="globalDebtBalance">0.00</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <table id="reporteFacturas">
       <thead>
@@ -107,6 +234,7 @@
       } else {
         grupoEstado.style.display = 'none';
         estado.value = 'todas';
+        renderCreditDebtDashboard(null, null);
       }
     }
 
@@ -132,6 +260,50 @@
 
     function getSaldoPendiente(f) {
       return f.paymentType === "Credito" ? Number(f.saldo || 0) : 0;
+    }
+
+    function getSaldoPagado(f) {
+      const total = Number(f.total || 0);
+      const pendiente = getSaldoPendiente(f);
+      return Math.max(total - pendiente, 0);
+    }
+
+    function calcularTotalesDeuda(facturas) {
+      return facturas.reduce((acc, item) => {
+        const f = item.data || item;
+        const total = Number(f.total || 0);
+        const pendiente = getSaldoPendiente(f);
+        const pagado = getSaldoPagado(f);
+
+        acc.total += total;
+        acc.pagado += pagado;
+        acc.pendiente += pendiente;
+        return acc;
+      }, { total: 0, pagado: 0, pendiente: 0 });
+    }
+
+    function renderDebtChart(prefix, totals) {
+      const paidPercent = totals.total > 0 ? Math.min((totals.pagado / totals.total) * 100, 100) : 0;
+      const pendingPercent = totals.total > 0 ? Math.min((totals.pendiente / totals.total) * 100, 100) : 0;
+
+      document.getElementById(`${prefix}DebtTotal`).textContent = formatoCordobas.format(totals.total);
+      document.getElementById(`${prefix}DebtPaid`).textContent = formatoCordobas.format(totals.pagado);
+      document.getElementById(`${prefix}DebtBalance`).textContent = formatoCordobas.format(totals.pendiente);
+      document.getElementById(`${prefix}DebtPendingPercent`).textContent = `${pendingPercent.toFixed(2)}% pendiente`;
+      document.getElementById(`${prefix}DebtPaidBar`).style.width = `${paidPercent}%`;
+      document.getElementById(`${prefix}DebtPendingBar`).style.width = `${pendingPercent}%`;
+    }
+
+    function renderCreditDebtDashboard(rangeFacturas, globalFacturas) {
+      const dashboard = document.getElementById('creditDebtDashboard');
+      if (!rangeFacturas || !globalFacturas) {
+        dashboard.classList.remove('active');
+        return;
+      }
+
+      renderDebtChart('range', calcularTotalesDeuda(rangeFacturas));
+      renderDebtChart('global', calcularTotalesDeuda(globalFacturas));
+      dashboard.classList.add('active');
     }
 
     function getVencimientoCredito(f) {
@@ -173,6 +345,17 @@
       return true;
     }
 
+    async function obtenerFacturasCreditoGlobales() {
+      const estadoFactura = document.getElementById('estadoFactura').value;
+      const snapshot = await db.collection("facturas")
+        .where("anulada", "==", false)
+        .get();
+
+      return snapshot.docs
+        .map(doc => ({ id: doc.id, ref: doc.ref, data: doc.data() }))
+        .filter(item => facturaCumpleFiltros(item.data, 'credito', estadoFactura));
+    }
+
     async function obtenerFacturasFiltradas(orden = 'desc') {
       const startInput = document.getElementById('startDate').value;
       const endInput   = document.getElementById('endDate').value;
@@ -205,6 +388,11 @@
     async function generarReporte() {
       const facturas = await obtenerFacturasFiltradas('desc');
       if (!facturas) return;
+      const tipoFactura = document.getElementById('tipoFactura').value;
+      const facturasCreditoGlobales = tipoFactura === 'credito'
+        ? await obtenerFacturasCreditoGlobales()
+        : null;
+      renderCreditDebtDashboard(tipoFactura === 'credito' ? facturas : null, facturasCreditoGlobales);
   
       const tbody = document.querySelector('#reporteFacturas tbody');
       tbody.innerHTML = "";

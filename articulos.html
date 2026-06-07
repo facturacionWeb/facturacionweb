@@ -281,7 +281,9 @@
     </table>
 
     <button id="btnExportarInventario" onclick="exportarInventarioExcel()">Exportar Inventario a Excel 📤</button>
+    <button id="btnExportarIMEIsEliminados" onclick="exportarIMEIsEliminadosExcel()">Exportar IMEIs eliminados a Excel</button>
     <div id="estadoExportacionInventario" style="margin-top:10px;font-weight:bold;color:#444;"></div>
+    <div id="estadoExportacionIMEIsEliminados" style="margin-top:10px;font-weight:bold;color:#444;"></div>
 
     <div class="quick-actions" style="margin-top:12px;">
       <button onclick="document.getElementById('articlesSection').scrollIntoView({behavior:'smooth'});">Volver a Gestión de Artículos ⤴️</button>
@@ -591,6 +593,32 @@
       document.getElementById("modalProveedor").style.display = "none";
     }
 
+    function calcularCargaInventarioFacturaProveedor(factura, imeisFactura = []) {
+      const items = factura.items || [];
+      const rows = items.map(item => {
+        const imeis = imeisFactura.filter(imei => imei.articleId === item.articleId);
+        const cantidad = Number(item.quantity || 0);
+        const imeisFromDocs = imeis.map(row => row.imei).filter(Boolean);
+        const imeisFromInvoice = (item.loadedImeis || []).filter(Boolean);
+        const imeisUnicos = Array.from(new Set([...imeisFromInvoice, ...imeisFromDocs]));
+        const cargados = Math.max(imeis.length, Number(item.loadedQuantity || 0), imeisUnicos.length);
+        return {
+          ...item,
+          loadedQuantityCalc: cargados,
+          pendingQuantityCalc: Math.max(cantidad - cargados, 0)
+        };
+      });
+      const totalPiezas = Number(factura.totalPiezas || rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+      const cargadas = rows.reduce((sum, item) => sum + Number(item.loadedQuantityCalc || 0), 0);
+      const pendientes = Math.max(totalPiezas - cargadas, 0);
+      return {
+        totalPiezas,
+        cargadas,
+        pendientes,
+        completa: totalPiezas > 0 && pendientes === 0
+      };
+    }
+
     function cargarFacturasProveedorEnModal(proveedorId) {
       const facturaSelect = document.getElementById("modalFacturaDistribuidor");
       facturaSelect.innerHTML = '<option value="">Cargando facturas...</option>';
@@ -613,23 +641,39 @@
         return;
       }
 
-      db.collection("Facturas_Proveedores").get()
-        .then((snapshot) => {
+      Promise.all([
+        db.collection("Facturas_Proveedores").get(),
+        db.collection("Articulos_X_IMEI").get()
+      ])
+        .then(([snapshot, imeisSnapshot]) => {
+          const imeisPorFactura = {};
+          imeisSnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (!data.facturaProveedorId) return;
+            if (!imeisPorFactura[data.facturaProveedorId]) imeisPorFactura[data.facturaProveedorId] = [];
+            imeisPorFactura[data.facturaProveedorId].push(data);
+          });
+
           facturaSelect.innerHTML = '<option value="">Seleccione una factura</option>';
           const facturas = snapshot.docs
             .map((doc) => ({ id: doc.id, ...doc.data() }))
             .filter((factura) => String(factura.proveedorId || '') === String(proveedorId))
+            .map((factura) => ({
+              ...factura,
+              cargaInventarioCalc: calcularCargaInventarioFacturaProveedor(factura, imeisPorFactura[factura.id] || [])
+            }))
+            .filter((factura) => factura.cargaInventarioCalc.pendientes > 0)
             .sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || '')));
 
           facturas.forEach((factura) => {
             facturasProveedorModal.push(factura);
             const opt = document.createElement("option");
             opt.value = factura.id;
-            opt.textContent = `${factura.orderNumber || factura.id} - ${factura.orderDate || 'Sin fecha'} - Total: ${Number(factura.orderTotal || 0).toFixed(2)}`;
+            opt.textContent = `${factura.orderNumber || factura.id} - ${factura.orderDate || 'Sin fecha'} - ${factura.cargaInventarioCalc.pendientes} piezas pendientes - Total: ${Number(factura.orderTotal || 0).toFixed(2)}`;
             facturaSelect.appendChild(opt);
           });
           if (facturas.length === 0) {
-            facturaSelect.innerHTML = '<option value="">Este proveedor no tiene facturas</option>';
+            facturaSelect.innerHTML = '<option value="">Este proveedor no tiene facturas con inventario pendiente</option>';
             facturaSelect.disabled = true;
           } else {
             facturaSelect.disabled = false;
@@ -857,6 +901,164 @@
       });
     }
 
+    function normalizarUsuarioAuditoria(usuario) {
+      if (!usuario || typeof usuario !== 'object') return {};
+      const usuarioAnidado = usuario.usuario && typeof usuario.usuario === 'object' ? usuario.usuario : {};
+      const username = usuario.username
+        || usuario.userName
+        || usuario.usuarioUsername
+        || usuarioAnidado.username
+        || (typeof usuario.usuario === 'string' ? usuario.usuario : '')
+        || '';
+      const fullName = usuario.fullName
+        || usuario.nombreUsuario
+        || usuario.usuarioNombre
+        || usuario.nombre
+        || usuario.name
+        || usuario.displayName
+        || usuarioAnidado.fullName
+        || '';
+      return {
+        ...usuario,
+        username,
+        fullName,
+        userLocation: usuario.userLocation || usuarioAnidado.userLocation || ''
+      };
+    }
+
+    function leerUsuarioStorage(storage, key) {
+      try {
+        const raw = storage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+      } catch (error) {
+        console.warn(`No se pudo leer ${key}:`, error);
+        return null;
+      }
+    }
+
+    function obtenerUsuarioActualAuditoria() {
+      try {
+        return normalizarUsuarioAuditoria(
+          window.usuarioLogueadoArticulos
+          || window.currentUser
+          || leerUsuarioStorage(sessionStorage, 'currentUser')
+          || leerUsuarioStorage(localStorage, 'currentUser')
+          || {}
+        );
+      } catch (error) {
+        console.warn("No se pudo leer el usuario actual para auditoria:", error);
+        return {};
+      }
+    }
+
+    async function obtenerUsuarioActualAuditoriaCompleto() {
+      const usuarioActual = obtenerUsuarioActualAuditoria();
+      if (!usuarioActual.username) return usuarioActual;
+
+      try {
+        const userDoc = await db.collection("users").doc(usuarioActual.username).get();
+        if (!userDoc.exists) return usuarioActual;
+        const userData = userDoc.data();
+        return normalizarUsuarioAuditoria({
+          ...usuarioActual,
+          username: userData.username || usuarioActual.username,
+          fullName: userData.fullName || usuarioActual.fullName || '',
+          userLocation: userData.userLocation || usuarioActual.userLocation || ''
+        });
+      } catch (error) {
+        console.warn("No se pudo completar el usuario desde users:", error);
+        return usuarioActual;
+      }
+    }
+
+    async function eliminarIMEIYDesvincularFacturaProveedor(docId, motivoEliminacion) {
+      const imeiRef = db.collection("Articulos_X_IMEI").doc(docId);
+      const auditoriaRef = db.collection("IMEIs_Eliminados").doc();
+      const usuarioActual = await obtenerUsuarioActualAuditoriaCompleto();
+      if (!usuarioActual.username) {
+        throw new Error("No se pudo identificar el usuario logueado. Vuelva a iniciar sesion e intente nuevamente.");
+      }
+
+      await db.runTransaction(async (transaction) => {
+        const imeiDoc = await transaction.get(imeiRef);
+        if (!imeiDoc.exists) {
+          throw new Error("El IMEI seleccionado ya no existe en inventario.");
+        }
+
+        const imeiData = imeiDoc.data();
+        const facturaProveedorId = imeiData.facturaProveedorId;
+        const articleId = imeiData.articleId;
+        const imei = imeiData.imei || '';
+
+        if (facturaProveedorId && articleId && imei) {
+          const facturaRef = db.collection("Facturas_Proveedores").doc(facturaProveedorId);
+          const facturaDoc = await transaction.get(facturaRef);
+
+          if (facturaDoc.exists) {
+            const factura = facturaDoc.data();
+            const items = (factura.items || []).map((item) => {
+              if (item.articleId !== articleId) return item;
+
+              const loadedImeisActuales = (item.loadedImeis || []).filter(Boolean);
+              const loadedImeis = loadedImeisActuales.filter((loadedImei) => loadedImei !== imei);
+              const loadedQuantityActual = Number(item.loadedQuantity || 0);
+              const loadedQuantity = loadedImeisActuales.length > 0
+                ? loadedImeis.length
+                : Math.max(loadedQuantityActual - 1, 0);
+
+              return {
+                ...item,
+                loadedQuantity,
+                loadedImeis,
+                loadedAt: loadedQuantity > 0 ? item.loadedAt || null : null
+              };
+            });
+
+            const totalPiezas = Number(factura.totalPiezas || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+            const totalCargado = items.reduce((sum, item) => sum + Number(item.loadedQuantity || 0), 0);
+
+            transaction.update(facturaRef, {
+              items,
+              inventoryLoadedPieces: totalCargado,
+              inventoryPendingPieces: Math.max(totalPiezas - totalCargado, 0),
+              inventoryStatus: totalPiezas > 0 && totalCargado >= totalPiezas ? 'Cargada' : 'Pendiente'
+            });
+          }
+        }
+
+        transaction.set(auditoriaRef, {
+          imei,
+          codigoImei: imei,
+          motivoEliminacion,
+          fechaEliminacion: firebase.firestore.FieldValue.serverTimestamp(),
+          fechaHoraLocal: new Date().toISOString(),
+          usuario: usuarioActual.username,
+          nombreUsuario: usuarioActual.fullName || usuarioActual.username,
+          nombreDeUsuario: usuarioActual.fullName || usuarioActual.username,
+          username: usuarioActual.username,
+          fullName: usuarioActual.fullName || usuarioActual.username,
+          usuarioInfo: {
+            username: usuarioActual.username || '',
+            fullName: usuarioActual.fullName || '',
+            userLocation: usuarioActual.userLocation || ''
+          },
+          usuarioUsername: usuarioActual.username || '',
+          usuarioNombre: usuarioActual.fullName || usuarioActual.username,
+          imeiDocId: docId,
+          articleId: imeiData.articleId || '',
+          proveedorId: imeiData.proveedorId || '',
+          distribuidorId: imeiData.distribuidorId || imeiData.proveedorId || '',
+          distribuidorNombre: imeiData.distribuidorNombre || '',
+          facturaProveedorId: imeiData.facturaProveedorId || '',
+          facturaDistribuidor: imeiData.facturaDistribuidor || '',
+          tipoFacturaProveedor: imeiData.tipoFacturaProveedor || '',
+          fechaVencimientoProveedor: imeiData.fechaVencimientoProveedor || '',
+          datosOriginales: imeiData
+        });
+        transaction.delete(imeiRef);
+      });
+    }
+
     function loadIMEIs(articleId) {
       db.collection("Articulos_X_IMEI").where("articleId", "==", articleId).get()
       .then((querySnapshot) => {
@@ -896,11 +1098,20 @@
 
     function deleteIMEI(docId, articleId) {
       if (confirm("¿Está seguro de que desea eliminar este IMEI?")) {
-        db.collection("Articulos_X_IMEI").doc(docId).delete().then(() => {
+        const motivoEliminacion = prompt("Ingrese el motivo de la eliminación del IMEI:");
+        if (motivoEliminacion === null) return;
+        const motivo = motivoEliminacion.trim();
+        if (!motivo) {
+          alert("Debe ingresar un motivo para eliminar el IMEI.");
+          return;
+        }
+
+        eliminarIMEIYDesvincularFacturaProveedor(docId, motivo).then(() => {
           alert("IMEI eliminado 😊");
           loadIMEIs(articleId);
         }).catch((error) => {
           console.error("Error al eliminar el IMEI: ", error);
+          alert("Error al eliminar el IMEI: " + error.message);
         });
       }
     }
@@ -1051,11 +1262,118 @@
       btn.disabled = false;
       btn.textContent = "Exportar Inventario a Excel 📤";
     }
+    function formatearFechaAuditoria(valor) {
+      if (!valor) return '';
+      if (valor.toDate) return valor.toDate().toLocaleString();
+      const fecha = new Date(valor);
+      return isNaN(fecha.getTime()) ? String(valor) : fecha.toLocaleString();
+    }
+
+    function obtenerUsernameAuditoria(data) {
+      return data.usuarioUsername
+        || data.username
+        || (typeof data.usuario === 'string' ? data.usuario : '')
+        || data.usuario?.username
+        || data.usuarioInfo?.username
+        || data.user?.username
+        || '';
+    }
+
+    function obtenerNombreUsuarioAuditoria(data, usuariosPorUsername) {
+      const username = obtenerUsernameAuditoria(data);
+      return data.nombreUsuario
+        || data.nombreDeUsuario
+        || data.usuarioNombre
+        || data.fullName
+        || (typeof data.usuario === 'object' ? data.usuario?.fullName : '')
+        || data.usuarioInfo?.fullName
+        || data.user?.fullName
+        || usuariosPorUsername[username]?.fullName
+        || username
+        || '';
+    }
+
+    async function exportarIMEIsEliminadosExcel() {
+      const btn = document.getElementById("btnExportarIMEIsEliminados");
+      const estado = document.getElementById("estadoExportacionIMEIsEliminados");
+
+      btn.disabled = true;
+      btn.textContent = "Exportando...";
+      estado.textContent = "Generando reporte de IMEIs eliminados...";
+      estado.style.color = "#444";
+
+      try {
+        const [snapshot, usersSnapshot] = await Promise.all([
+          db.collection("IMEIs_Eliminados")
+            .orderBy("fechaEliminacion", "desc")
+            .get(),
+          db.collection("users").get()
+        ]);
+        const usuariosPorUsername = {};
+        usersSnapshot.forEach((doc) => {
+          const userData = doc.data();
+          const username = userData.username || doc.id;
+          usuariosPorUsername[username] = userData;
+        });
+
+        if (snapshot.empty) {
+          estado.textContent = "No hay IMEIs eliminados para exportar.";
+          estado.style.color = "#444";
+          return;
+        }
+
+        const hoja = [[
+          "IMEI",
+          "Motivo",
+          "Fecha y hora",
+          "Usuario",
+          "Nombre usuario",
+          "Articulo",
+          "Proveedor",
+          "Factura proveedor",
+          "Tipo factura",
+          "Documento inventario"
+        ]];
+
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const username = obtenerUsernameAuditoria(data);
+          hoja.push([
+            data.codigoImei || data.imei || '',
+            data.motivoEliminacion || '',
+            formatearFechaAuditoria(data.fechaEliminacion || data.fechaHoraLocal),
+            username,
+            obtenerNombreUsuarioAuditoria(data, usuariosPorUsername),
+            data.articleId || '',
+            data.distribuidorNombre || data.proveedorId || data.distribuidorId || '',
+            data.facturaDistribuidor || data.facturaProveedorId || '',
+            data.tipoFacturaProveedor || '',
+            data.imeiDocId || ''
+          ]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(hoja);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "IMEIsEliminados");
+        XLSX.writeFile(wb, `IMEIs_Eliminados_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+        estado.textContent = "Reporte de IMEIs eliminados exportado con exito.";
+        estado.style.color = "green";
+      } catch (err) {
+        console.error("Error al exportar IMEIs eliminados:", err);
+        estado.textContent = "Error al generar el reporte de IMEIs eliminados.";
+        estado.style.color = "red";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Exportar IMEIs eliminados a Excel";
+      }
+    }
   </script>
 
   <script type="module">
-    import {requireAccess} from './auth.js';
-    requireAccess('articulos');  
+    import {requireAccess, getCurrentUser} from './auth.js';
+    requireAccess('articulos');
+    window.usuarioLogueadoArticulos = getCurrentUser();
   </script>
 
   <!-- Modal de selección de proveedor -->

@@ -258,8 +258,15 @@
       return match ? Number(match[0]) : 0;
     }
 
-    function getSaldoPendiente(f) {
+    /*function getSaldoPendiente(f) {
       return f.paymentType === "Credito" ? Number(f.saldo || 0) : 0;
+    }*/
+    function getSaldoPendiente(f) {
+      if (f.paymentType !== "Credito") return 0;
+
+      const saldo = Number(f.saldo || 0);
+      // Fuerza a que el número se corte en 2 decimales reales para eliminar residuos
+      return Number(saldo.toFixed(2));
     }
 
     function getSaldoPagado(f) {

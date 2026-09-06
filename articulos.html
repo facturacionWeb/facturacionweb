@@ -604,16 +604,18 @@
         const imeisFromDocs = imeis.map(row => row.imei).filter(Boolean);
         const imeisFromInvoice = (item.loadedImeis || []).filter(Boolean);
         const imeisUnicos = Array.from(new Set([...imeisFromInvoice, ...imeisFromDocs]));
-        const cargados = Math.max(imeis.length, Number(item.loadedQuantity || 0), imeisUnicos.length);
+        const cargadosDetectados = Math.max(Number(item.loadedQuantity || 0), imeisUnicos.length);
+        const cargados = Math.min(cantidad, cargadosDetectados);
         return {
           ...item,
           loadedQuantityCalc: cargados,
-          pendingQuantityCalc: Math.max(cantidad - cargados, 0)
+          pendingQuantityCalc: Math.max(cantidad - cargados, 0),
+          excessQuantityCalc: Math.max(cargadosDetectados - cantidad, 0)
         };
       });
       const totalPiezas = Number(factura.totalPiezas || rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
       const cargadas = rows.reduce((sum, item) => sum + Number(item.loadedQuantityCalc || 0), 0);
-      const pendientes = Math.max(totalPiezas - cargadas, 0);
+      const pendientes = rows.reduce((sum, item) => sum + Number(item.pendingQuantityCalc || 0), 0);
       return {
         totalPiezas,
         cargadas,
@@ -704,10 +706,21 @@
         .where("facturaProveedorId", "==", facturaProveedorId)
         .where("articleId", "==", articleId)
         .get();
-      return snapshot.size;
+      const imeisUnicos = new Set(
+        snapshot.docs.map((doc) => doc.data().imei).filter(Boolean)
+      );
+      return imeisUnicos.size;
     }
 
     async function validarImeisPendientesDisponibles({ facturaProveedorId, articleId }) {
+      const imeisNormalizados = pendingIMEIs.map((imei) => String(imei || '').trim()).filter(Boolean);
+      const imeisDuplicados = Array.from(new Set(
+        imeisNormalizados.filter((imei, index) => imeisNormalizados.indexOf(imei) !== index)
+      ));
+      if (imeisDuplicados.length > 0) {
+        throw new Error(`Hay IMEIs repetidos dentro de esta carga: ${imeisDuplicados.join(', ')}. Elimine las copias antes de guardar.`);
+      }
+
       for (const imei of pendingIMEIs) {
         const snap = await db.collection("Articulos_X_IMEI").where("imei", "==", imei).get();
         if (!snap.empty) {
@@ -852,12 +865,12 @@
       });
     }
 
-    function buildFacturaDistribuidorId(proveedorId, facturaDistribuidor) {
-      return `${proveedorId}_${facturaDistribuidor}`.replace(/[\/\\.#$\[\]]/g, '_').trim();
+    function buildFacturaDistribuidorId(facturaProveedorId) {
+      return String(facturaProveedorId || '').replace(/[\/\\.#$\[\]]/g, '_').trim();
     }
 
     function registrarFacturaDistribuidor({ proveedorId, proveedorNombre, facturaProveedorId, facturaDistribuidor, tipoFacturaProveedor, fechaVencimientoProveedor, articleId, imeisGuardados }) {
-      const facturaId = buildFacturaDistribuidorId(proveedorId, facturaDistribuidor);
+      const facturaId = buildFacturaDistribuidorId(facturaProveedorId);
       return db.collection("Facturas_Distribuidor").doc(facturaId).set({
         proveedorId,
         distribuidorId: proveedorId,
@@ -893,14 +906,24 @@
         };
       });
 
-      const totalPiezas = Number(factura.totalPiezas || 0);
-      const totalCargado = items.reduce((sum, item) => sum + Number(item.loadedQuantity || 0), 0);
+      const totalPiezas = Number(factura.totalPiezas || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+      const cargaPorItem = items.map((item) => {
+        const cantidad = Number(item.quantity || 0);
+        const cargadosDetectados = Math.max(Number(item.loadedQuantity || 0), (item.loadedImeis || []).filter(Boolean).length);
+        const cargados = Math.min(cantidad, cargadosDetectados);
+        return {
+          cargados,
+          pendientes: Math.max(cantidad - cargados, 0)
+        };
+      });
+      const totalCargado = cargaPorItem.reduce((sum, item) => sum + item.cargados, 0);
+      const totalPendiente = cargaPorItem.reduce((sum, item) => sum + item.pendientes, 0);
 
       return facturaRef.update({
         items,
         inventoryLoadedPieces: totalCargado,
-        inventoryPendingPieces: Math.max(totalPiezas - totalCargado, 0),
-        inventoryStatus: totalCargado >= totalPiezas ? 'Cargada' : 'Pendiente'
+        inventoryPendingPieces: totalPendiente,
+        inventoryStatus: totalPiezas > 0 && totalPendiente === 0 ? 'Cargada' : 'Pendiente'
       });
     }
 
@@ -1018,13 +1041,23 @@
             });
 
             const totalPiezas = Number(factura.totalPiezas || items.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
-            const totalCargado = items.reduce((sum, item) => sum + Number(item.loadedQuantity || 0), 0);
+            const cargaPorItem = items.map((item) => {
+              const cantidad = Number(item.quantity || 0);
+              const cargadosDetectados = Math.max(Number(item.loadedQuantity || 0), (item.loadedImeis || []).filter(Boolean).length);
+              const cargados = Math.min(cantidad, cargadosDetectados);
+              return {
+                cargados,
+                pendientes: Math.max(cantidad - cargados, 0)
+              };
+            });
+            const totalCargado = cargaPorItem.reduce((sum, item) => sum + item.cargados, 0);
+            const totalPendiente = cargaPorItem.reduce((sum, item) => sum + item.pendientes, 0);
 
             transaction.update(facturaRef, {
               items,
               inventoryLoadedPieces: totalCargado,
-              inventoryPendingPieces: Math.max(totalPiezas - totalCargado, 0),
-              inventoryStatus: totalPiezas > 0 && totalCargado >= totalPiezas ? 'Cargada' : 'Pendiente'
+              inventoryPendingPieces: totalPendiente,
+              inventoryStatus: totalPiezas > 0 && totalPendiente === 0 ? 'Cargada' : 'Pendiente'
             });
           }
         }

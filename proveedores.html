@@ -846,23 +846,27 @@
         const imeisFromDocs = imeis.map(row => row.imei).filter(Boolean);
         const imeisFromInvoice = (item.loadedImeis || []).filter(Boolean);
         const imeisUnicos = Array.from(new Set([...imeisFromInvoice, ...imeisFromDocs]));
-        const cargados = Math.max(imeis.length, Number(item.loadedQuantity || 0), imeisUnicos.length);
+        const cargadosDetectados = Math.max(Number(item.loadedQuantity || 0), imeisUnicos.length);
+        const cargados = Math.min(cantidad, cargadosDetectados);
         return {
           ...item,
           loadedQuantityCalc: cargados,
           pendingQuantityCalc: Math.max(cantidad - cargados, 0),
+          excessQuantityCalc: Math.max(cargadosDetectados - cantidad, 0),
           isLoadedCalc: cargados >= cantidad && cantidad > 0,
           loadedImeisCalc: imeisUnicos
         };
       });
       const totalPiezas = Number(inv.totalPiezas || rows.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
       const cargadas = rows.reduce((sum, item) => sum + Number(item.loadedQuantityCalc || 0), 0);
-      const pendientes = Math.max(totalPiezas - cargadas, 0);
+      const pendientes = rows.reduce((sum, item) => sum + Number(item.pendingQuantityCalc || 0), 0);
+      const excedentes = rows.reduce((sum, item) => sum + Number(item.excessQuantityCalc || 0), 0);
       return {
         items: rows,
         totalPiezas,
         cargadas,
         pendientes,
+        excedentes,
         completa: totalPiezas > 0 && pendientes === 0
       };
     }
@@ -1078,6 +1082,7 @@
         <td class="number">${item.loadedQuantityCalc}/${item.quantity}</td>
         <td>
           <span class="status-pill ${item.isLoadedCalc ? 'status-paid' : 'status-missing'}">${item.isLoadedCalc ? 'Cargado' : `${item.pendingQuantityCalc} pendientes`}</span>
+          ${item.excessQuantityCalc > 0 ? `<div class="muted" style="color:#b45309;font-weight:600;">Revisar: ${item.excessQuantityCalc} registro(s) excedente(s)</div>` : ''}
           ${item.loadedImeisCalc.length ? `<div class="muted">IMEIs: ${item.loadedImeisCalc.map(escapeHtml).join(', ')}</div>` : ''}
         </td>
       </tr>`).join('');
@@ -1119,6 +1124,7 @@
             <div class="summary-box"><span>Piezas pendientes</span><strong>${carga.pendientes}</strong></div>
             <div class="summary-box"><span>Estado inventario</span><strong>${carga.completa ? 'Completa' : 'Pendiente'}</strong></div>
           </div>
+          ${carga.excedentes > 0 ? `<p style="color:#b45309;font-weight:600;">Revisión requerida: se encontraron ${carga.excedentes} registro(s) de inventario por encima de las cantidades facturadas. Estos registros no se cuentan como piezas cargadas.</p>` : ''}
           ${inv.invoiceType === 'Credito' ? `
             <div class="summary-row">
               <div class="summary-box"><span>Total abonado</span><strong>${money(abonado)}</strong></div>
